@@ -31,11 +31,18 @@ Requirements
 Installation
 ------------
 
-Debian: simply type "make dpkg" and a ".deb" should be created automatically.
+DEBIAN:
 
-Other systems:
+1. Copy config.mk.dist to config.mk
+2. Optionally edit config.mk (see below)
+3. Run "make dpkg"
+4. "dpkg --install *.deb"
 
-1. Look at the start of "config.mk" and set correct values for:
+OTHER SYSTEMS:
+
+1. Copy config.mk.dist to config.mk
+
+2. Look at the start of "config.mk" and set correct values for:
 
  (MUST be set correctly)
 
@@ -57,9 +64,9 @@ Other systems:
 	SECTION
 	FILESECTION
 
-2. run "make"
+3. run "make"
 
-3. run "make install"
+4. run "make install"
 
 
 Documentation
