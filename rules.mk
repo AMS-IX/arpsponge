@@ -10,7 +10,7 @@ default : all
 RM            =  /bin/rm -f
 MV            =  /bin/mv
 
-RELEASE       =  3.3
+RELEASE       =  3.3.2
 NAME          =  arpswiffer
 PACKAGE       =  $(NAME)-$(RELEASE)
 TOOLDIR       =  $(TOPDIR)/tools
