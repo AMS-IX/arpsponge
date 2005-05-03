@@ -1,0 +1,18 @@
+#IPADDR/PREFIXLEN dev IFNAME
+
+rm -f swif.out swif.notify swif.status
+mkfifo swif.notify
+
+#./arpswiffer 10.1.1.0/25 dev eth0:1 \
+#../sbin/arpswiffer 193.194.136.128/25 dev eth0 \
+arpswiffer 193.194.136.128/25 dev eth0 \
+  --verbose=1		\
+  --queuedepth=20	\
+  --sweep=900/3600	\
+  --rate=50			\
+  --pending=3		\
+  --notify=swif.notify	\
+  --statusfile=swif.status \
+	2>&1 | es -a -s swif.out &
+# --dummy \
+tail -f swif.out
