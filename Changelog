@@ -1,0 +1,21 @@
+@(#)$Id$
+
+3.3.1 - 03.may.2005 - steven
+
+  * Added check for "misfit" ARPs and logging of those.
+
+3.3 - 03.may.2005 - steven
+
+  * Added "HUP" signal to arpswiffer. Added README file.
+
+3.2 - 01.may.2005 - steven
+
+  * Sponge.pm "set_alive" needs to check for local IP, otherwise the
+    state table gets contaminated.
+
+3.1 - 30.apr.2005 - steven
+
+  * Properly Debianized.
+  * Added code to recognize the duplicate detection packets from
+    DHCP clients.
+
