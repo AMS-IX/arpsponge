@@ -1,0 +1,12 @@
+Source: arpswiffer
+Section: unknown
+Priority: optional
+Maintainer: Steven Bakker <steven.bakker@ams-ix.net>
+Build-Depends: debhelper (>= 4.0.0)
+Standards-Version: 3.6.1
+
+Package: arpswiffer
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Nifty ARP sponge.
+ Nifty ARP sponge featuring gratuitous ARP, sweeping, etc.
