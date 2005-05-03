@@ -324,8 +324,10 @@ sub process_pkt {
 	{
 		# We only store/sponge ARPs for our "local" IP addresses.
 
-		$sponge->print_log("misplaced ARP for %s from %s", $dst_ip, $src_ip);
-		$sponge->print_notify("action=misfit;src=%s;dst=%s", $src_ip, $dst_ip);
+		$sponge->print_log("misplaced ARP for %s from %s\@%s",
+								$dst_ip, $src_ip, $src_mac);
+		$sponge->print_notify("action=misfit;src=%s;mac=%s;dst=%s",
+								$src_ip, $src_mac, $dst_ip);
 
 		return; # b-bye...
 	}
