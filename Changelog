@@ -1,5 +1,9 @@
 @(#)$Id$
 
+3.3.2 - 03.may.2005 - steven
+
+  * "misfit" ARPs now get their src MAC logged as well.
+
 3.3.1 - 03.may.2005 - steven
 
   * Added check for "misfit" ARPs and logging of those.
