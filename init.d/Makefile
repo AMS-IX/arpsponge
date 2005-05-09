@@ -21,19 +21,19 @@ INSTALLDIRS	=	$(DESTDIR)/etc/init.d \
 				$(DESTDIR)/etc/rc6.d
 
 INSTALLINKS	=	\
-				$(DESTDIR)/etc/rc0.d/K80arpswiffer:../init.d/arpswiffer \
-				$(DESTDIR)/etc/rc1.d/K80arpswiffer:../init.d/arpswiffer \
-				$(DESTDIR)/etc/rc2.d/S30arpswiffer:../init.d/arpswiffer \
-				$(DESTDIR)/etc/rc3.d/S30arpswiffer:../init.d/arpswiffer \
-				$(DESTDIR)/etc/rc4.d/S30arpswiffer:../init.d/arpswiffer \
-				$(DESTDIR)/etc/rc5.d/S30arpswiffer:../init.d/arpswiffer \
-				$(DESTDIR)/etc/rc6.d/K80arpswiffer:../init.d/arpswiffer
+				$(DESTDIR)/etc/rc0.d/K80$(NAME):../init.d/$(NAME) \
+				$(DESTDIR)/etc/rc1.d/K80$(NAME):../init.d/$(NAME) \
+				$(DESTDIR)/etc/rc2.d/S30$(NAME):../init.d/$(NAME) \
+				$(DESTDIR)/etc/rc3.d/S30$(NAME):../init.d/$(NAME) \
+				$(DESTDIR)/etc/rc4.d/S30$(NAME):../init.d/$(NAME) \
+				$(DESTDIR)/etc/rc5.d/S30$(NAME):../init.d/$(NAME) \
+				$(DESTDIR)/etc/rc6.d/K80$(NAME):../init.d/$(NAME)
 
 TARGETS		=	\
-			arpswiffer
+			$(NAME)
 
 INSTALLFILES	=	\
-			$(INITDIR)/arpswiffer
+			$(INITDIR)/$(NAME)
 
 include ../rules.mk
 
