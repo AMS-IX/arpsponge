@@ -1,32 +1,34 @@
-arpswiffer (3.4-1) unstable; urgency=low
+arpsponge (3.4-1) unstable; urgency=low
 
   * See upstream Changelog.
 
-arpswiffer (3.3.2-1) unstable; urgency=low
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 09 May 2005 18:03:00 +0200
 
-  * See upstream Changelog.
-
- -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 13:15:00 +0200
-
-arpswiffer (3.3.1-1) unstable; urgency=low
+arpsponge (3.3.2-1) unstable; urgency=low
 
   * See upstream Changelog.
 
  -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 13:15:00 +0200
 
-arpswiffer (3.3-1) unstable; urgency=low
+arpsponge (3.3.1-1) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 13:15:00 +0200
+
+arpsponge (3.3-1) unstable; urgency=low
 
   * See upstream Changelog.
 
  -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 11:48:00 +0200
 
-arpswiffer (3.2-1) unstable; urgency=low
+arpsponge (3.2-1) unstable; urgency=low
 
   * See upstream Changelog.
 
  -- Steven Bakker <sb@ams-ix.net>  Sun, 01 May 2005 11:48:00 +0200
 
-arpswiffer (3.1-1) unstable; urgency=low
+arpsponge (3.1-1) unstable; urgency=low
 
   * Initial Release.
 
