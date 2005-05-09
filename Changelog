@@ -1,5 +1,9 @@
 @(#)$Id$
 
+3.4 - 09.may.2005 - steven
+
+  * Renamed to "arpsponge" to prevent lawsuits :-)
+
 3.3.2 - 03.may.2005 - steven
 
   * "misfit" ARPs now get their src MAC logged as well.

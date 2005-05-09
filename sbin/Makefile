@@ -13,10 +13,10 @@ TOPDIR		=	..
 INSTALLDIRS	=	$(BINDIR)
 
 TARGETS		=	\
-			arpswiffer
+			$(NAME)
 
 INSTALLFILES	=	\
-			$(BINDIR)/arpswiffer
+			$(BINDIR)/$(NAME)
 
 include ../rules.mk
 

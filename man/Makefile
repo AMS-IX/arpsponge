@@ -13,16 +13,16 @@ TOPDIR		=	..
 SECTION		=	8
 
 TARGETS		=	\
-			arpswiffer.pod \
-			arpswiffer.$(SECTION)
+			$(NAME).pod \
+			$(NAME).$(SECTION)
 
 INSTALLFILES	=	\
-			$(MANDIR)/man$(SECTION)/arpswiffer.$(SECTION)
+			$(MANDIR)/man$(SECTION)/$(NAME).$(SECTION)
 
 include ../rules.mk
 
-arpswiffer.pod: ../sbin/arpswiffer
-	$(RM) -f arpswiffer.pod
-	ln -s ../sbin/arpswiffer arpswiffer.pod
+$(NAME).pod: ../sbin/$(NAME)
+	$(RM) -f $(NAME).pod
+	ln -s ../sbin/$(NAME) $(NAME).pod
 
 # E.O.F. Makefile
