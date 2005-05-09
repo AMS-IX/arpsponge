@@ -1,18 +1,19 @@
 #IPADDR/PREFIXLEN dev IFNAME
 
-rm -f swif.out swif.notify swif.status
-mkfifo swif.notify
+rm -f sponge.out sponge.notify sponge.status
+mkfifo sponge.notify
+touch sponge.out
 
-#./arpswiffer 10.1.1.0/25 dev eth0:1 \
-#../sbin/arpswiffer 193.194.136.128/25 dev eth0 \
-arpswiffer 193.194.136.128/25 dev eth0 \
+#./arpsponge 10.1.1.0/25 dev eth0:1 \
+#../sbin/arpsponge 193.194.136.128/25 dev eth0 \
+arpsponge 193.194.136.128/25 dev eth0 \
   --verbose=1		\
   --queuedepth=20	\
   --sweep=900/3600	\
   --rate=50			\
   --pending=3		\
-  --notify=swif.notify	\
-  --statusfile=swif.status \
-	2>&1 | es -a -s swif.out &
+  --notify=sponge.notify	\
+  --statusfile=sponge.status \
+	2>&1 | es -a -s sponge.out &
 # --dummy \
-tail -f swif.out
+tail -f sponge.out

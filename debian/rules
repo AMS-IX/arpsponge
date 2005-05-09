@@ -35,7 +35,7 @@ build-stamp: configure-stamp
 
 	# Add here commands to compile the package.
 	$(MAKE)
-	#docbook-to-man debian/arpswiffer.sgml > arpswiffer.1
+	#docbook-to-man debian/arpsponge.sgml > arpsponge.1
 
 	touch build-stamp
 
@@ -55,8 +55,8 @@ install: build
 	dh_clean -k 
 	dh_installdirs
 
-	# Add here commands to install the package into debian/arpswiffer.
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/arpswiffer
+	# Add here commands to install the package into debian/arpsponge.
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/arpsponge
 
 
 # Build architecture-independent files here.
