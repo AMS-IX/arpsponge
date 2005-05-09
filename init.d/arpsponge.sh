@@ -3,13 +3,13 @@
 # @(#) $Id$
 ###############################################################################
 #
-# Start-up script for the arpswiffer program.
+# Start-up script for the arpsponge program.
 #
 ###############################################################################
 
 PATH=/sbin:/bin:/usr/bin:@BINDIR@
 
-PROG=arpswiffer
+PROG=arpsponge
 SPONGE_VAR=@SPONGE_VAR@
 SPONGE_OPTIONS="@SPONGE_OPTIONS@"
 
