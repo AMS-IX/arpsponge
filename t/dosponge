@@ -14,6 +14,6 @@ arpsponge 193.194.136.128/25 dev eth0 \
   --pending=3		\
   --notify=sponge.notify	\
   --statusfile=sponge.status \
-	2>&1 | es -a -s sponge.out &
+	2>&1 | es -a -r 3 -p 86400 -s sponge.out &
+
 # --dummy \
-tail -f sponge.out
