@@ -708,6 +708,7 @@ B<@NAME@> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
 [B<--dummy>]
 [B<--loglevel>=I<level>]
 [B<--rate>=I<n>]
+[B<--pending>=I<n>
 [B<--queuedepth>=I<n>]
 [B<--daemon>=I<pidfile>]
 [B<--sweep>=I<interval>/I<threshold>]
@@ -854,6 +855,20 @@ Sponging is not triggered until at least this number of ARP queries are seen.
 =item X<--rate>B<--rate>=I<n>
 
 ARP threshold rate in queries/min (default @DFL_RATE@).
+
+=item X<--pending>B<--pending>=I<n>
+
+Number of ARP queries we send ourselves before sponging an IP address
+(default: @DFL_PENDING@).
+
+After the ARP queue for an IP address if full and the rate exceeds the
+L<--rate|/--rate> parameter, the sponge allows I<n> more ARP queries,
+but each time sends a query itself as well. This serves as an extra check
+before sponging.
+
+Choosing the I<pending> parameter wisely (around @DFL_PENDING@) will
+prevent unjustified sponging (e.g. when a Black Hat sends streams of
+ARP queries in the hopes of getting the target sponged).
 
 =item X<--re-init>B<--re-init>=I<file>
 
