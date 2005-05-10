@@ -708,7 +708,7 @@ B<@NAME@> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
 [B<--dummy>]
 [B<--loglevel>=I<level>]
 [B<--rate>=I<n>]
-[B<--pending>=I<n>
+[B<--pending>=I<n>]
 [B<--queuedepth>=I<n>]
 [B<--daemon>=I<pidfile>]
 [B<--sweep>=I<interval>/I<threshold>]
@@ -780,6 +780,16 @@ by parties that did not clean up their BGP configurations.
 The program can send out a gratuitous ARP when it starts to sponge an
 address. This should bring down the ARP rate on the LAN further, since
 ideally all devices update their ARP cache immediately.
+
+=head3 Pending State
+
+If the query rate for an IP address exceeds the queue depth and rate
+threshold, the sponge can put the IP address in a "pending" state:
+when the sponge receives an ARP query for the target address, it will
+send a query for that address itself. If after a specified number
+of queries there is still no sign of life from the target, it moves from
+"pending" to "dead" and will be sponged. See also the L<--pending|/--pending>
+option below.
 
 =head3 Sweeping
 
@@ -858,17 +868,23 @@ ARP threshold rate in queries/min (default @DFL_RATE@).
 
 =item X<--pending>B<--pending>=I<n>
 
-Number of ARP queries we send ourselves before sponging an IP address
+Number of ARP queries the sponge itself sends before sponging an IP address
 (default: @DFL_PENDING@).
 
-After the ARP queue for an IP address if full and the rate exceeds the
-L<--rate|/--rate> parameter, the sponge allows I<n> more ARP queries,
-but each time sends a query itself as well. This serves as an extra check
-before sponging.
+The L<pending state|/Pending State> (see L<above|/Pending State>)
+serves as an extra check before sponging: if it gets a response from
+the target IP, then that address is obviously not dead yet.
 
-Choosing the I<pending> parameter wisely (around @DFL_PENDING@) will
-prevent unjustified sponging (e.g. when a Black Hat sends streams of
-ARP queries in the hopes of getting the target sponged).
+Choosing the I<pending> parameter wisely (larger than one, but not much
+larger than @DFL_PENDING@) will prevent unjustified sponging (e.g. when
+a Black Hat sends streams of ARP queries in the hopes of getting the
+target sponged).
+
+B<Tip 1>: if you increase this value significantly, you should consider
+decreasing the L<--queuedepth|/--queuedepth> parameter by the same amount.
+
+B<Tip 2>: don't set this value too high, or you will soon find that
+the sponge roughly I<doubles> the amount of ARP traffic on the LAN!
 
 =item X<--re-init>B<--re-init>=I<file>
 
