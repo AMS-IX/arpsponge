@@ -271,6 +271,8 @@ sub is_my_network($$) {
 sub set_pending($$;$) {
 	my ($self, $target_ip, $n) = @_;
 	$self->set_state($target_ip, PENDING($n));
+	$self->print_log("Pending: %s (state %d)", $ip, $n);
+	$self->print_notify("action=pending;ip=%s;state=%d", $ip, $n);
 }
 
 ###############################################################################
@@ -360,8 +362,7 @@ sub set_dead($$) {
 	my ($self, $ip) = @_;
 	my $rate = $self->queue->rate($ip);
 
-	$self->print_log("ARP-rate for %s is %0.1f q/min", $ip, $rate);
-	$self->print_log("Sponging: %s", $ip);
+	$self->print_log("Sponging: %s (%0.1f q/min)", $ip, $rate);
 	$self->print_notify("action=sponge;ip=%s;mac=%s", $ip, $self->my_mac);
 
 	$self->gratuitous_arp($ip) if $self->gratuitous;

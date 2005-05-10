@@ -26,7 +26,7 @@
    DFL_LOGLEVEL		=	info
 
  SPONGE_OPTIONS		=	--age=$(DFL_ARP_AGE)
-     SPONGE_VAR		=	/var/run/arpswiffer
+     SPONGE_VAR		=	/var/run/$(NAME)
 
   # ----------------------------
   # --- Installation details ---
