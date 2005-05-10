@@ -1,5 +1,11 @@
 @(#)$Id$
 
+3.4.1 - 10.may.2005 - steven
+
+  * Logging fixes. One log line for a sponge event.
+  * Also log/notify for "pending" states.
+  * Various POD fixes.
+
 3.4 - 09.may.2005 - steven
 
   * Renamed to "arpsponge" to prevent lawsuits :-)
