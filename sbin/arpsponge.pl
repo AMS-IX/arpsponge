@@ -24,7 +24,7 @@ use Net::PcapUtils;
 use NetPacket::Ethernet qw( :types );
 use NetPacket::ARP qw( ARP_OPCODE_REQUEST );
 use NetPacket::IP;
-use Time::HiRes qw( time );
+use Time::HiRes qw( time sleep );
 use Net::ARP;
 use Sys::Syslog;
 use Net::IPv4Addr qw( :all );
@@ -44,7 +44,9 @@ my $DFL_LOGLEVEL   = '@DFL_LOGLEVEL@';
 my $DFL_RATE       = '@DFL_RATE@';
 my $DFL_ARP_AGE    = '@DFL_ARP_AGE@';
 my $DFL_PENDING    = '@DFL_PENDING@';
+my $DFL_LEARN      = '@DFL_LEARN@';
 my $DFL_QUEUEDEPTH = '@DFL_QUEUEDEPTH@';
+my $DFL_PROBERATE  = '@DFL_PROBERATE@';
 
 $::USAGE=<<EOF;
 Usage: $0 [options] IPADDR/PREFIXLEN dev IFNAME
@@ -55,7 +57,9 @@ Options:
   --loglevel=level  - syslog logging level ("$DFL_LOGLEVEL")
   --queuedepth=n    - number of ARP queries before we take notice ($DFL_QUEUEDEPTH)
   --rate=n          - ARP threshold rate in queries/min ($DFL_RATE)
-  --pending=n       - number of ARP queries we send before sponging ($DFL_PENDING)
+  --pending=n       - number of seconds we send ARP queries before sponging ($DFL_PENDING)
+  --learning=n      - number of seconds we spend in LEARNING mode ($DFL_LEARN)
+  --proberate=n     - number queries/sec we send when learning or sweeping ($DFL_PROBERATE)
   --daemon=pidfile  - put process in background, write pid to pidfile
   --notify=file     - print notifications of sponge actions to file
   --age=secs        - time until we consider an ARP entry "stale" ($DFL_ARP_AGE)
@@ -67,10 +71,6 @@ See also "perldoc $0".
 EOF
 
 ###############################################################################
-
-my $Start_time   = time;
-
-my %ARP_table;   # Keep an ARP table, keyed by IP, values are [MAC, time].
 
 my $wrote_pid = 0;
 my $daemon    = undef;
@@ -94,8 +94,10 @@ sub Main {
 	my $loglevel   = $DFL_LOGLEVEL;
 	my $queuedepth = $DFL_QUEUEDEPTH;
 	my $pending    = $DFL_PENDING;
+	my $learning   = $DFL_LEARN;
 	my $rate       = $DFL_RATE;
 	my $age        = $DFL_ARP_AGE;
+	my $proberate  = $DFL_PROBERATE;
 	my $notify     = undef;
 	my $gratuitous = undef;
 	my $dummy      = undef;
@@ -117,6 +119,8 @@ sub Main {
 		'loglevel=s'   => \$loglevel,
 		'rate=i'       => \$rate,
 		'pending=i'    => \$pending,
+		'learning=i'   => \$learning,
+		'proberate=i'  => \$proberate,
 		'statusfile=s' => \$statusfile,
 		'daemon=s'     => \$daemon,
 		'queuedepth=i' => \$queuedepth,
@@ -196,6 +200,18 @@ sub Main {
 			syslog_ident => SYSLOG_IDENT
 		);
 
+	$sponge->user('start_time', time);
+	$sponge->user('statusfile', $statusfile);
+	$sponge->user('learning', $learning);
+	$proberate = $DFL_PROBERATE if $proberate < 0 || $proberate > 1e6;
+	$sponge->user('probesleep', 1.0/$proberate);
+
+	if ($sweep_sec) {
+		$sponge->user('sweep_sec', $sweep_sec);
+		$sponge->user('next_sweep', time+$sweep_sec);
+		$sponge->user('sweep_age', $sweep_threshold);
+	}
+
 	$sponge->print_notify("action=init;dev=%s;ip=%s;mac=%s",
 					$sponge->device, $sponge->my_ip, $sponge->my_mac);
 
@@ -210,15 +226,16 @@ sub Main {
 	$::SIG{'INT'}  = sub { process_signal($sponge, 'INT')  };
 	$::SIG{'QUIT'} = sub { process_signal($sponge, 'QUIT') };
 	$::SIG{'TERM'} = sub { process_signal($sponge, 'TERM') };
-	$::SIG{'USR1'} = sub { do_status('USR1', $sponge, $statusfile) };
-	$::SIG{'HUP'}  = sub { do_status('HUP',  $sponge, $statusfile) };
+	$::SIG{'USR1'} = sub { do_status('USR1', $sponge) };
+	$::SIG{'HUP'}  = sub { do_status('HUP',  $sponge) };
 
-	$::SIG{'ALRM'} = sub { do_sweep($sponge, $sweep_sec, $sweep_threshold) };
+	$::SIG{'ALRM'} = sub { do_timer($sponge) };
 
-	alarm($sweep_sec);
+	alarm(1);
 	my $err = Net::PcapUtils::loop(
 			\&process_pkt,
 			USERDATA => $sponge,
+			SNAPLEN  => 512,
 			DEV      => $device,
 			PROMISC  => 1
 		);
@@ -233,21 +250,103 @@ sub Main {
 
 Main;
 
+
+###############################################################################
+# do_timer($sponge)
+#
+#    Called by the alarm() interrupt.
+#
+#    Process & probe pending entries, handle LEARN mode, sweep, etc.
+#
+#    After all this, reset the alarm timer.
+#
+###############################################################################
+sub do_timer($) {
+	alarm(0);
+	my $sponge = shift;
+
+	my $pending  = $sponge->pending;
+	my $learning = $sponge->user('learning');
+	my $sleep    = $sponge->user('probesleep');
+
+	if ($learning > 0) {
+		do_learn($sponge);
+		$sponge->user('learning', $learning-1);
+	}
+	else {
+		$sponge->verbose(2, "Probing pending addresses...\n");
+		my $n = 0;
+		for my $ip (sort keys %$pending) {
+			if ($$pending{$ip} > PENDING($sponge->max_pending)) {
+				$sponge->set_dead($ip);
+			}
+			else {
+				$sponge->verbose(1, "probing $ip\n");
+				$sponge->send_probe($ip);
+				$sponge->incr_pending($ip);
+				$sponge->verbose(1, "$ip moved to state ",
+										$sponge->get_state($ip), "\n");
+				sleep($sleep);
+			}
+			$n++;
+		}
+		$sponge->print_log("%d pending IPs probed", $n)
+			if $sponge->is_verbose>1 || $n;
+
+		if ($sponge->user('next_sweep') && time >= $sponge->user('next_sweep'))
+		{
+			do_sweep($sponge);
+			$sponge->user('next_sweep', time+$sponge->user('sweep_sec'));
+		}
+	}
+	alarm(1);
+}
+
+###############################################################################
+# do_learn($sponge)
+#
+#    Called by the do_timer() interrupt handler.
+#
+###############################################################################
+sub do_learn($) {
+	my $sponge = shift;
+	my $sleep  = $sponge->user('probesleep');
+
+	my ($net, $mask) = ($sponge->network, $sponge->netmask);
+	$sponge->print_log("LEARN: %d secs left", $sponge->user('learning'));
+	
+	my $lo = ip2int(ipv4_network($net, $mask))+1;
+	my $hi = ip2int(ipv4_broadcast($net, $mask))-1;
+
+	my $nprobe = 0;
+	for (my $num = $lo; $num <= $hi; $num++) {
+		my $ip = int2ip($num);
+		next if $sponge->is_my_ip($ip);
+		if (int($sponge->get_state($ip)) >= PENDING(0)) {
+			$sponge->send_probe($ip);
+			$sponge->set_state_mtime($ip, time);
+			$sponge->set_state($ip, PENDING(0));
+			$nprobe++;
+			sleep($sleep);
+		}
+	}
+	$sponge->print_log("LEARN: probed %d IP addresses", $nprobe);
+}
+
 ###############################################################################
 # do_sweep($sponge, $interval, $threshold);
 #
-#    Called by the alarm() interrupt.
+#    Called by the do_time() interrupt handler.
 #
 #    Sweep the range of IP addresses and send ARP requests for the ones
 #    that have been quiet for at least $threshold seconds.
 #
-#    After the sweep, reset the alarm timer to $interval.
-#
 ###############################################################################
-sub do_sweep($$) {
-	my $sponge     = shift;
-	my $interval   = shift;
-	my $threshold  = shift;
+sub do_sweep($) {
+	my $sponge    = shift;
+	my $interval  = $sponge->user('sweep_sec');
+	my $threshold = $sponge->user('sweep_age');
+	my $sleep     = $sponge->user('probesleep');
 
 	my ($net, $mask) = ($sponge->network, $sponge->netmask);
 	$sponge->print_log("sweeping for quiet entries on $net/$mask");
@@ -266,12 +365,12 @@ sub do_sweep($$) {
 			$sponge->send_probe($ip);
 			$sponge->set_state_mtime($ip, time);
 			$nprobe++;
+			sleep($sleep);
 		} else {
 			$sponge->verbose(1, "SKIP PROBE $ip ($age < $threshold)\n");
 		}
 	}
 	$sponge->is_verbose($v);
-	alarm($interval);
 	$sponge->print_log("probed $nprobe IP addresses");
 }
 
@@ -379,16 +478,19 @@ sub process_pkt {
 		}
 	}
 
-	if ($state >= PENDING(0)) {
-		if ($state > PENDING($sponge->max_pending)) {
-			$state = $sponge->set_dead($dst_ip);
-		}
-		else {
-			$state = $sponge->incr_pending($dst_ip);
-			#print STDERR "$dst_ip: STATE $state\n";
-			$sponge->send_probe($dst_ip);
+	# PENDING states are handled by the do_timer() routine.
+	if (0) {
+		if ($state >= PENDING(0)) {
+			if ($state > PENDING($sponge->max_pending)) {
+				$state = $sponge->set_dead($dst_ip);
+			}
+			else {
+				$state = $sponge->incr_pending($dst_ip);
+				$sponge->send_probe($dst_ip);
+			}
 		}
 	}
+	# The block above is obsolete now.
 
 	if ($state == DEAD) {
 		$sponge->send_reply($dst_ip, $arp_obj);
@@ -472,14 +574,15 @@ sub process_signal {
 #                              UTILITY ROUTINES
 ###############################################################################
 
-# do_status($filename)
+# do_status($signal, $sponge)
 #
 #	Write status information to $filename.
 #
 sub do_status {
 	my $signal = shift;
 	my $sponge = shift;
-	my $filename = shift;
+	my $filename = $sponge->user('statusfile');
+	my $start_time = $sponge->user('start_time');
 
 	unless (length($filename)) {
 		$sponge->verbose(1, "Ignoring SIG$signal -- no dump file set\n");
@@ -513,8 +616,8 @@ sub do_status {
 				strftime("%Y-%m-%d %H:%M:%S", localtime($now)),
 				" [", int($now), "]\n",
 			"started: ",
-				strftime("%Y-%m-%d %H:%M:%S", localtime($Start_time)),
-				" [", int($Start_time), "]\n",
+				strftime("%Y-%m-%d %H:%M:%S", localtime($start_time)),
+				" [", int($start_time), "]\n",
 			"\n"
 	);
 
@@ -593,103 +696,6 @@ sub do_status {
 
 __END__
 
-# do_status($filename)
-#
-#	Write status information to $filename.
-#
-sub do_status {
-	my $sponge = shift;
-	my $filename = shift;
-
-	return unless length($filename);
-
-	# Open the status file as read/write, non-blocking,
-	# and don't buffer anything. This is useful if the destination
-	# is a FIFO and there is not always a reader. Same thing as
-	# the $Notify_fh case, really.
-
-	my $fh = new IO::File($filename, O_RDWR|O_CREAT);
-
-	unless ($fh) {
-		print_log("cannot write status to $filename: $!");
-		return;
-	}
-
-	$fh->truncate(0);
-	$fh->autoflush(1);
-	$fh->blocking(0);
-
-	my $now = time;
-	$fh->print(
-			"id:      ", SYSLOG_IDENT, "\n",
-			"date:    ",
-				strftime("%Y-%m-%d %H:%M:%S", localtime($now)),
-				" [$now]\n",
-			"started: ",
-				strftime("%Y-%m-%d %H:%M:%S", localtime($Start_time)),
-				" [$Start_time]\n",
-			"sponged: ", int(keys %Sponged), "\n",
-			"\n"
-	);
-
-	##########################################################################
-	$fh->print(
-			"<QUEUE DEPTH=$::opt_queuedepth>\n",
-			 sprintf("%-17s %7s %11s %11s %12s\n", "# IP", "Queries",
-											"First", "Last", "Rate (q/sec)"));
-
-	my @iplist = sort { ip2hex($a) cmp ip2hex($b) } keys %Query_times;
-
-	for my $ip (@iplist) {
-		my $q = $Query_times{$ip};
-		my $depth = int(@$q);
-		next unless $depth;
-		my $first = $q->[0];
-		my $last = $q->[$depth-1];
-		$fh->print(
-				sprintf("%-17s %7d %11d %11d %8.3f\n",
-					$ip, $depth, $first, $last,
-					$depth*1.0/($last>$first ? ($last-$first) : 1)));
-	}
-	$fh->print("</QUEUE>\n\n");
-	##########################################################################
-	$fh->print(
-			"<SPONGE-TABLE>\n",
-			sprintf("%-17s %-17s %-11s %s\n", "# IP", "MAC", "Epoch", "Time")
-		);
-
-	for my $ip (sort { ip2hex($a) cmp ip2hex($b) } keys %Sponged) {
-		my $mac = $ARP_table{$ip} ? $ARP_table{$ip}->[0] : 'unknown';
-
-		$fh->print(
-			sprintf("%-17s %-17s %-11d ", $ip, $mac, $Sponged{$ip}),
-			strftime("%Y-%m-%d %H:%M:%S\n", localtime($Sponged{$ip}))
-		);
-	}
-
-	$fh->print("</SPONGE-TABLE>\n\n");
-	##########################################################################
-	$fh->print(
-			"<ARP-TABLE>\n",
-			sprintf("%-17s %-17s %-11s %s\n", "# MAC", "IP", "Epoch", "Time")
-		);
-
-	for my $ip (sort { ip2hex($a) cmp ip2hex($b) } keys %ARP_table) {
-		my ($mac, $time) = @{$ARP_table{$ip}};
-
-		$fh->print(
-			sprintf("%-17s %-17s %-11d ", $mac, $ip, $time),
-			strftime("%Y-%m-%d %H:%M:%S\n", localtime($time))
-		);
-	}
-
-	$fh->print("</ARP-TABLE>\n");
-	##########################################################################
-	$fh->close;
-
-}
-
-
 =pod
 
 =head1 NAME
@@ -709,8 +715,10 @@ B<@NAME@> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
 [B<--loglevel>=I<level>]
 [B<--rate>=I<n>]
 [B<--pending>=I<n>]
+[B<--proberate>=I<n>]
 [B<--queuedepth>=I<n>]
 [B<--daemon>=I<pidfile>]
+[B<--learning>=I<nsec>]
 [B<--sweep>=I<interval>/I<threshold>]
 [B<--[no]gratuitous>
 [B<--notify>=I<file>]
@@ -775,6 +783,12 @@ by parties that did not clean up their BGP configurations.
 
 =head2 Features
 
+=head3 Learning State
+
+The sponge initially spends @DFL_LEARN@ seconds in "learning mode". During
+this time, it records IP and MAC addresses and probes unknown addresses
+every second. It does not "sponge" addresses during this learning state.
+
 =head3 Gratuitous ARP
 
 The program can send out a gratuitous ARP when it starts to sponge an
@@ -785,10 +799,11 @@ ideally all devices update their ARP cache immediately.
 
 If the query rate for an IP address exceeds the queue depth and rate
 threshold, the sponge can put the IP address in a "pending" state:
-when the sponge receives an ARP query for the target address, it will
-send a query for that address itself. If after a specified number
-of queries there is still no sign of life from the target, it moves from
-"pending" to "dead" and will be sponged. See also the L<--pending|/--pending>
+it will send out a query for the IP address every second for the next
+@DFL_PENDING@ seconds. 
+If there is still no sign of life from the target, the target's state moves
+from "pending" to "dead" and will be sponged. See also the
+L<--pending|/--pending>
 option below.
 
 =head3 Sweeping
@@ -811,6 +826,25 @@ signal.
 =head1 OPTIONS
 
 =over
+
+=item X<--learning>B<--learning>=I<n>
+
+Number of initial ARP sweeps the sponge will perform over the IP range
+at startup.
+
+The sweeps are all one second apart, so this parameter gives a rough
+indication of the number of seconds the sponge spends in learning mode.
+The exact amount of time also depends on the probe rate (see
+L<--proberate|/--proberate>) and the size of the IP range. Generally
+speaking, the following formula gives an upper bound for the time
+spent in LEARN mode:
+
+                    
+                      _              _
+                     /     IP_SIZE    \
+  Tmax = LEARNING * ( 1 + ---------    )
+                     \_    PROBERATE _/
+                     
 
 =item X<--age>B<--age>=I<secs>
 
@@ -864,7 +898,9 @@ Sponging is not triggered until at least this number of ARP queries are seen.
 
 =item X<--rate>B<--rate>=I<n>
 
-ARP threshold rate in queries/min (default @DFL_RATE@).
+ARP threshold rate in queries/min (default @DFL_RATE@). If the ARP queue
+(see above) is full, and the average rate of incoming queries per second
+exceeds I<n>, we move the target IP to I<PENDING> state.
 
 =item X<--pending>B<--pending>=I<n>
 
@@ -880,11 +916,26 @@ larger than @DFL_PENDING@) will prevent unjustified sponging (e.g. when
 a Black Hat sends streams of ARP queries in the hopes of getting the
 target sponged).
 
-B<Tip 1>: if you increase this value significantly, you should consider
-decreasing the L<--queuedepth|/--queuedepth> parameter by the same amount.
+B<Tip>: Increasing the value pending parameter by one adds one second
+of delay before the sponge kicks in. If you increase this value significantly,
+you should consider decreasing the L<--queuedepth|/--queuedepth> parameter
+as well.
 
-B<Tip 2>: don't set this value too high, or you will soon find that
-the sponge roughly I<doubles> the amount of ARP traffic on the LAN!
+=item X<--proberate>B<--proberate>=I<n>
+
+The rate at which we send our ARP queries. Used when learning, sweeping
+and probing pending addresses.
+Default is @DFL_PROBERATE@, but check the rate your network can
+comfortably handle.
+
+The CPU can usually throw ICMP packets at an interface much faster than
+the actual wire-speed, so many not make it onto the wire.
+Furthermore, since ARP queries are broadcast and thus typically CPU-bound,
+they may get rate-limited by the L2 infrastructure or at the
+receiving stations.
+
+Having the sponge itself be a source of periodic broadcast storms pretty
+much defeats the purpose of the thing.  
 
 =item X<--re-init>B<--re-init>=I<file>
 
@@ -1165,9 +1216,10 @@ others.
 =head1 AUTHORS
 
 Arien Vijn at AMS-IX (arien.vijn@ams-ix.net) created
-the concept and implemented the first version.
+the concept, implemented the first version and has been involved it
+its evolution since then.
 
-Steven Bakker at AMS-IX (steven.bakker@ams-ix.net) built upon the concept
-and produced this beast.
+Steven Bakker at AMS-IX (steven.bakker@ams-ix.net) built upon the original
+concept and produced this beast.
 
 =cut

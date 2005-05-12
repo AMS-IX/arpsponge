@@ -1,5 +1,28 @@
 @(#)$Id$
 
+3.5 - 12.may.2005 - steven
+
+  * Incorporated Arien's ideas:
+  
+  	* Start in LEARN state, where we probe every second or so, for
+	  "--learn" times. During this period, we do not sponge addresses,
+	  we only probe and learn.
+	* Rewrote the handling of pending addresses. Pending addresses are
+	  now probed once per second for max_pending times. The previous
+	  behaviour was to probe a pending IP whenever an ARP query for it
+	  came in. If the incoming rate is high enough, we exhaust our pending
+	  probes before the target IP has a chance to answer.
+
+  * Added ARP rating through the "--proberate" option. Throwing ARP
+    queries at the interface at full CPU speed causes many packets to
+	be dropped, whether it's at the interface, the LAN (switch), or
+	the receiving end. Besides, broadcast storms are the very thing
+	we are trying to avoid here.
+
+  * --dummy now sends probes, but never sponged answers. Previously
+    it was not sending probes either, making it difficult to test the
+	sweeping/probing code.
+
 3.4.1 - 10.may.2005 - steven
 
   * Logging fixes. One log line for a sponge event.

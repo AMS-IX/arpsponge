@@ -72,12 +72,37 @@ sub _getset($@) {
 
 ###############################################################################
 #
+#					User Attributes
+#
+###############################################################################
+
+# $hash = $sponge->user;
+# $val = $sponge->user($attr);
+# $oldval = $sponge->user($attr, $newval);
+sub user {
+	my $self = shift;
+	my $user = $self->{'user'};
+
+	return $user unless @_;
+
+	my $attr = shift;
+	my $oldval = $user->{$attr};
+	if (@_) {
+		my $val = shift;
+		$user->{$attr} = $val;
+	}
+	return $oldval;
+}
+
+###############################################################################
+#
 #					Object Attributes
 #
 ###############################################################################
 sub queue        { $_[0]->{'queue'} }
 sub device       { $_[0]->{'device'} }
 sub phys_device  { $_[0]->{'phys_device'} }
+sub pending      { $_[0]->{'pending'} }
 
 sub syslog_ident { _getset('syslog_ident', @_) }
 sub is_verbose   { _getset('verbose', @_) }
@@ -103,10 +128,19 @@ sub set_state_mtime  { $_[0]->{state_mtime}->{$_[1]} = $_[2] }
 
 sub state_table  { $_[0]->{state} }
 sub get_state    { $_[0]->{state}->{$_[1]} }
+
 sub set_state    {
-		$_[0]->{state_mtime}->{$_[1]} = $_[0]->{state_atime}->{$_[1]} = time;
-		$_[0]->{state}->{$_[1]} = $_[2];
+	my ($self, $ip, $state) = @_;
+
+	$self->{state_mtime}->{$ip} = $self->{state_atime}->{$ip} = time;
+	$self->{state}->{$ip} = $state;
+	if ($state >= PENDING(0)) {
+		$self->{'pending'}->{$ip} = $state;
 	}
+	else {
+		delete $self->{'pending'}->{$ip};
+	}
+}
 
 ###############################################################################
 # $sponge->DESTROY
@@ -143,6 +177,8 @@ sub new {
 		my ($prog) = $0 =~ m|([^/]+)$|;
 		$self->syslog_ident($prog);
 	}
+	$self->{user}        = {};
+	$self->{pending}     = {};
 	$self->{state}       = {};
 	$self->{state_mtime} = {};
 	$self->{state_atime} = {};
@@ -300,7 +336,7 @@ sub send_probe($$) {
 
 	$self->set_state_atime($target_ip, time);
 
-	return if $self->is_dummy;
+	#return if $self->is_dummy;
 
 	Net::ARP::send_packet($self->phys_device,
 			$self->my_ip,  $target_ip,

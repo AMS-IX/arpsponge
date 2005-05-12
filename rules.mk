@@ -10,7 +10,7 @@ default : all
 RM            =  /bin/rm -f
 MV            =  /bin/mv
 
-RELEASE       =  3.4.1
+RELEASE       =  3.5
 NAME          =  arpsponge
 PACKAGE       =  $(NAME)-$(RELEASE)
 TOOLDIR       =  $(TOPDIR)/tools
@@ -55,6 +55,8 @@ perlit= $(PERL) -p -e \
 		    s!\@DFL_ARP_AGE@!$(DFL_ARP_AGE)!g;	\
 		    s!\@DFL_QUEUEDEPTH@!$(DFL_QUEUEDEPTH)!g;	\
 		    s!\@DFL_PENDING@!$(DFL_PENDING)!g;	\
+		    s!\@DFL_PROBERATE@!$(DFL_PROBERATE)!g;	\
+		    s!\@DFL_LEARN@!$(DFL_LEARN)!g;	\
 		    s!\@DFL_LOGLEVEL@!$(DFL_LOGLEVEL)!g;	\
 		    "
 
