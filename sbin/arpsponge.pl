@@ -281,10 +281,9 @@ sub do_timer($) {
 				$sponge->set_dead($ip);
 			}
 			else {
-				$sponge->verbose(1, "probing $ip\n");
 				$sponge->send_probe($ip);
 				$sponge->incr_pending($ip);
-				$sponge->verbose(1, "$ip moved to state ",
+				$sponge->verbose(2, "probed $ip, state=",
 										$sponge->get_state($ip), "\n");
 				sleep($sleep);
 			}
