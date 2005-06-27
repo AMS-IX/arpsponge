@@ -1,5 +1,19 @@
 @(#)$Id$
 
+3.6.1 - 27.jun.2005 - steven
+
+  * Fixed "rate" calculation. Off-by-one error spoiled the calculation :-(
+
+3.6 - 19.jun.2005 - steven
+
+  * Four ways to initialise the program:
+  	* --init=DEAD
+  	* --init=ALIVE
+  	* --init=PENDING
+  	* --init=NONE
+
+  * LEARN state does not probe, only listen.
+
 3.5 - 12.may.2005 - steven
 
   * Incorporated Arien's ideas:

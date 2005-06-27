@@ -20,4 +20,8 @@ INSTALLFILES	=	\
 
 include ../rules.mk
 
+bla: arpsponge.pl Makefile
+	@ echo expanding
+	@ $(perlit) arpsponge.pl > bla
+
 # E.O.F. Makefile

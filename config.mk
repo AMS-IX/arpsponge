@@ -24,6 +24,7 @@
     DFL_ARP_AGE		=	600
     DFL_PENDING		=	5
   DFL_PROBERATE		=	100
+       DFL_INIT		=	ALIVE
       DFL_LEARN		=	5
    DFL_LOGLEVEL		=	info
 

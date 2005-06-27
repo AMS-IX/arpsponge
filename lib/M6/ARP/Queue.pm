@@ -13,6 +13,8 @@
 ###############################################################################
 package M6::ARP::Queue;
 
+use strict;
+
 BEGIN {
 	use Exporter;
 	our $Version = 1.01;
@@ -113,13 +115,50 @@ per minute.
 
 =cut
 
+# Slightly tricky calculation. Dumb calculation would be:
+#
+#   n / (Tn - T1)
+#
+# Where "n" is the number of entries, "T1" is the timestamp
+# of the first entry and "Tn" is the n-th timestamp.
+#
+# However, this skews the calculation somewhat (the shorter the queue the
+# worse the skew... hey that rhymes!).
+#
+# Consider the case where we send a packet once every second:
+#
+#   Packet 1 at time 0
+#   Packet 2 at time 1
+#
+# In the queue we now have two entries with timestamps 0 and 1. Using the
+# above formula, we get a rate of _two_ packets per second... That's clearly
+# wrong. Even worse, the rate slowly aproaches 1 the further we go:
+#
+#   Packet   3 at time  2 => rate = 1.5
+#   Packet   4 at time  3 => rate = 1.3333
+#   Packet   5 at time  4 => rate = 1.2
+#   ...
+#   Packet 100 at time 99 => rate = 1.0101
+#
+# The correct way to handle this is to not count the first entry as part
+# of the "n". After all, the rate of packets is calculated by looking at
+# the gaps between them, and there is no gap _before_ the first packet.
+#
+# Hence, the corrected formula is:
+#
+# 	(n-1) / (Tn - T1)
+#
+# Which gives the correct rate of "1" for the above examples.
+#
+# [Statistics: comment/code > 4]
+#
 sub rate($$) {
 	my $q = $_[0]->{$_[1]};
-	return undef if @$q < 2;
+	return undef unless defined($q) && @$q > 1;
 	my $first = $q->[0];
 	my $last  = $q->[$#$q];
 	my $time  = ($first < $last) ? $last-$first : 1;
-	my $n = int(@$q);
+	my $n = int(@$q)-1;
 	return ($n / $time) * 60;
 }
 
@@ -190,12 +229,13 @@ sub get($$;$) {
 =item X<get_queue>B<get_queue> ( I<IP> )
 
 Return the timestamps for I<IP>.
-I<NOTE:> this is a reference to the internal list of data, so be careful
-not to inadvertently modify it.
+I<NOTE:> this is a reference to the internal list of data, so take care
+that you don't inadvertently modify it.
 
 =cut
 
-sub get_queue($$;$) {
+sub get_queue($$) {
+	my ($self, $ip) = @_;
 	return $self->{$ip};
 }
 

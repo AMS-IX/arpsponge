@@ -14,8 +14,9 @@ touch sponge.out
 #arpsponge 193.194.136.128/25 dev eth0 \
 
 ../sbin/arpsponge 193.194.136.128/25 dev eth0 \
-  --dummy			\
   --verbose=1		\
+  --init=NONE		\
+  --learning=10		\
   --queuedepth=20	\
   --sweep=900/3600	\
   --rate=50			\

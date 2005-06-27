@@ -14,6 +14,8 @@
 ###############################################################################
 package M6::ARP::Sponge;
 
+use strict;
+
 use M6::ARP::Queue;
 use M6::ARP::Util qw( :all );
 
@@ -43,6 +45,7 @@ BEGIN {
 			'log'    => \@log,
 			'all'    => [ @log, @states ]
 		);
+	0 if 0 && $::opt_verbose;
 }
 
 use constant STATIC  => -3;
@@ -226,7 +229,7 @@ sub arp_table($;$$$) {
 		my $time = @_ ? shift : time;
 		$self->{'arp_table'}->{$ip} = [ $mac, $time ];
 	}
-	return @{$self->{'arp_table'}->{$ip}};
+	return $self->{'arp_table'}->{$ip} ? @{$self->{'arp_table'}->{$ip}} : ();
 }
 
 ###############################################################################
@@ -307,8 +310,8 @@ sub is_my_network($$) {
 sub set_pending($$;$) {
 	my ($self, $target_ip, $n) = @_;
 	$self->set_state($target_ip, PENDING($n));
-	$self->print_log("Pending: %s (state %d)", $ip, $n);
-	$self->print_notify("action=pending;ip=%s;state=%d", $ip, $n);
+	$self->print_log("Pending: %s (state %d)", $target_ip, $n);
+	$self->print_notify("action=pending;ip=%s;state=%d", $target_ip, $n);
 }
 
 ###############################################################################
