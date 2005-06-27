@@ -3,10 +3,10 @@
 Primary site is:
 	http://www.ams-ix.net/
 
-About Arpswiffer
-----------------
+About ARPSPONGE (a.k.a. "Bob")
+------------------------------
 
-Arpswiffer is a tool that sweeps up stray ARP queries from a LAN. It
+ARPSPONGE is a tool that sweeps up stray ARP queries from a LAN. It
 listens on an ethernet interface and if the ARP rate for a particular
 IP address goes over the threshold, it starts faking responses.
 
@@ -48,7 +48,7 @@ OTHER SYSTEMS:
 
 	PERL         (/usr/bin/perl)
 	IFCONFIG     (/sbin/ifconfig)
-	SPONGE_VAR   (/var/run/arpswiffer)
+	SPONGE_VAR   (/var/run/arpsponge)
 
  (MAY be changed)
 
@@ -72,4 +72,4 @@ OTHER SYSTEMS:
 Documentation
 -------------
 
-See the "arpswiffer" man page, or "perldoc arpswiffer".
+See the "arpsponge" man page, or "perldoc arpsponge".
