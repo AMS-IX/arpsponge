@@ -1,5 +1,9 @@
 @(#)$Id$
 
+3.6.2 - 11.jul.2005 - steven
+
+  * Fixed POD comments regarding proberate.
+
 3.6.1 - 27.jun.2005 - steven
 
   * Fixed "rate" calculation. Off-by-one error spoiled the calculation :-(

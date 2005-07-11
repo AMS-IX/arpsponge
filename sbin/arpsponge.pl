@@ -1029,7 +1029,7 @@ the time spent in a probing sweep:
 So a sweep over 100 addresses a probe rate of 50 takes about 2 seconds.
 
 The CPU can usually throw ICMP packets at an interface much faster than
-the actual wire-speed, so many not make it onto the wire.
+the actual wire-speed, so many do not make it onto the wire.
 Furthermore, since ARP queries are broadcast and thus typically CPU-bound,
 they may get rate-limited by the L2 infrastructure or at the
 receiving stations.
@@ -1039,11 +1039,13 @@ much defeats the purpose of the thing.
 
 =over 7
 
-=item NOTE
+=item NOTE:
 
 It seems that the Perl interface to C<usleep> introduces at least
 0.01 seconds of delay, so your proberate may not go above 100 and
-probably gets stuck at 50 or so.
+probably gets stuck at 50 or so. See also 
+L<Bugs and Limitations|/BUGS AND LIMITATIONS>
+below.
 
 =back
 
@@ -1068,12 +1070,12 @@ following:
 
 =over 4
 
-=item o
+=item *
 
 A shorter I<interval> generally results in a better spread of
 sweep ARP queries at the cost of more processing spent in sweeping.
 
-=item o
+=item *
 
 A shorter I<threshold> results in a quicker rediscovery of a sponged
 address that has come back but has been quiet for some reason at the
@@ -1296,33 +1298,41 @@ L<perl(1)|perl>, L<arp(8)|arp>, L<mkfifo(1)|mkfifo>.
 
 =over 3
 
-=item o
+=item *
 
 Nothing prevents multiple sponge instances for the same interface/network
 from being run if they specify different PID files.
 
-=item o
+=item *
 
 You can specify only one network prefix to listen to per interface.
 If you want to monitor multiple prefixes, you will have to find a common
 prefix and monitor that.
 
-=item o
+=item *
 
 The notification FIFO should have I<only one> reader. Multiple readers will
 have unpredictable results: some messages are split across the readers
 (so they only see partial messages), others are seen by one but not the
 others.
 
+=item *
+
+The C<--proberate> is implemented by using the L<usleep()|Time::HiRes/usleep>
+function from L<Time::HiRes|Time::HiRes>. Depending on your hardware, OS and
+general system load, the actual sleep time may be off by a considerable margin.
+
+For example, on a 1.4GHz Pentium M, a usleep of 0.01 yields 0.015 on average.
+On a AMD Opteron 244 running at 1.8 GHz, this becomes 0.012. On a Pentium III
+running at 1 GHz, this is 0.02. This means that you will typically get a lower
+probe rate than what you specify on the command line. Hence, the parameter
+should be seen as an upper limit, not an exact figure.
+
 =back
 
 =head1 AUTHORS
 
-Arien Vijn at AMS-IX (arien.vijn@ams-ix.net) created
-the concept, implemented the first version and has been involved it
-its evolution since then.
-
-Steven Bakker at AMS-IX (steven.bakker@ams-ix.net) built upon the original
-concept and produced this beast.
+Arien Vijn at AMS-IX (arien.vijn@ams-ix.net),
+Steven Bakker at AMS-IX (steven.bakker@ams-ix.net).
 
 =cut
