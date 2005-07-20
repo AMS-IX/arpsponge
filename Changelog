@@ -1,5 +1,10 @@
 @(#)$Id$
 
+3.6.3 - 20.jul.2005 - steven
+  * Fixed POD comments regarding LEARN state. Added check for
+	--dummy and --daemon (mutually exclusive). Added comment
+	about this in POD.
+
 3.6.2 - 11.jul.2005 - steven
 
   * Fixed POD comments regarding proberate.

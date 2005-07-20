@@ -55,6 +55,7 @@ Usage: $0 [options] IPADDR/PREFIXLEN dev IFNAME
 Options:
   --verbose[=n]     - be verbose; print information on STDOUT; turns off syslog
   --dummy           - dummy operation (simulate sponging); turns off syslog
+  --daemon=pidfile  - put process in background, write pid to pidfile
   --loglevel=level  - syslog logging level ("$DFL_LOGLEVEL")
   --queuedepth=n    - number of ARP queries before we take notice ($DFL_QUEUEDEPTH)
   --rate=n          - ARP threshold rate in queries/min ($DFL_RATE)
@@ -62,7 +63,6 @@ Options:
   --init=state      - how to initialize (default: $DFL_INIT)
   --learning=secs   - number of seconds to spend in LEARN state
   --proberate=n     - number queries/sec we send when learning or sweeping ($DFL_PROBERATE)
-  --daemon=pidfile  - put process in background, write pid to pidfile
   --notify=file     - print notifications of sponge actions to file
   --age=secs        - time until we consider an ARP entry "stale" ($DFL_ARP_AGE)
   --statusfile=file - write status to "file" when receiving HUP or USR1 signal
@@ -134,6 +134,10 @@ sub Main {
 		'sponge-network' => \$sponge_net,
 		'gratuitous!'    => \$gratuitous,
 	) or pod2usage(2);
+
+	if ($dummy && $daemon) {
+		die("$0: --dummy and --daemon are mutually exclusive\n");
+	}
 
 	die($::USAGE) if $help;
 	pod2usage(-exitstatus => 0, -verbose => 2) if $man;
@@ -757,8 +761,7 @@ B<@NAME@> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
 I<Options>:
 
     --verbose[=n]
-    --dummy
-    --daemon=pidfile
+    --dummy | --daemon=pidfile
     --notify=file
     --loglevel=level
     --status=file
@@ -831,10 +834,9 @@ by parties that did not clean up their BGP configurations.
 
 =head3 Learning State
 
-The sponge can optionally spend @DFL_LEARN@ seconds in "learning mode"
-at startup. During this time, it records IP and MAC addresses and
-probes unknown addresses every second. It does not "sponge" addresses
-during this learning state.
+By default, the sponge spends @DFL_LEARN@ seconds in "learning mode"
+at startup. During this time it records IP and MAC addresses, but
+does not sponge addresses or send probes.
 
 =head3 Gratuitous ARP
 
@@ -937,6 +939,8 @@ listen to network traffic, we don't send probes or sponged answers. This
 parameter is especially useful in conjunction with init states I<DEAD>,
 I<PENDING> and I<NONE> as it will clear the table for live IP addresses.
 
+A value of zero (0) disables the initial learning state.
+
 =item X<--age>B<--age>=I<secs>
 
 Time until we consider an ARP entry "stale" (default @DFL_ARP_AGE@).
@@ -957,6 +961,8 @@ PID to I<pidfile>.
 This option turns off C<--verbose> and enables logging to
 L<syslogd(8)|syslogd>.
 
+Mutually exclusive with the L<--dummy|/--dummy> option.
+
 =item X<--dummy>B<--dummy>
 
 Dummy operation (simulate sponging). Does send probes but no sponge
@@ -964,6 +970,8 @@ replies.
 
 This options turns off logging to L<syslogd(8)|syslogd> and
 causes the information to be printed to F<STDOUT> instead.
+
+Mutually exclusive with the L<--daemon|/--daemon> option.
 
 =item X<--gratuitious>X<--nogratuitous>B<--[no]gratuitous>
 
@@ -1092,7 +1100,7 @@ The higher the level I<n> (default is 1 if not given), the
 more detailed information is printed.  Not recommended for
 production use.
 
-Does not work in conjunction with C<--daemon>.
+Has no effect when L<--daemon|/--daemon> is specified.
 
 =back
 
