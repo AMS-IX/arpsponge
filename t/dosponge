@@ -14,16 +14,24 @@ touch sponge.out
 #arpsponge 193.194.136.128/25 dev eth0 \
 
 ../sbin/arpsponge 193.194.136.128/25 dev eth0 \
+    \
   --verbose=1		\
-  --init=NONE		\
-  --learning=10		\
-  --queuedepth=20	\
-  --sweep=900/3600	\
-  --rate=50			\
-  --pending=3		\
   --notify=sponge.notify	\
-  --statusfile=sponge.status \
-	2>&1 | es -a -r 3 -p 86400 sponge.out
+  --status=sponge.status \
+    \
+  --init=NONE		\
+  --sponge-network  \
+  --learning=10		\
+    \
+  --queuedepth=20	\
+  --rate=50			\
+  --pending=5		\
+    \
+  --sweep=900/3600	\
+  --gratuitous      \
+  --age=600         \
+    \
+2>&1 | es -a -r 3 -p 86400 -s sponge.out &
 
-#2>&1 | es -a -r 3 -p 86400 -s sponge.out &
+#2>&1 | es -a -r 3 -p 86400 sponge.out
 # --dummy \
