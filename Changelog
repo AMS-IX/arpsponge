@@ -4,6 +4,9 @@
   * Fixed POD comments regarding LEARN state. Added check for
 	--dummy and --daemon (mutually exclusive). Added comment
 	about this in POD.
+  * Added some verbosity in M6::ARP::Sponge::set_alive().
+
+  * Fixed verbosity in do_learn.
 
 3.6.2 - 11.jul.2005 - steven
 

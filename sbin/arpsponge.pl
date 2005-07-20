@@ -288,15 +288,15 @@ sub do_timer($) {
 	alarm(0);
 	my $sponge = shift;
 
-	my $pending  = $sponge->pending;
 	my $learning = $sponge->user('learning');
-	my $sleep    = $sponge->user('probesleep');
-
 	if ($learning > 0) {
 		do_learn($sponge);
 		$sponge->user('learning', $learning-1);
 	}
 	else {
+		my $pending  = $sponge->pending;
+		my $sleep    = $sponge->user('probesleep');
+
 		$sponge->verbose(2, "Probing pending addresses...\n");
 		my $n = 0;
 		for my $ip (sort keys %$pending) {
@@ -358,38 +358,9 @@ sub init_state($) {
 sub do_learn($) {
 	my $sponge = shift;
 
-	$sponge->print_log("LEARN: %d secs left", $sponge->user('learning'));
+	$sponge->verbose(1, "LEARN: %d secs left", $sponge->user('learning'));
 	
 	return;
-
-	# Obsolete code...
-
-	my ($net, $mask) = ($sponge->network, $sponge->netmask);
-	my $sleep  = $sponge->user('probesleep');
-
-	my $lo = ip2int(ipv4_network($net, $mask))+1;
-	my $hi = ip2int(ipv4_broadcast($net, $mask))-1;
-
-	my $t1 = time;
-	my $nprobe = 0;
-	my $now = time;
-	for (my $num = $lo; $num <= $hi; $num++) {
-		my $ip = int2ip($num);
-		next if $sponge->is_my_ip($ip);
-		if (int($sponge->get_state($ip)) >= PENDING(0)) {
-			$sponge->send_probe($ip);
-			$sponge->set_state($ip, PENDING(0));
-			$nprobe++;
-			my $s = $sleep - (time-$now);
-			sleep($s) if $s > 0;
-			$now = time;
-		}
-	}
-	$t1 = time - $t1;
-	$sponge->print_log(
-		"LEARN: probed %d IP addresses in %0.2f secs (%0.2f probes/sec)",
-		$nprobe, $t1, $t1>0 ? $nprobe/$t1 : 0
-	);
 }
 
 ###############################################################################

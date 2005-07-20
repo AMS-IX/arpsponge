@@ -437,9 +437,11 @@ sub set_alive($$$) {
 	my @arp = $self->arp_table($ip);
 
 	if (!@arp) {
+		$self->verbose(1, "Learned: $ip [found at $mac]\n");
 		$self->print_notify("action=learn;ip=%s;mac=%s", $ip, $mac);
 	}
 	elsif ($arp[0] ne $mac) {
+		$self->verbose(1, "Flip: $ip [found at $mac]\n");
 		$self->print_notify("action=flip;ip=%s;mac=%s", $ip, $mac);
 	}
 	elsif (time - $arp[1] > $self->arp_age) {
