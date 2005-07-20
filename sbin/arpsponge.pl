@@ -358,8 +358,8 @@ sub init_state($) {
 sub do_learn($) {
 	my $sponge = shift;
 
-	$sponge->verbose(1, "LEARN: %d secs left", $sponge->user('learning'));
-	
+	$sponge->verbose(1, "LEARN: ",
+				int($sponge->user('learning')), " secs left\n");
 	return;
 }
 
