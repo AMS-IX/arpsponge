@@ -1,5 +1,9 @@
 @(#)$Id$
 
+3.6.4 - 28.jul.2005 - steven
+  * Fixed POD section for --init. In the OPTIONS section, it was
+    missing the "NONE".
+
 3.6.3 - 20.jul.2005 - steven
   * Fixed POD comments regarding LEARN state. Added check for
 	--dummy and --daemon (mutually exclusive). Added comment

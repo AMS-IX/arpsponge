@@ -857,7 +857,7 @@ this address.
 Use this option if you have not assigned the base address to any interface
 in your network.
 
-=item X<--init>B<--init>={B<ALIVE>|B<DEAD>|B<PENDING>}
+=item X<--init>B<--init>={B<ALIVE>|B<DEAD>|B<PENDING>|B<NONE>}
 
 How to initialise the sponge's state table:
 
