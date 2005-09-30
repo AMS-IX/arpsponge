@@ -25,7 +25,6 @@ use NetPacket::Ethernet qw( :types );
 use NetPacket::ARP qw( ARP_OPCODE_REQUEST );
 use NetPacket::IP;
 use Time::HiRes qw( time sleep );
-use Net::ARP;
 use Sys::Syslog;
 use Net::IPv4Addr qw( :all );
 use IO::File;

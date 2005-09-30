@@ -19,14 +19,14 @@ Requirements
 	* GNU make
 	* Perl (>= 5.8)
 	* Perl modules:
+		- Net::Pcap
 		- Net::PcapUtils
 		- NetPacket::Ethernet
 		- NetPacket::ARP
 		- NetPacket::IP
 		- Time::HiRes
 		- Net::ARP
-		- Sys::Syslog
-		- Net::IPv4Addr
+		- Net::IP
 
 Installation
 ------------

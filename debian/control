@@ -4,12 +4,19 @@ Priority: optional
 Maintainer: Steven Bakker <steven.bakker@ams-ix.net>
 Build-Depends: debhelper (>= 4.0.0)
 Build-Depends: libnet-pcap-perl, libnet-pcap-utils-perl
+Build-Depends: libnet-pcap-perl, libnet-pcap-utils-perl
+Build-Depends: libnetpacket-ethernet-perl, libnetpacket-arp-perl
+Build-Depends: libnetpacket-ip-perl, libtime-hires-perl
+Build-Depends: libnet-arp-perl, libsys-syslog-perl, libnet-ip-perl
 Standards-Version: 3.6.1
 
 Package: arpsponge
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Depends: libnet-pcap-perl, libnet-pcap-utils-perl
+Depends: libnetpacket-ethernet-perl, libnetpacket-arp-perl
+Depends: libnetpacket-ip-perl, libtime-hires-perl
+Depends: libnet-arp-perl, libnet-ip-perl
 Description: Nifty ARP sponge.
  Nifty ARP sponge featuring gratuitous ARP, sweeping, reporting, etc.
  Also keeps an internal ARP table which can be dumped to a file.
