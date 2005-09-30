@@ -1,3 +1,9 @@
+arpsponge (3.6.4-1) unstable; urgency=low
+
+  * Dependency fixes.
+
+ -- Steven Bakker <sb@ams-ix.net>  Fri, 30 Sep 2005 17:49:00 +0200
+
 arpsponge (3.6.4) unstable; urgency=low
 
   * See upstream Changelog.
