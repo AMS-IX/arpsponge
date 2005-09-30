@@ -1,5 +1,11 @@
 @(#)$Id$
 
+3.7 - 30.sep.2005 - steven
+  * Fixed the f*cking call to f*cking Net::ARP::get_mac($dev, $mac).
+    It never wanted a reference as the second parameter, which
+	is bad enough in itself, but newer versions don't like an
+	undef or empty value for $mac either :-(
+
 3.6.4 - 28.jul.2005 - steven
   * Fixed POD section for --init. In the OPTIONS section, it was
     missing the "NONE".

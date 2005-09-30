@@ -31,7 +31,7 @@ use IO::File;
 
 BEGIN {
 	use Exporter;
-	our $Version = 1.01;
+	our $Version = 1.02;
 	our @ISA = qw( Exporter );
 
 	my @states = qw( STATIC DEAD ALIVE PENDING );
@@ -243,8 +243,14 @@ sub arp_table($;$$$) {
 sub get_mac($;$) {
 	my $dev = pop @_;
 	if (ref $dev) { $dev = $dev->device }
-	my $mac;
-	Net::ARP::get_mac($dev, $mac);
+
+	# get_mac is SCARY! and WRONG!
+	my $val = '00:00:00:00:00:00';
+	Net::ARP::get_mac($dev, $val); # Yes, Virginia, NOT a ref!
+
+	my $mac = $val; # Copy it to safety...
+
+	#print STDERR "Net::ARP::get_mac($dev, \$mac) -> \"$mac\"\n";
 	return mac2mac($mac);
 }
 
