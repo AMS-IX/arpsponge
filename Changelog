@@ -1,5 +1,17 @@
 @(#)$Id$
 
+3.8 - 19.oct.2005 - steven
+  * Updated init script to move away from $SPONGE_OPTS and have a
+    more flexible set-up using separate variables which can be
+	overridden in the individual interface files.
+
+    This breaks the old syntax! Instead of a single string
+	in /etc/default/arpsponge/ethX (namely the network/prefix),
+	we need to define "NETWORK=network/prefix". It is also possible
+	to override the device "ethX" by setting "DEVICE".
+
+  * Added POD documentation for the new init set-up.
+
 3.7 - 30.sep.2005 - steven
   * Fixed the f*cking call to f*cking Net::ARP::get_mac($dev, $mac).
     It never wanted a reference as the second parameter, which

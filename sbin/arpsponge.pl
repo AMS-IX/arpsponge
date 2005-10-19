@@ -1168,19 +1168,19 @@ Now F</tmp/sponge.out> should contain something like:
    started: 2005-04-30 23:26:39 [1114896399]
 
    <STATE>
-   # IP              State        Queries Rate (q/min) Updated
-   193.194.136.129   ALIVE              0    0.000     2005-05-01 10:15:58
-   193.194.136.130   DEAD               6    0.012     2005-05-01 09:56:40
-   193.194.136.131   ALIVE              1    0.000     2005-05-01 09:41:40
-   193.194.136.135   ALIVE              0    0.000     2005-05-01 10:16:12
-   193.194.136.139   ALIVE              0    0.000     2005-05-01 10:06:28
-   193.194.136.140   DEAD               5    0.018     2005-05-01 09:41:40
-   193.194.136.143   DEAD               5    0.021     2005-05-01 10:11:40
-   193.194.136.146   ALIVE              0    0.000     2005-05-01 09:41:40
-   193.194.136.147   DEAD               6    0.013     2005-05-01 09:26:40
-   193.194.136.148   ALIVE              0    0.000     2005-05-01 10:12:38
-   193.194.136.185   PENDING(3)         3    0.019     2005-05-01 09:43:16
-   193.194.136.205   PENDING(4)         4    0.012     2005-05-01 09:43:16
+   # IP              State     Queries Rate (q/min) Updated
+   193.194.136.129   ALIVE           0    0.000     2005-05-01 10:15:58
+   193.194.136.130   DEAD            6    0.012     2005-05-01 09:56:40
+   193.194.136.131   ALIVE           1    0.000     2005-05-01 09:41:40
+   193.194.136.135   ALIVE           0    0.000     2005-05-01 10:16:12
+   193.194.136.139   ALIVE           0    0.000     2005-05-01 10:06:28
+   193.194.136.140   DEAD            5    0.018     2005-05-01 09:41:40
+   193.194.136.143   DEAD            5    0.021     2005-05-01 10:11:40
+   193.194.136.146   ALIVE           0    0.000     2005-05-01 09:41:40
+   193.194.136.147   DEAD            6    0.013     2005-05-01 09:26:40
+   193.194.136.148   ALIVE           0    0.000     2005-05-01 10:12:38
+   193.194.136.185   PENDING(3)      3    0.019     2005-05-01 09:43:16
+   193.194.136.205   PENDING(4)      4    0.012     2005-05-01 09:43:16
    </STATE>
 
    <ARP-TABLE>
@@ -1204,7 +1204,23 @@ F</etc/init.d/@NAME@>. This script looks for the following files:
 =item F</etc/default/@NAME@/defaults>
 
 Contains default options for every sponge instance. The options are
-specified as L<sh(1)|sh> shell variables. The options recognised are:
+specified as L<sh(1)|sh> shell variables.
+
+=item F</etc/default/@NAME@/ethX>
+
+Contains a network definition for the sponge on I<ethX>.
+
+=back
+
+For every I<ethX> file the script finds, it starts a sponge daemon on
+the I<ethX> interface. The sponge daemon will write its status file to
+F<$SPONGE_VAR/ethX/status> and the notifications to the
+F<$SPONGE_VAR/ethX/notify> FIFO.
+
+=head2 Init Variables
+
+For boolean variables, "true", "yes", "on" and positive integers evaluate
+to "true", other values are "false".
 
 =over 4
 
@@ -1213,26 +1229,62 @@ specified as L<sh(1)|sh> shell variables. The options recognised are:
 Directory root that holds state information for the various sponge
 instances. The script will create the directory if it doesn't exist yet.
 
-=item I<$SPONGE_OPTIONS> (default: C<@SPONGE_OPTIONS@>)
+=item I<DUMMY_MODE> (boolean)
 
-Other command line options to give to the B<@NAME@> daemon. Please note
-that the script already provides appropriate C<--notify>, C<--statusfile>
-and C<--daemon> options.
+Use C<--dummy> on the sponge.
+
+=item I<INIT_MODE>
+
+Specify the C<--init> state.
+
+=item I<SPONGE_NETWORK> (boolean)
+
+Use C<--sponge-network>
+
+=item I<LEARNING> (integer)
+
+How many seconds to spend in learning mode.
+
+=item I<QUEUE_DEPTH> (integer)
+
+The argument to C<--queuedepth>.
+
+=item I<RATE> (integer)
+
+The argument to C<--rate>.
+
+=item I<PENDING>
+
+The argument to C<--pending>.
+
+=item I<SWEEP>
+
+The argument to C<--sweep>.
+
+=item I<GRATUITOUS> (boolean)
+
+Whether or not to send gratuitous ARPs (C<--gratuitous>).
+
+=item I<AGE> (integer)
+
+The argument to C<--age>.
 
 =back
 
-=item F</etc/default/@NAME@/ethX>
+The I<ethX> files can override each of the above and can also specify:
 
-Contains a network/prefixlen for the sponge on I<ethX>. N.B.: The
-I<only> thing in this file should be a line of the form
-"I<aaa.bbb.ccc.ddd/len>"!
+=over 4
+
+=item I<NETWORK> (mandatory)
+
+This specifies the network for which to sponge.
+
+=item I<DEVICE> (optional)
+
+By default, the init script will use I<ethX> as the device name, but this
+can be overridden with the I<DEVICE> variable.
 
 =back
-
-For every I<ethX> file the script finds, it starts a sponge daemon on
-the I<ethX> interface. The sponge daemon will write its status file to
-F<$SPONGE_VAR/ethX/status> and the notifications to the
-F<$SPONGE_VAR/ethX/notify> FIFO.
 
 =head1 FILES
 
@@ -1248,7 +1300,9 @@ Contains default options for the sponge's L<init(1)|init> script.
 
 =item F</etc/default/@NAME@/ethX>
 
-Contains a network/prefixlen for the sponge on I<ethX>.
+Contains a interface specific options for the sponge on I<ethX>.
+This I<must> define the C<NETWORK> variable.
+
 This is used by the sponge's L<init(1)|init> script.
 
 =item F<@SPONGE_VAR@/ethX/status>
