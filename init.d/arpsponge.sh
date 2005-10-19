@@ -81,7 +81,7 @@ start_sponge() {
 
 			printf "  %-10s " "${DEVICE}"
 
-			echo @BINDIR@/${PROG} ${opts} --daemon="${pidfile}" \
+			@BINDIR@/${PROG} ${opts} --daemon="${pidfile}" \
 				--notify="${notify}" --statusfile="${status}" \
 				${NETWORK} dev "${DEVICE}" 2>/dev/null
 		
