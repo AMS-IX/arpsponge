@@ -294,6 +294,9 @@ sub do_timer($) {
 	if ($learning > 0) {
 		do_learn($sponge);
 		$sponge->user('learning', $learning-1);
+		if ($learning-1 == 0) {
+			$sponge->print_log("exiting learning state");
+		}
 	}
 	else {
 		my $pending  = $sponge->pending;
@@ -404,7 +407,7 @@ sub do_sweep($) {
 		}
 	}
 	$sponge->is_verbose($v);
-	$sponge->print_log("probed $nprobe IP addresses");
+	$sponge->print_log("probed $nprobe IP address(es)");
 }
 
 ###############################################################################
@@ -632,27 +635,35 @@ sub do_status {
 	$fh->autoflush(1);
 	$fh->blocking(0);
 
-	my $queue = $sponge->queue;
-
 	my $now = time;
+	my $learning = $sponge->user('learning');
+	if ($learning) {
+		$learning = "yes ($learning sec left)";
+	}
+	else {
+		$learning = 'no';
+	}
+
 	$fh->print(
 		"id:            ", $sponge->syslog_ident, "\n",
-		"network:       ", $sponge->network, "/", $sponge->netmask, "\n",
-		"interface:     ", $sponge->device, "\n",
-		"IP/MAC:        ", $sponge->my_ip, "[", $sponge->my_mac, "]\n",
-		"queue depth:   ", $queue->depth, "\n",
-		"pending:       ", $sponge->pending, "\n",
-		"proberate:     ", int(1/$sponge->user('probesleep')), "\n",
-		"max rate:      ", $sponge->max_rate, "\n",
-		"sweep period:  ", $sponge->user('sweep_sec'), " sec\n",
-		"sweep age:     ", $sponge->user('sweep_age'), " sec\n",
-		"next sweep in: ", int($sponge->user('next_sweep')-time()), " sec\n",
-		"date:        ",
+		"version:       ", '@RELEASE@', "\n",
+		"date:          ",
 			strftime("%Y-%m-%d %H:%M:%S", localtime($now)),
 			" [", int($now), "]\n",
-		"started:   ",
+		"started:       ",
 			strftime("%Y-%m-%d %H:%M:%S", localtime($start_time)),
 			" [", int($start_time), "]\n",
+		"network:       ", $sponge->network, "/", $sponge->netmask, "\n",
+		"interface:     ", $sponge->device, "\n",
+		"IP/MAC:        ", $sponge->my_ip, " [", $sponge->my_mac, "]\n",
+		"queue depth:   ", $sponge->queuedepth, "\n",
+		"max rate:      ", $sponge->max_rate, "\n",
+		"max pending:   ", $sponge->max_pending, "\n",
+		"sweep period:  ", $sponge->user('sweep_sec'), " sec\n",
+		"sweep age:     ", $sponge->user('sweep_age'), " sec\n",
+		"proberate:     ", int(1/$sponge->user('probesleep')), "\n",
+		"next sweep in: ", int($sponge->user('next_sweep')-time()), " sec\n",
+		"learning:      ", $learning, "\n",
 		"\n"
 	);
 
@@ -664,6 +675,7 @@ sub do_status {
 		 );
 
 	my $states = $sponge->state_table;
+	my $queue = $sponge->queue;
 
 	my ($nalive, $ndead, $npending, $nmac) = (0,0,0,0);
 	
@@ -727,9 +739,10 @@ sub do_status {
 	}
 
 	$fh->print("</ARP-TABLE>\n");
-	$fh->print("alive=%d dead=%d pending=%d ARP_entries=%d\n",
-						$nalive, $ndead, $npending, $nmac);
 
+	##########################################################################
+	$fh->print(sprintf("\nalive=%d dead=%d pending=%d ARP_entries=%d\n",
+						$nalive, $ndead, $npending, $nmac));
 	##########################################################################
 	$fh->close;
 	$sponge->print_log("alive=%d dead=%d pending=%d ARP_entries=%d",

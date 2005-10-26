@@ -10,9 +10,14 @@
     caused the production install to run with a queue depth of 50,
     which works miraculously well. ;-)
 
-	Also added the PROBERATE variable and a defaults.sample.
+  * Added the PROBERATE variable.
 
-	Also added some more info in do_status.
+  * Added defaults.sample file.
+
+  * Added some more info in do_status.
+
+  * Fine-tuned logging information. For instance, a log entry is
+    printed when we clear a pending entry.
 
 3.9 - 19.oct.2005 - steven
   * Something (syslog?) is causing clone() calls, which exit using
