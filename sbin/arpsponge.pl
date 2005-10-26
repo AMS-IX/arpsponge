@@ -21,17 +21,20 @@ use Getopt::Long;
 use Pod::Usage;
 
 use Net::PcapUtils;
-use NetPacket::Ethernet qw( :types );
-use NetPacket::ARP qw( ARP_OPCODE_REQUEST );
-use NetPacket::IP;
-use Time::HiRes qw( time sleep );
-use Sys::Syslog;
-use Net::IPv4Addr qw( :all );
-use IO::File;
-use POSIX qw( strftime );
 
-use M6::ARP::Sponge qw( :states );
-use M6::ARP::Util qw( :all );
+use NetPacket::Ethernet qw( :types );
+use NetPacket::ARP      qw( ARP_OPCODE_REQUEST );
+use NetPacket::IP;
+
+use Time::HiRes         qw( time sleep );
+use Net::IPv4Addr       qw( :all );
+use POSIX               qw( strftime );
+
+use Sys::Syslog;
+use IO::File;
+
+use M6::ARP::Sponge     qw( :states );
+use M6::ARP::Util       qw( :all );
 
 ###############################################################################
 $0 =~ s|.*/||g;
@@ -78,7 +81,7 @@ my $daemon    = undef;
 
 # ============================================================================
 END {
-	if (defined $wrote_pid && $wrote_pid>0) {
+	if (defined $wrote_pid && $$ == $wrote_pid) {
 		print STDERR "$$ unlinking $daemon\n";
 		unlink($daemon);
 	}
@@ -311,8 +314,9 @@ sub do_timer($) {
 			}
 			$n++;
 		}
-		$sponge->print_log("%d pending IPs probed", $n)
-			if $sponge->is_verbose>1 || $n;
+		if ($sponge->is_verbose > 1 || $n > 1) {
+			$sponge->print_log("%d pending IPs probed", $n);
+		}
 
 		if ($sponge->user('next_sweep') && time >= $sponge->user('next_sweep'))
 		{
@@ -557,7 +561,7 @@ sub start_daemon($$) {
 	# Child (daemon) process.
 	if (open(PID, ">$pidfile")) {
 		print PID $$, "\n";
-		$wrote_pid++;
+		$wrote_pid = $$;
 		close PID;
 	}
 	else {
@@ -570,8 +574,8 @@ sub start_daemon($$) {
 	close STDOUT;
 	close STDERR;
 	close STDIN;
-	$sponge->is_verbose(undef);
-	$sponge->is_dummy(undef);
+	$sponge->is_verbose(0);
+	$sponge->is_dummy(0);
 	return undef;
 }
 
@@ -607,12 +611,10 @@ sub do_status {
 	my $start_time = $sponge->user('start_time');
 
 	unless (length($filename)) {
-		$sponge->verbose(1, "Ignoring SIG$signal -- no dump file set\n");
-		return;
+		$filename = '/dev/null';
 	}
 
-	$sponge->verbose(1, "SIG$signal -- dumping status to $filename\n");
-
+	$sponge->print_log("SIG%s; dumping status to %s", $signal, $filename);
 
 	# Open the status file as read/write, non-blocking,
 	# and don't buffer anything. This is useful if the destination
@@ -622,7 +624,7 @@ sub do_status {
 	my $fh = new IO::File($filename, O_RDWR|O_CREAT);
 
 	unless ($fh) {
-		$sponge->print_log("cannot write status to $filename: $!");
+		$sponge->print_log("cannot write status to %s: %s", $filename, $!);
 		return;
 	}
 
@@ -630,28 +632,40 @@ sub do_status {
 	$fh->autoflush(1);
 	$fh->blocking(0);
 
+	my $queue = $sponge->queue;
+
 	my $now = time;
 	$fh->print(
-			"id:      ", $sponge->syslog_ident, "\n",
-			"network: ", $sponge->network, "/", $sponge->netmask, "\n",
-			"date:    ",
-				strftime("%Y-%m-%d %H:%M:%S", localtime($now)),
-				" [", int($now), "]\n",
-			"started: ",
-				strftime("%Y-%m-%d %H:%M:%S", localtime($start_time)),
-				" [", int($start_time), "]\n",
-			"\n"
+		"id:            ", $sponge->syslog_ident, "\n",
+		"network:       ", $sponge->network, "/", $sponge->netmask, "\n",
+		"interface:     ", $sponge->device, "\n",
+		"IP/MAC:        ", $sponge->my_ip, "[", $sponge->my_mac, "]\n",
+		"queue depth:   ", $queue->depth, "\n",
+		"pending:       ", $sponge->pending, "\n",
+		"proberate:     ", int(1/$sponge->user('probesleep')), "\n",
+		"max rate:      ", $sponge->max_rate, "\n",
+		"sweep period:  ", $sponge->user('sweep_sec'), " sec\n",
+		"sweep age:     ", $sponge->user('sweep_age'), " sec\n",
+		"next sweep in: ", int($sponge->user('next_sweep')-time()), " sec\n",
+		"date:        ",
+			strftime("%Y-%m-%d %H:%M:%S", localtime($now)),
+			" [", int($now), "]\n",
+		"started:   ",
+			strftime("%Y-%m-%d %H:%M:%S", localtime($start_time)),
+			" [", int($start_time), "]\n",
+		"\n"
 	);
 
 	##########################################################################
 	$fh->print(
 			"<STATE>\n",
 			 sprintf("%-17s %-12s %7s %12s %7s\n",
-					 "# IP", "State", "Queries", "Rate (q/min)", "Updated")
+					 "# IP", "State", "Queue", "Rate (q/min)", "Updated")
 		 );
 
-	my $queue = $sponge->queue;
 	my $states = $sponge->state_table;
+
+	my ($nalive, $ndead, $npending, $nmac) = (0,0,0,0);
 	
 	my $ip;
 	for $ip (sort { ip2int($a) <=> ip2int($b) } keys %$states) {
@@ -666,15 +680,18 @@ sub do_status {
 		SWITCH: {
 			$state == DEAD			&&do{
 				$str = 'DEAD';
+				$ndead++;
 				last SWITCH};
 			$state == ALIVE			&&do{
 				$str = 'ALIVE';
+				$nalive++;
 				last SWITCH};
 			$state == STATIC		&&do{
 				$str = 'STATIC';
 				last SWITCH};
 			$state >= 0				&&do{
 				$str = 'PENDING('.int($state).')';
+				$npending++;
 				last SWITCH};
 		}
 
@@ -701,6 +718,8 @@ sub do_status {
 	for $ip (sort { ip2hex($a) cmp ip2hex($b) } keys %{$sponge->arp_table}) {
 		my ($mac, $time) = @{$sponge->arp_table->{$ip}};
 
+		$nmac++;
+
 		$fh->print(
 			sprintf("%-17s %-17s %-11d ", $mac, $ip, int($time)),
 			strftime("%Y-%m-%d %H:%M:%S\n", localtime($time))
@@ -708,9 +727,13 @@ sub do_status {
 	}
 
 	$fh->print("</ARP-TABLE>\n");
+	$fh->print("alive=%d dead=%d pending=%d ARP_entries=%d\n",
+						$nalive, $ndead, $npending, $nmac);
 
 	##########################################################################
 	$fh->close;
+	$sponge->print_log("alive=%d dead=%d pending=%d ARP_entries=%d",
+						$nalive, $ndead, $npending, $nmac);
 }
 
 

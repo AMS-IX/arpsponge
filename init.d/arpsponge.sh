@@ -16,6 +16,7 @@ SPONGE_OPTIONS="@SPONGE_OPTIONS@"
 # Program defaults
 export DUMMY_MODE INIT_MODE SPONGE_NETWORK LEARNING
 export QUEUE_DEPTH RATE PENDING SWEEP GRATUITOUS AGE
+export PROBERATE
 
 # Defaults for all sponges.
 if test -f /etc/default/${PROG}/defaults ; then
@@ -48,9 +49,10 @@ start_sponge() {
 		[ -n "${INIT_MODE}" ]       && opts="$opts --init=${INIT_MODE}"
 		[ -n "${LEARNING}" ]        && opts="$opts --learning=${LEARNING}"
 		[ -n "${QUEUE_DEPTH}" ]     && opts="$opts --queuedepth=${QUEUE_DEPTH}"
-		[ -n "${RATE}" ]            && opts="$opts --queuedepth=${RATE}"
+		[ -n "${RATE}" ]            && opts="$opts --rate=${RATE}"
 		[ -n "${PENDING}" ]         && opts="$opts --pending=${PENDING}"
 		[ -n "${SWEEP}" ]           && opts="$opts --sweep=${SWEEP}"
+		[ -n "${PROBERATE}" ]       && opts="$opts --proberate=${PROBERATE}"
 		[ -n "${AGE}" ]             && opts="$opts --age=${AGE}"
 
 		if [ ! -n "${DEVICE}" ]

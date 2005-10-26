@@ -1,5 +1,37 @@
 @(#)$Id$
 
+3.9.1 - 26.oct.2005 - steven
+  * Pretty stupid bug in init.d script. Called the sponge with:
+
+        --queuedepth=${QUEUE_DEPTH}
+        --queuedepth=${RATE}
+
+    Obviously, the second option should have been "--rate"; this
+    caused the production install to run with a queue depth of 50,
+    which works miraculously well. ;-)
+
+	Also added the PROBERATE variable and a defaults.sample.
+
+	Also added some more info in do_status.
+
+3.9 - 19.oct.2005 - steven
+  * Something (syslog?) is causing clone() calls, which exit using
+    EXIT{} block which tends to unlink() the PID file :-(
+	Traces seem to indicate that the clone()-d process is connected
+	to syslog, since it opens "/dev/console" which is typically a
+	last resort for failed syslog() connections.
+
+	As a first fix, I modified the EXIT{} block to only unlink()
+	the pid file if the pid of the current process ($$) matches
+	that of the master ($wrote_pid).
+
+	Second, I modified the code a bit to also log when dumping
+	status (if no filename is set, it will use /dev/null), and
+	to log a summary of the status.
+
+	Finally, the "probed 0 IP addresses" messages should have
+	gone from the log now...
+
 3.8 - 19.oct.2005 - steven
   * Updated init script to move away from $SPONGE_OPTS and have a
     more flexible set-up using separate variables which can be

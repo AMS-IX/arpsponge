@@ -31,7 +31,7 @@ use IO::File;
 
 BEGIN {
 	use Exporter;
-	our $Version = 1.02;
+	our $Version = 1.03;
 	our @ISA = qw( Exporter );
 
 	my @states = qw( STATIC DEAD ALIVE PENDING );
@@ -316,7 +316,7 @@ sub is_my_network($$) {
 sub set_pending($$;$) {
 	my ($self, $target_ip, $n) = @_;
 	$self->set_state($target_ip, PENDING($n));
-	$self->print_log("Pending: %s (state %d)", $target_ip, $n);
+	$self->print_log("pending: %s (state %d)", $target_ip, $n);
 	$self->print_notify("action=pending;ip=%s;state=%d", $target_ip, $n);
 }
 
@@ -407,7 +407,7 @@ sub set_dead($$) {
 	my ($self, $ip) = @_;
 	my $rate = $self->queue->rate($ip);
 
-	$self->print_log("Sponging: %s (%0.1f q/min)", $ip, $rate);
+	$self->print_log("sponging: %s (%0.1f q/min)", $ip, $rate);
 	$self->print_notify("action=sponge;ip=%s;mac=%s", $ip, $self->my_mac);
 
 	$self->gratuitous_arp($ip) if $self->gratuitous;
@@ -429,8 +429,12 @@ sub set_alive($$$) {
 	return unless $self->is_my_network($ip);
 
 	if ($self->get_state($ip) == DEAD) {
-		$self->print_log("Unsponging: %s [found at %s]", $ip, $mac);
+		$self->print_log("unsponging: %s [found at %s]", $ip, $mac);
 		$self->print_notify("action=unsponge;ip=%s;mac=%s", $ip, $mac);
+	}
+	elsif ($self->get_state($ip) >= PENDING(0)) {
+		$self->print_log("clearing: %s [found at %s]", $ip, $mac);
+		$self->print_notify("action=clear;ip=%s;mac=%s", $ip, $mac);
 	}
 	elsif ($self->queue->depth($ip) > 0) {
 		$self->verbose(1, "Clearing: $ip [found at $mac]\n");

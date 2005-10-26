@@ -14,11 +14,13 @@ TOPDIR	=	.
 include $(TOPDIR)/config.mk
 include $(TOPDIR)/rules.mk
 
+TARGETS = defaults.sample
+
 default		:	all
 
-all			:	sbin-all init.d-all man-all lib-all
+all			:	$(TARGETS) sbin-all init.d-all man-all lib-all
 
-install		:	sbin-install init.d-install man-install lib-install
+install		:	all sbin-install init.d-install man-install lib-install
 
 clean		:	sbin-clean init.d-clean man-clean lib-clean
 
