@@ -51,6 +51,7 @@ dist:
 	    find . \( -name '*.src' -o -name '*.tar' \) -exec $(RM) '{}' ';' ;\
 	    find . \( -name '*.gz' -o -name '*.Z' \) -exec $(RM) '{}' ';' ;\
 	    find . -depth -type d -name CVS -exec $(RM) -r '{}' ';' ;\
+	    find . -depth -type d -name .svn -exec $(RM) -r '{}' ';' ;\
 	    $(RM) -r ./old ;\
 	    $$DIR/tools/mkdist Makefile > Makefile.dist; \
 			mv Makefile.dist Makefile; \
