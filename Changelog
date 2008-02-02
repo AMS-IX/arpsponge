@@ -1,5 +1,10 @@
 @(#)$Id$
 
+3.9.2 - 26.jan.2008 - arien
+  * Signals set flags. These flags get evaluated before a packet is
+    processed. This might solve the crashes since Debian Etch. 
+    This change was made after a hint from dvorak.
+
 3.9.1 - 26.oct.2005 - steven
   * Pretty stupid bug in init.d script. Called the sponge with:
 

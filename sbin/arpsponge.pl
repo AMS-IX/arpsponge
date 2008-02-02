@@ -78,6 +78,9 @@ EOF
 
 my $wrote_pid = 0;
 my $daemon    = undef;
+my $flag_hup = 0;
+my $flag_usr1 = 0;
+my $flag_alrm = 0;
 
 # ============================================================================
 END {
@@ -250,10 +253,10 @@ sub Main {
 	$::SIG{'INT'}  = sub { process_signal($sponge, 'INT')  };
 	$::SIG{'QUIT'} = sub { process_signal($sponge, 'QUIT') };
 	$::SIG{'TERM'} = sub { process_signal($sponge, 'TERM') };
-	$::SIG{'USR1'} = sub { do_status('USR1', $sponge) };
-	$::SIG{'HUP'}  = sub { do_status('HUP',  $sponge) };
+	$::SIG{'USR1'} = sub { $flag_usr1 = 1; };
+	$::SIG{'HUP'}  = sub { $flag_hup = 1; };
 
-	$::SIG{'ALRM'} = sub { do_timer($sponge) };
+	$::SIG{'ALRM'} = sub { $flag_alrm = 1; };
 
 	alarm(1);
 
@@ -426,6 +429,12 @@ sub process_pkt {
 	my ($sponge, $hdr, $pkt) = @_;
 	my $eth_obj = NetPacket::Ethernet->decode($pkt);
 	my $src_mac = hex2mac($eth_obj->{src_mac});
+
+	# First handle any pending signal		
+
+	if($flag_usr1) { $flag_usr1 = 0; do_status('USR1', $sponge) };
+	if($flag_hup) { $flag_hup = 0; do_status('HUP',  $sponge) };
+	if($flag_alrm) { $flag_alrm = 0; do_timer($sponge) };
 
 	# Self-generated packets are not relevant.
 	return if $src_mac eq $sponge->my_mac;
