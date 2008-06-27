@@ -180,7 +180,7 @@ sub is_full($$) { $_[0]->depth($_[1]) >= $_[0]->max_depth }
 
 =item X<add>B<add> ( I<IP>, I<TIMESTAMP> )
 
-Add I<TIMESTAMP to the queue for I<IP>, wrapping the buffer ring if
+Add I<TIMESTAMP> to the queue for I<IP>, wrapping the buffer ring if
 necessary. Returns the new queue depth.
 
 =cut
