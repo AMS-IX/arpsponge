@@ -57,6 +57,9 @@ dist:
 			mv Makefile.dist Makefile; \
 	    $$DIR/tools/mkdist config.mk > config.mk.dist; \
 			rm config.mk; \
+		$(perlit) sbin/arpsponge.pl > sbin/arpsponge; \
+			pod2text sbin/arpsponge > arpsponge.txt; \
+			$(RM) sbin/arpsponge; \
 	    \
 	    echo "tarring and zipping it up"; \
 	    cd ..; \
