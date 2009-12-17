@@ -18,13 +18,17 @@ TARGETS = defaults.sample
 
 default		:	all
 
-all			:	$(TARGETS) sbin-all init.d-all man-all lib-all
+all			:	$(TARGETS) sbin-all init.d-all man-all \
+				lib-all doc-all
 
-install		:	all sbin-install init.d-install man-install lib-install
+install		:	all sbin-install init.d-install man-install \
+				lib-install doc-install
 
-clean		:	sbin-clean init.d-clean man-clean lib-clean
+clean		:	sbin-clean init.d-clean man-clean \
+				lib-clean doc-clean
 
-veryclean	:	sbin-veryclean init.d-veryclean man-veryclean lib-veryclean
+veryclean	:	sbin-veryclean init.d-veryclean man-veryclean \
+				lib-veryclean doc-veryclean
 
 #NODIST
 

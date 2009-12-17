@@ -1,5 +1,8 @@
 @(#)$Id$
 
+26.jan.2008 - steven
+	Add doc dir.
+
 3.9.2 - 26.jan.2008 - arien
   * Signals set flags. These flags get evaluated before a packet is
     processed. This might solve the crashes since Debian Etch. 
