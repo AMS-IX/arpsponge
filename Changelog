@@ -1,7 +1,15 @@
 @(#)$Id$
 
-26.jan.2008 - steven
-	Add doc dir.
+# vim:sw=2:ts=4:et:filetype=text
+
+3.9.3 - 08.apr.2010 - steven
+
+  * 26.jan.2008 - steven
+    Add doc dir.
+
+  * 08.apr.2010 - steven
+    Fixed event loop by using select() + Net::Pcap,
+    getting rid of the PcapUtils dependency in the process.
 
 3.9.2 - 26.jan.2008 - arien
   * Signals set flags. These flags get evaluated before a packet is
@@ -149,4 +157,3 @@
   * Properly Debianized.
   * Added code to recognize the duplicate detection packets from
     DHCP clients.
-
