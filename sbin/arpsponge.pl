@@ -6,7 +6,7 @@
 #
 # ARP sponge
 #
-# (c) Copyright AMS-IX B.V. 2004-2005; all rights reserved.
+# (c) Copyright AMS-IX B.V. 2004-2010; all rights reserved.
 #
 # See the LICENSE file that came with this package.
 #
@@ -20,7 +20,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 
-use Net::PcapUtils;
+use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno pcap_setnonblock );
 
 use NetPacket::Ethernet qw( :types );
 use NetPacket::ARP      qw( ARP_OPCODE_REQUEST );
@@ -258,39 +258,131 @@ sub Main {
 
 	$::SIG{'ALRM'} = sub { $flag_alrm = 1; };
 
-	alarm(1);
+    packet_capture_loop($sponge);
 
-	my $err = Net::PcapUtils::loop(
-			\&process_pkt,
-			USERDATA => $sponge,
-			SNAPLEN  => 512,
-			DEV      => $device,
-			PROMISC  => 1
-		);
-	alarm(0);
-
-	if (length($err)) {
-		print "ERROR: $err\n";
-		exit(1);
-	}
-	exit(0);
+    exit(0);
 }
+
 
 Main;
 
 
 ###############################################################################
+# packet_capture_loop($sponge);
+#
+#    Loop over incoming traffic for sponge instance $sponge.
+#
+###############################################################################
+sub packet_capture_loop {
+    my $sponge = shift;
+
+    my $err = '';
+    my $pcap_h
+        = pcap_open_live(
+                $sponge->device, # capture device
+                512,             # snaplen
+                1,               # promiscuous
+                0,               # timeout (we're handling that ourselves)
+                \$err,           # error diagnostic
+        );
+
+    if (!$pcap_h) {
+        my $msg = qq{cannot capture on }.$sponge->device.qq{: $err};
+        $sponge->print_log($msg);
+        die("$0: $msg\n");
+    }
+    if (pcap_setnonblock($pcap_h, 0, \$err) < 0) {
+        my $msg = "cannot capture in non-blocking mode: $err";
+        $sponge->print_log($msg);
+        die("$0: $msg\n");
+    }
+
+    my $pcap_fd = pcap_fileno($pcap_h);
+
+    my $rbits = '';
+    vec($rbits, $pcap_fd, 1) = 1;
+
+
+    # Keep track of how many errors we've seen and how when
+    # we logged the last error. This is used to suppress too
+    # much logging.
+    my $err_count = 0;
+    my $last_err  = 0;
+
+    # Schedule our next periodic task run.
+    my $next_alarm = time + 1.0;
+
+    my $timeleft = 1.0;
+
+    while (1) {
+        my $rbits_out = my $ebits_out = $rbits;
+
+        if ($timeleft <= 0.02) {
+            $timeleft = 1.0;
+        }
+
+        (my $nfound, $timeleft)
+                = select($rbits_out, undef, $ebits_out, $timeleft);
+
+        # First handle any pending signal(s).
+        if($flag_usr1) { $flag_usr1 = 0; do_status('USR1', $sponge) };
+        if($flag_hup)  { $flag_hup  = 0; do_status('HUP',  $sponge) };
+
+        my $now = time;
+
+        if ($nfound) {
+            if ($last_err + 15 < $now) {
+                if ($err_count > 1) {
+                    $sponge->print_log("select error repeated ",
+                                $err_count-1, " time(s)");
+                }
+                $err_count = 0;
+            }
+
+            if (vec($rbits_out, $pcap_fd, 1)) {
+                # This should process all buffered packets, but
+                # it seems to only process one packet.
+                pcap_dispatch($pcap_h, -1, \&process_pkt, $sponge);
+            }
+            else {
+                if (!$err_count) {
+                    $sponge->print_log("error in select():",
+                            qq{ nfound=$nfound; },
+                            qq{ rbits=}, unpack("b*", $rbits_out), q{;},
+                            qq{ ebits=}, unpack("b*", $ebits_out), q{;},
+                            qq{ err=$!\n}
+                        );
+                    $last_err = $now;
+                }
+                $err_count++;
+            }
+            # Check if we need to run our periodic task.
+            if ( ($now = time) >= $next_alarm ) {
+                do_timer($sponge);
+                $next_alarm = $now + 1.0;
+            }
+        }
+        else {
+            # select() timeout.
+            do_timer($sponge);
+            $next_alarm = $now + 1.0;
+        }
+    }
+
+    # We don't really ever exit this loop...
+    $sponge->print_log("unexpected end of loop!");
+    die("$0: unexpected end of loop!\n");
+}
+
+###############################################################################
 # do_timer($sponge)
 #
-#    Called by the alarm() interrupt.
+#    Called periodically (~ 1/sec) by the processing loop.
 #
 #    Process & probe pending entries, handle LEARN mode, sweep, etc.
 #
-#    After all this, reset the alarm timer.
-#
 ###############################################################################
 sub do_timer($) {
-	alarm(0);
 	my $sponge = shift;
 
 	my $learning = $sponge->user('learning');
@@ -320,17 +412,16 @@ sub do_timer($) {
 			}
 			$n++;
 		}
-		if ($sponge->is_verbose > 1 || $n > 1) {
+		if ($n > 1 || $sponge->is_verbose > 1) {
 			$sponge->print_log("%d pending IPs probed", $n);
 		}
 
-		if ($sponge->user('next_sweep') && time >= $sponge->user('next_sweep'))
-		{
+        my $next_sweep = $sponge->user('next_sweep');
+		if ($next_sweep && time >= $next_sweep) {
 			do_sweep($sponge);
 			$sponge->user('next_sweep', time+$sponge->user('sweep_sec'));
 		}
 	}
-	alarm(1);
 }
 
 ###############################################################################
@@ -416,12 +507,12 @@ sub do_sweep($) {
 ###############################################################################
 # process_pkt($sponge, $hdr, $pkt);
 #
-#    Called by Net::PcapUtils::loop() as:
+#    Called by pcap_dispatch() as:
 #
 #        process_pkt($sponge, $hdr, $pkt);
 #
 #    Process sniffed packets. The "$sponge" parameter is what was passed
-#    as the USERDATA parameter to the Net::PcapUtils::loop call. In our
+#    as the "user data" parameter to the pcap_dispatch() call. In our
 #    case, that is the M6::ARP::Sponge instance, a.k.a. "$sponge".
 #
 ###############################################################################
@@ -429,12 +520,6 @@ sub process_pkt {
 	my ($sponge, $hdr, $pkt) = @_;
 	my $eth_obj = NetPacket::Ethernet->decode($pkt);
 	my $src_mac = hex2mac($eth_obj->{src_mac});
-
-	# First handle any pending signal		
-
-	if($flag_usr1) { $flag_usr1 = 0; do_status('USR1', $sponge) };
-	if($flag_hup) { $flag_hup = 0; do_status('HUP',  $sponge) };
-	if($flag_alrm) { $flag_alrm = 0; do_timer($sponge) };
 
 	# Self-generated packets are not relevant.
 	return if $src_mac eq $sponge->my_mac;
@@ -481,7 +566,6 @@ sub process_pkt {
 	if ($sponge->is_my_ip($dst_ip)) {
 		# ARPs for our IPs require no action (handled by the kernel),
 		# except for maybe updating our internal ARP table.
-
 		$sponge->verbose(1, "ARP from $src_ip for our $dst_ip\n");
 		$sponge->set_alive($dst_ip, $sponge->my_mac);
 		return;
@@ -598,7 +682,6 @@ sub start_daemon($$) {
 #
 ###############################################################################
 sub process_signal {
-	alarm(0);
 	my $sponge = shift;
 	my $name = shift;
 
@@ -1388,22 +1471,24 @@ prefix and monitor that.
 
 =item *
 
-The notification FIFO should have I<only one> reader. Multiple readers will
-have unpredictable results: some messages are split across the readers
-(so they only see partial messages), others are seen by one but not the
-others.
+The notification FIFO should have I<only one> reader. Multiple readers
+will have unpredictable results: some messages are split across the
+readers (so they only see partial messages), others are seen by one but
+not the others.
 
 =item *
 
-The C<--proberate> is implemented by using the L<usleep()|Time::HiRes/usleep>
-function from L<Time::HiRes|Time::HiRes>. Depending on your hardware, OS and
-general system load, the actual sleep time may be off by a considerable margin.
+The C<--proberate> is implemented by using
+the L<usleep()|Time::HiRes/usleep> function from
+L<Time::HiRes|Time::HiRes>. Depending on your hardware, OS and general
+system load, the actual sleep time may be off by a considerable margin.
 
-For example, on a 1.4GHz Pentium M, a usleep of 0.01 yields 0.015 on average.
-On a AMD Opteron 244 running at 1.8 GHz, this becomes 0.012. On a Pentium III
-running at 1 GHz, this is 0.02. This means that you will typically get a lower
-probe rate than what you specify on the command line. Hence, the parameter
-should be seen as an upper limit, not an exact figure.
+For example, on a 1.4GHz Pentium M, a C<usleep> of 0.01 yields 0.015
+on average.  On an AMD Opteron 244 running at 1.8 GHz, this becomes
+0.012. On a Pentium III running at 1 GHz, this is 0.02. This means that
+you will typically get a lower probe rate than what you specify on the
+command line. Hence, the parameter should be seen as an upper limit,
+not an exact figure.
 
 =back
 
