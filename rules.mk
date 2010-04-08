@@ -10,7 +10,7 @@ default : all
 RM            =  /bin/rm -f
 MV            =  /bin/mv
 
-RELEASE       =  3.9.1
+RELEASE       =  3.9.3
 NAME          =  arpsponge
 PACKAGE       =  $(NAME)-$(RELEASE)
 TOOLDIR       =  $(TOPDIR)/tools
@@ -188,15 +188,14 @@ post-install	:
 			$(MV) $(INSTALL_LOG).tmp $(INSTALL_LOG)
 
 uninstall	:
-	@echo "Removing installed files:" ; \
+	echo "Removing installed files:" ; \
 	files=$(INSTALLFILES); \
 	if [ -f $(INSTALL_LOG) ]; then \
 		files="$$files `cat $(INSTALL_LOG)`"; \
 	fi; \
 	echo '** Warning: will remove the following files:'; \
-	echo $$files | $(PERL) -p -e '\
-			    @x = split(" ", $$_); \
-			    $$_ = "    ".join("\n    ", @x)."\n"'; \
+	echo $$files | $(PERL) -n -e \
+		'print map { qq{    $$_\n} } split(" ", $$_);'; \
 	if [ `echo "\c" | wc -c` -gt 0 ]; then \
 	    echo -n "Are you sure [yn] y"; \
 	else \
