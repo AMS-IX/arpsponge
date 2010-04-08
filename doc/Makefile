@@ -10,8 +10,9 @@ include ../config.mk
 
 TOPDIR		=	..
 
-TARGETS		= \
-			arpsponge_architecture.txt
+TARGETS		= 
+
+INSTALLDIR  = $(DOCDIR)
 
 INSTALLFILES	= \
 			$(DOCDIR)/arpsponge_architecture.txt
