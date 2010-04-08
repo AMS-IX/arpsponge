@@ -31,7 +31,7 @@ use IO::File;
 
 BEGIN {
 	use Exporter;
-	our $Version = 1.03;
+	our $VERSION = 1.04;
 	our @ISA = qw( Exporter );
 
 	my @states = qw( STATIC DEAD ALIVE PENDING );
@@ -52,7 +52,7 @@ use constant STATIC  => -3;
 use constant DEAD    => -2;
 use constant ALIVE   => -1;
 
-sub PENDING($;$)	{ 0 + $_[$#_] };
+sub PENDING	{ 0 + $_[$#_] };
 
 # $val = _getset($field, $sponge [, $val]);
 #
@@ -62,7 +62,7 @@ sub PENDING($;$)	{ 0 + $_[$#_] };
 #
 #		sub myfield { _getset('myfield', @_) }
 #
-sub _getset($@) {
+sub _getset {
 	my $field = shift;
 	my $self  = shift;
 
@@ -217,7 +217,7 @@ sub new {
 #	Perform a ARP table lookup, or update the ARP table.
 #
 ###############################################################################
-sub arp_table($;$$$) {
+sub arp_table {
 	my $self = shift;
 
 	return $self->{'arp_table'} unless @_;
@@ -240,7 +240,7 @@ sub arp_table($;$$$) {
 #	Return MAC address for device $device.
 #
 ###############################################################################
-sub get_mac($;$) {
+sub get_mac {
 	my $dev = pop @_;
 	if (ref $dev) { $dev = $dev->device }
 
@@ -280,7 +280,7 @@ sub get_ip_all {
 #	Return IP address for device $device, or '0.0.0.0' if none.
 #
 ###############################################################################
-sub get_ip($;$) {
+sub get_ip {
 	my $dev = pop @_;
 	if (ref $dev) { $dev = $dev->device }
 	my $ip = `ifconfig $dev 2>/dev/null`;
@@ -298,7 +298,7 @@ sub get_ip($;$) {
 #	network range(s).
 #
 ###############################################################################
-sub is_my_network($$) {
+sub is_my_network {
 	my ($self, $target_ip) = @_;
 	return ipv4_in_network($self->network, $self->netmask, $target_ip);
 }
@@ -310,7 +310,7 @@ sub is_my_network($$) {
 # 	Set $target_ip's state to PENDING "$n". Returns new state.
 #
 ###############################################################################
-sub set_pending($$;$) {
+sub set_pending {
 	my ($self, $target_ip, $n) = @_;
 	$self->set_state($target_ip, PENDING($n));
 	$self->print_log("pending: %s (state %d)", $target_ip, $n);
@@ -323,7 +323,7 @@ sub set_pending($$;$) {
 # 	Increment $target_ip's PENDING state. Returns new state.
 #
 ###############################################################################
-sub incr_pending($$) {
+sub incr_pending {
 	my ($self, $target_ip) = @_;
 	$self->set_state($target_ip, $self->get_state($target_ip)+1);
 }
@@ -335,7 +335,7 @@ sub incr_pending($$) {
 # 	erroneously sponging when there's a cretin sending ARP floods.
 #
 ###############################################################################
-sub send_probe($$) {
+sub send_probe {
 	my ($self, $target_ip) = @_;
 
 	$self->verbose(2, "Probing [dev=", $self->phys_device, "]: $target_ip\n");
@@ -357,7 +357,7 @@ sub send_probe($$) {
 # 	Send a (sponge) ARP WHO HAS $ip TELL $ip".
 #
 ###############################################################################
-sub gratuitous_arp($$) {
+sub gratuitous_arp {
 	my ($self, $ip) = @_;
 
 	$self->verbose(1, "Gratuitous ARP [dev=", $self->phys_device, "]: $ip\n");
@@ -379,7 +379,7 @@ sub gratuitous_arp($$) {
 # 	Send a (sponge) ARP "$src_ip IS AT" in reply to the $arp_obj request.
 #
 ###############################################################################
-sub send_reply($$$) {
+sub send_reply {
 	my ($self, $src_ip, $arp_obj) = @_;
 
 	$self->set_state_atime($src_ip, time);
@@ -400,7 +400,7 @@ sub send_reply($$$) {
 #    Set $target_ip's state to DEAD (i.e. "sponged").
 #
 ###############################################################################
-sub set_dead($$) {
+sub set_dead {
 	my ($self, $ip) = @_;
 	my $rate = $self->queue->rate($ip);
 
@@ -420,7 +420,7 @@ sub set_dead($$) {
 #	Update ARP cache and print appropriate notifications.
 #
 ###############################################################################
-sub set_alive($$$) {
+sub set_alive {
 	my ($self, $ip, $mac) = @_;
 
 	return unless $self->is_my_network($ip);
@@ -465,7 +465,7 @@ sub set_alive($$$) {
 #	Print the arguments to STDOUT if verbosity is at least $level.
 #
 ###############################################################################
-sub verbose($$;@) {
+sub verbose {
 	my ($self, $verbose);
 
 	if (UNIVERSAL::isa($_[0], 'M6::ARP::Sponge')) {
@@ -524,7 +524,7 @@ sub print_log {
 #
 #	Notify of sponge actions on the notify handle.
 ###############################################################################
-sub print_notify($$;@) {
+sub print_notify {
 	my ($self, $fh);
 	if (UNIVERSAL::isa($_[0], 'M6::ARP::Sponge')) {
 		$self = shift;

@@ -16,7 +16,7 @@ package M6::ARP::Util;
 BEGIN {
 	use Exporter;
 
-	our $Version = 1.01;
+	our $VERSION = 1.02;
 	our @ISA = qw( Exporter );
 
 	our @EXPORT_OK = qw( int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac );
@@ -68,7 +68,7 @@ Example: int2ip(3250751620) returns "193.194.136.132".
 
 =cut
 
-sub int2ip($) {
+sub int2ip {
 	hex2ip(sprintf("%08x", shift @_));
 };
 
@@ -82,7 +82,7 @@ Example: ip2int("193.194.136.132") returns "3250751620".
 
 =cut
 
-sub ip2int($) {
+sub ip2int {
 	hex(ip2hex(shift @_));
 };
 
@@ -96,7 +96,7 @@ Example: hex2ip("c1c28884") returns "193.194.136.132".
 
 =cut
 
-sub hex2ip($) {
+sub hex2ip {
 	my $hex = shift;
 
 	$hex =~ /(..)(..)(..)(..)/;
@@ -115,7 +115,7 @@ returns "c1c28884".
 
 =cut
 
-sub ip2hex($) {
+sub ip2hex {
 	return sprintf("%02x%02x%02x%02x", split(/\./, shift));
 };
 
@@ -130,7 +130,7 @@ returns "a1:b2:03:04:e5:f6"
 
 =cut
 
-sub hex2mac($) {
+sub hex2mac {
 	my $hex = substr("000000000000".(shift @_), -12);
 	$hex =~ /(..)(..)(..)(..)(..)(..)/;
 	return sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
@@ -149,7 +149,7 @@ returns "a1b20304e5f6".
 
 =cut
 
-sub mac2hex($) {
+sub mac2hex {
 	my @mac = split(/[\s\.\-:\-]/, shift);
 	return undef if 12 % int(@mac);
 	my $digits = int(12 / int(@mac));
@@ -170,7 +170,7 @@ returns "a1:b2:03:04:e5:f6"
 
 =cut
 
-sub mac2mac($) {
+sub mac2mac {
 	hex2mac(mac2hex($_[0]));
 }
 

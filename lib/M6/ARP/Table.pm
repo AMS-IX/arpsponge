@@ -16,8 +16,7 @@ package M6::ARP::Table;
 use Time::HiRes qw( time );
 
 BEGIN {
-	use Exporter;
-	our $Version = 1.01;
+	our $VERSION = 1.02;
 }
 
 =pod
@@ -57,7 +56,7 @@ Create a new object instance and return a reference to it.
 
 =cut
 
-sub new($$) {
+sub new {
 	my $type = shift;
 	my $max_depth = shift;
 
@@ -77,7 +76,7 @@ Clear the ARP table for I<IP>.
 
 =cut
 
-sub clear($$) {
+sub clear {
 	my ($self, $ip) = @_;
 
 	if (my $mac = $self->arp($ip)) {
@@ -93,7 +92,7 @@ entry for I<IP>.
 
 =cut
 
-sub arp($$)	{ $_[0]->{'arp'}->{$_[1]} }
+sub arp	{ $_[0]->{'arp'}->{$_[1]} }
 
 =item X<rarp>B<rarp> ( I<MAC> )
 
@@ -101,7 +100,7 @@ Return a sorted list of IP addresses that are mapped to I<MAC>.
 
 =cut
 
-sub rarp($$) { sort { ip_sort($a, $b) } keys %{$_[0]->{'rarp'}->{$_[1]}} }
+sub rarp { sort { ip_sort($a, $b) } keys %{$_[0]->{'rarp'}->{$_[1]}} }
 
 =item X<ip_list>B<ip_list>
 
@@ -109,7 +108,7 @@ Return a sorted list of IP addresses that are present in the ARP table.
 
 =cut
 
-sub ip_list($) { sort { ip_sort($a, $b) } keys %{$_[0]->{'arp'}} }
+sub ip_list { sort { ip_sort($a, $b) } keys %{$_[0]->{'arp'}} }
 
 =item X<mac_list>B<mac_list>
 
@@ -117,7 +116,7 @@ Return a sorted list of MAC addresses that are present in the ARP table.
 
 =cut
 
-sub mac_list($) { sort { ip_sort($a, $b) } keys %{$_[0]->{'rarp'}} }
+sub mac_list { sort { ip_sort($a, $b) } keys %{$_[0]->{'rarp'}} }
 
 =item X<add>B<add> ( I<IP>, I<MAC> [, I<TIMESTAMP>] )
 
@@ -127,7 +126,7 @@ Returns the timestamp.
 
 =cut
 
-sub add($$$;$) {
+sub add {
 	my ($self, $ip, $mac, $timestamp) = @_;
 	$timestamp = time unless defined($timestamp);
 	$self->clear($ip);

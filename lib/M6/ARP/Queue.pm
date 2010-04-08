@@ -16,8 +16,7 @@ package M6::ARP::Queue;
 use strict;
 
 BEGIN {
-	use Exporter;
-	our $Version = 1.01;
+	our $VERSION = 1.02;
 }
 
 =pod
@@ -78,7 +77,7 @@ of I<MAXDEPTH>. Returns a reference to the newly created object.
 
 =cut
 
-sub new($$) {
+sub new {
 	my $type = shift;
 	my $max_depth = shift;
 
@@ -98,7 +97,7 @@ Clear the queue for I<IP>.
 
 =cut
 
-sub clear($$)     { delete $_[0]->{$_[1]} }
+sub clear     { delete $_[0]->{$_[1]} }
 
 =item X<depth>B<depth> ( I<IP> )
 
@@ -106,7 +105,7 @@ Return the depth of the queue for I<IP>.
 
 =cut
 
-sub depth($$)     { $_[0]->{$_[1]} ?  int(@{$_[0]->{$_[1]}}) : 0 }
+sub depth     { $_[0]->{$_[1]} ?  int(@{$_[0]->{$_[1]}}) : 0 }
 
 =item X<rate>B<rate> ( I<IP> )
 
@@ -152,7 +151,7 @@ per minute.
 #
 # [Statistics: comment/code > 4]
 #
-sub rate($$) {
+sub rate {
 	my $q = $_[0]->{$_[1]};
 	return undef unless defined($q) && @$q > 1;
 	my $first = $q->[0];
@@ -168,7 +167,7 @@ Return the maximum depth of the queues.
 
 =cut
 
-sub max_depth($) { $_[0]->{'max_depth'} }
+sub max_depth { $_[0]->{'max_depth'} }
 
 =item X<is_full>B<is_full> ( I<IP> )
 
@@ -176,7 +175,7 @@ Return whether or not the queue for I<IP> is full, i.e. is wrapping.
 
 =cut
 
-sub is_full($$) { $_[0]->depth($_[1]) >= $_[0]->max_depth }
+sub is_full { $_[0]->depth($_[1]) >= $_[0]->max_depth }
 
 =item X<add>B<add> ( I<IP>, I<TIMESTAMP> )
 
@@ -185,7 +184,7 @@ necessary. Returns the new queue depth.
 
 =cut
 
-sub add($$$) {
+sub add {
 	my ($self, $ip, $val) = @_;
 	if ($self->depth($ip) >= $self->max_depth) {
 		shift @{$self->{$ip}};
@@ -214,7 +213,7 @@ Also:
 
 =cut
 
-sub get($$;$) {
+sub get {
 	my ($self, $ip, $index) = @_;
 
 	$index = 0 unless defined($index);
@@ -234,7 +233,7 @@ that you don't inadvertently modify it.
 
 =cut
 
-sub get_queue($$) {
+sub get_queue {
 	my ($self, $ip) = @_;
 	return $self->{$ip};
 }
