@@ -17,16 +17,13 @@ Requirements
 ------------
 
 	* GNU make
-	* Perl (>= 5.8)
+	* Perl (>= 5.10)
 	* Perl modules:
 		- Net::Pcap
-		- Net::PcapUtils
-		- NetPacket::Ethernet
-		- NetPacket::ARP
-		- NetPacket::IP
-		- Time::HiRes
+		- NetPacket (::Ethernet, ::ARP, ::IP)
 		- Net::ARP
-		- Net::IP
+		- Net::IPvAddr
+		- Sys::Syslog
 
 Installation
 ------------
