@@ -245,12 +245,9 @@ sub get_mac($;$) {
 	if (ref $dev) { $dev = $dev->device }
 
 	# get_mac is SCARY! and WRONG!
-	my $val = '00:00:00:00:00:00';
-	Net::ARP::get_mac($dev, $val); # Yes, Virginia, NOT a ref!
+	my $mac = Net::ARP::get_mac($dev);
 
-	my $mac = $val; # Copy it to safety...
-
-	#print STDERR "Net::ARP::get_mac($dev, \$mac) -> \"$mac\"\n";
+	#print STDERR "Net::ARP::get_mac($dev) -> \"$mac\"\n";
 	return mac2mac($mac);
 }
 
