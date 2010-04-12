@@ -19,7 +19,6 @@ use strict;
 use M6::ARP::Queue;
 use M6::ARP::Util qw( :all );
 
-use Net::PcapUtils;
 use POSIX qw( strftime );
 use NetPacket::Ethernet qw( :types );
 use NetPacket::ARP qw( ARP_OPCODE_REQUEST );

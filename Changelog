@@ -2,6 +2,11 @@
 
 # vim:sw=2:ts=4:et:filetype=text
 
+3.9.4 - 12.apr.2010 - steven
+
+  * 12.apr.2010 - steven
+    Remove useless reference to Net::PcapUtils from Sponge.pm.
+
 3.9.3 - 08.apr.2010 - steven
 
   * 26.jan.2008 - steven
