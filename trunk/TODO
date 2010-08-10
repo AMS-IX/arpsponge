@@ -1,0 +1,24 @@
+@(#) $Id$
+
+Wish list for future enhancements:
+
+* setuid() to unprivileged user after opening relevant streams.
+
+* use ithreads for better real-time behaviour:
+	
+	- process
+	- learner
+	- sweeper
+	- prober
+
+	Process:    Always active, listens to packets on the wire.
+                Handles ALIVE->PENDING and DEAD->ALIVE, manages
+                the ARP table.
+
+	Learner:    stays active for "n" iterations, then finishes.
+
+	Prober:     waits for Learner to finish, then every second, probes
+                the IPs that are PENDING, moving them to DEAD if necessary.
+
+	Sweeper:    waits for Learner to finish, then periodically probes
+                "quiet" IPs.

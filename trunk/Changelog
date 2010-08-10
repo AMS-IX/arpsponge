@@ -1,0 +1,170 @@
+@(#)$Id$
+
+*-* vim:sw=2:ts=4:et:filetype=text
+
+3.9.5 - 10.aug.2010 - steven
+
+  * 10.aug.2010 - steven
+    - Added LSB headers for init script.
+    - Added post/pre scripts to make initscript handling smooth.
+
+3.9.4 - 12.apr.2010 - steven
+
+  * 12.apr.2010 - steven
+    Remove useless reference to Net::PcapUtils from Sponge.pm.
+
+3.9.3 - 08.apr.2010 - steven
+
+  * 26.jan.2008 - steven
+    Add doc dir.
+
+  * 08.apr.2010 - steven
+    Fixed event loop by using select() + Net::Pcap,
+    getting rid of the PcapUtils dependency in the process.
+
+3.9.2 - 26.jan.2008 - arien
+  * Signals set flags. These flags get evaluated before a packet is
+    processed. This might solve the crashes since Debian Etch. 
+    This change was made after a hint from dvorak.
+
+3.9.1 - 26.oct.2005 - steven
+  * Pretty stupid bug in init.d script. Called the sponge with:
+
+        --queuedepth=${QUEUE_DEPTH}
+        --queuedepth=${RATE}
+
+    Obviously, the second option should have been "--rate"; this
+    caused the production install to run with a queue depth of 50,
+    which works miraculously well. ;-)
+
+  * Added the PROBERATE variable.
+
+  * Added defaults.sample file.
+
+  * Added some more info in do_status.
+
+  * Fine-tuned logging information. For instance, a log entry is
+    printed when we clear a pending entry.
+
+3.9 - 19.oct.2005 - steven
+  * Something (syslog?) is causing clone() calls, which exit using
+    EXIT{} block which tends to unlink() the PID file :-(
+	Traces seem to indicate that the clone()-d process is connected
+	to syslog, since it opens "/dev/console" which is typically a
+	last resort for failed syslog() connections.
+
+	As a first fix, I modified the EXIT{} block to only unlink()
+	the pid file if the pid of the current process ($$) matches
+	that of the master ($wrote_pid).
+
+	Second, I modified the code a bit to also log when dumping
+	status (if no filename is set, it will use /dev/null), and
+	to log a summary of the status.
+
+	Finally, the "probed 0 IP addresses" messages should have
+	gone from the log now...
+
+3.8 - 19.oct.2005 - steven
+  * Updated init script to move away from $SPONGE_OPTS and have a
+    more flexible set-up using separate variables which can be
+	overridden in the individual interface files.
+
+    This breaks the old syntax! Instead of a single string
+	in /etc/default/arpsponge/ethX (namely the network/prefix),
+	we need to define "NETWORK=network/prefix". It is also possible
+	to override the device "ethX" by setting "DEVICE".
+
+  * Added POD documentation for the new init set-up.
+
+3.7 - 30.sep.2005 - steven
+  * Fixed the f*cking call to f*cking Net::ARP::get_mac($dev, $mac).
+    It never wanted a reference as the second parameter, which
+	is bad enough in itself, but newer versions don't like an
+	undef or empty value for $mac either :-(
+
+3.6.4 - 28.jul.2005 - steven
+  * Fixed POD section for --init. In the OPTIONS section, it was
+    missing the "NONE".
+
+3.6.3 - 20.jul.2005 - steven
+  * Fixed POD comments regarding LEARN state. Added check for
+	--dummy and --daemon (mutually exclusive). Added comment
+	about this in POD.
+  * Added some verbosity in M6::ARP::Sponge::set_alive().
+
+  * Fixed verbosity in do_learn.
+
+3.6.2 - 11.jul.2005 - steven
+
+  * Fixed POD comments regarding proberate.
+
+3.6.1 - 27.jun.2005 - steven
+
+  * Fixed "rate" calculation. Off-by-one error spoiled the calculation :-(
+
+3.6 - 19.jun.2005 - steven
+
+  * Four ways to initialise the program:
+  	* --init=DEAD
+  	* --init=ALIVE
+  	* --init=PENDING
+  	* --init=NONE
+
+  * LEARN state does not probe, only listen.
+
+3.5 - 12.may.2005 - steven
+
+  * Incorporated Arien's ideas:
+  
+  	* Start in LEARN state, where we probe every second or so, for
+	  "--learn" times. During this period, we do not sponge addresses,
+	  we only probe and learn.
+	* Rewrote the handling of pending addresses. Pending addresses are
+	  now probed once per second for max_pending times. The previous
+	  behaviour was to probe a pending IP whenever an ARP query for it
+	  came in. If the incoming rate is high enough, we exhaust our pending
+	  probes before the target IP has a chance to answer.
+
+  * Added ARP rating through the "--proberate" option. Throwing ARP
+    queries at the interface at full CPU speed causes many packets to
+	be dropped, whether it's at the interface, the LAN (switch), or
+	the receiving end. Besides, broadcast storms are the very thing
+	we are trying to avoid here.
+
+  * --dummy now sends probes, but never sponged answers. Previously
+    it was not sending probes either, making it difficult to test the
+	sweeping/probing code.
+
+3.4.1 - 10.may.2005 - steven
+
+  * Logging fixes. One log line for a sponge event.
+  * Also log/notify for "pending" states.
+  * Various POD fixes.
+
+3.4 - 09.may.2005 - steven
+
+  * Renamed to "arpsponge" to prevent lawsuits :-)
+  * Cleaned up a bunch of stub files in the debian directory.
+
+3.3.2 - 03.may.2005 - steven
+
+  * "misfit" ARPs now get their src MAC logged as well.
+
+3.3.1 - 03.may.2005 - steven
+
+  * Added check for "misfit" ARPs and logging of those.
+
+3.3 - 03.may.2005 - steven
+
+  * Added "HUP" signal to arpswiffer. Added README file.
+
+3.2 - 01.may.2005 - steven
+
+  * Sponge.pm "set_alive" needs to check for local IP, otherwise the
+    state table gets contaminated.
+
+3.1 - 30.apr.2005 - steven
+
+  * Properly Debianized.
+  * Added code to recognize the duplicate detection packets from
+    DHCP clients.

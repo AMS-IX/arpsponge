@@ -1,0 +1,37 @@
+#IPADDR/PREFIXLEN dev IFNAME
+
+rm -f sponge.out sponge.status
+
+if [ ! -p sponge.notify ]
+then
+	rm -f sponge.notify
+	mkfifo sponge.notify
+fi
+
+touch sponge.out
+
+#../sbin/arpsponge 10.1.1.0/25 dev eth0:1 \
+#arpsponge 193.194.136.128/25 dev eth0 \
+
+../sbin/arpsponge 193.194.136.128/25 dev eth0 \
+    \
+  --verbose=1		\
+  --notify=sponge.notify	\
+  --status=sponge.status \
+    \
+  --init=NONE		\
+  --sponge-network  \
+  --learning=10		\
+    \
+  --queuedepth=20	\
+  --rate=50			\
+  --pending=5		\
+    \
+  --sweep=900/3600	\
+  --gratuitous      \
+  --age=600         \
+    \
+2>&1 | es -a -r 3 -p 86400 -s sponge.out &
+
+#2>&1 | es -a -r 3 -p 86400 sponge.out
+# --dummy \

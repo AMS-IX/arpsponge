@@ -1,0 +1,48 @@
+@(#)$Id$
+
+WORKINGS
+--------
+
+We keep two tables:
+
+	STATE
+		- Indexed by IP address
+		- Contains state flag:
+			-2   == DEAD
+			-1   == ALIVE
+			n>=0 == PENDING/n
+
+	QUEUE
+		- Indexed by IP address
+		- Each IP maps to a circular buffer of QUEUE_DEPTH elements
+		- Buffer holds timestamps for ARP queries
+
+Startup:
+
+	for each IP in RANGE:
+		set STATE[IP] to PENDING/0;
+
+	loop over incoming packets (src, dst, type):
+
+		set STATE[src] to ALIVE;
+		clear QUEUE[src];
+
+		if type == ARP:
+
+			add timestamp to QUEUE[dst];
+
+			if STATE[dst] == ALIVE:
+				if depth of QUEUE[dst] == MAX_QUEUE:
+					if rate for dst >= MAX_RATE
+						set STATE[dst] to PENDING/0;
+
+			if STATE[dst] == PENDING/n:
+				if n > MAX_PENDING:
+					set STATE[dst] to DEAD;
+				else
+					increment STATE[dst];
+					send ARP_QUERY for dst;
+
+			if STATE[dst] == DEAD:
+				send ARP_REPLY for dst;
+

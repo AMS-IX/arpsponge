@@ -1,0 +1,146 @@
+#!/bin/sh
+#
+# $Id$
+#
+# bsdinst.sh: BSD-like install program
+#
+# Not all BSD install options are supported, and one extra is added:
+#
+#	-l logfile
+
+ prog=`basename $0`
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/usr/ucb
+export PATH
+
+usage() {
+ echo "$@" >&2
+ echo "usage: $prog [options] file ... destination" >&2
+ echo "options: [-cs] [-l logfile] [-g group] [-m mode] [-o owner]" >&2
+ exit 1;
+}
+
+verbose=false
+  go_on=true
+   copy=true
+  strip=false
+
+   mode=755
+logfile=''
+
+[ `whoami` = root ] && root=true || root=false
+
+if $root; then
+    owner=root
+    group=staff
+fi
+
+while [ $# -gt 0 ] && $go_on
+do
+    case X:$1 in
+	X:-s)	shift
+		strip=true ;;
+	X:-c)	shift
+		copy=true ;;
+	X:-cs |\
+	X:-sc)	shift
+		copy=true
+		strip=true ;;
+	X:-l)	shift
+		logfile=$1
+		shift ;;
+	X:-g)	shift
+		if $root; then
+		    group=$1
+		elif $verbose; then
+		    echo "warning: \"-g\" flag ignored (not super-user)" >&2
+		fi
+		shift ;;
+	X:-m)	shift
+		mode=$1
+		shift;;
+	X:-d)	usage "\"-d\" flag is not supported (sorry)" ;;
+	X:-v)	shift
+		verbose=true ;;
+	X:-o)	shift
+		if $root; then
+		    owner=$1
+		elif $verbose; then
+		    echo "warning: \"-o\" flag ignored (not super-user)" >&2
+		fi
+		shift ;;
+	X:---)	shift; go_on=false;;
+	X:-*)	usage "unknown option \"$1\"" ;;
+	X:*)	go_on=false ;;
+    esac
+done
+
+if [ $# -lt 2 ]; then
+    usage "too few arguments"
+elif [ $# -gt 2 ]; then
+    multiple_src=true
+else
+    multiple_src=false
+fi
+
+while [ $# -gt 1 ]
+do
+    files="$files $1"
+    shift
+done
+
+destination=$1
+
+[ -d "$destination" ] && dst_is_a_file=false || dst_is_a_file=true
+
+if $multiple_src && $dst_is_a_file
+then
+    usage
+fi
+
+set $files
+
+$copy && mvcp=cp || mvcp=mv
+
+for file
+do
+    $dst_is_a_file && dst_file=$destination || \
+	dst_file=$destination/`basename $file`
+
+    $verbose && echo + $mvcp $file $dst_file
+    rm -f $dst_file
+    $mvcp $file $dst_file || exit 1
+
+    if [ -n "$logfile" ]; then
+	echo $dst_file >> $logfile
+    fi
+
+    if [ -n "$mode" ]; then
+	chmod 600 $dst_file
+	$verbose && echo + chmod $mode $dst_file
+	chmod $mode $dst_file > /dev/null 2>&1
+	[ $? = 0 ] || \
+		echo "$dst_file: could not chmod (ignored)" >&2
+    fi
+
+    if $strip; then
+	$verbose && echo + strip $dst_file
+	strip $dst_file >/dev/null 2>&1
+	[ $? = 0 ] || \
+		echo "$dst_file: could not strip (ignored)" >&2
+    fi
+
+    if [ -n "$owner" ]; then
+	$verbose && echo + chown $owner $dst_file
+	chown $owner $dst_file >/dev/null 2>&1
+	[ $? = 0 ] || \
+		echo "$dst_file: could not chown (ignored)" >&2
+    fi
+
+    if [ -n "$group" ]; then
+	$verbose && echo + chgrp $group $dst_file
+	chgrp $group $dst_file >/dev/null 2>&1
+	[ $? = 0 ] || \
+		echo "$dst_file: could not chgrp (ignored)" >&2
+    fi
+done
