@@ -1,4 +1,13 @@
 #!/bin/sh
+### BEGIN INIT INFO
+# Provides:          arpsponge
+# Required-Start:    $network
+# Required-Stop:     $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Starts the arpsponge daemon
+### END INIT INFO
+
 ###############################################################################
 # @(#) $Id$
 ###############################################################################
@@ -7,7 +16,9 @@
 #
 ###############################################################################
 
-PATH=/sbin:/bin:/usr/bin:@BINDIR@
+BINDIR=@BINDIR@
+#BINDIR=../bin
+PATH=/sbin:/bin:/usr/bin:${BINDIR}
 
 PROG=arpsponge
 SPONGE_VAR=@SPONGE_VAR@
@@ -72,7 +83,7 @@ start_sponge() {
 
 		if eval_bool $SPONGE_DEBUG
 		then
-			echo @BINDIR@/${PROG} ${opts} --daemon="${pidfile}" \
+			echo ${BINDIR}/${PROG} ${opts} --daemon="${pidfile}" \
 					--notify="${notify}" --statusfile="${status}" \
 					${NETWORK} dev "${DEVICE}"
 		else
@@ -83,7 +94,7 @@ start_sponge() {
 
 			printf "  %-10s " "${DEVICE}"
 
-			@BINDIR@/${PROG} ${opts} --daemon="${pidfile}" \
+			${BINDIR}/${PROG} ${opts} --daemon="${pidfile}" \
 				--notify="${notify}" --statusfile="${status}" \
 				${NETWORK} dev "${DEVICE}" 2>/dev/null
 		
