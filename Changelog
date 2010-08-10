@@ -1,6 +1,11 @@
 @(#)$Id$
 
-# vim:sw=2:ts=4:et:filetype=text
+*-* vim:sw=2:ts=4:et:filetype=text
+
+3.9.5 - 10.aug.2010 - steven
+
+  * 10.aug.2010 - steven
+    Added LSB headers for init script.
 
 3.9.4 - 12.apr.2010 - steven
 
