@@ -5,7 +5,8 @@
 3.9.5 - 10.aug.2010 - steven
 
   * 10.aug.2010 - steven
-    Added LSB headers for init script.
+    - Added LSB headers for init script.
+    - Added post/pre scripts to make initscript handling smooth.
 
 3.9.4 - 12.apr.2010 - steven
 
