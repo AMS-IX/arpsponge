@@ -9,7 +9,7 @@
 # See the LICENSE file that came with this package.
 #
 # A.Vijn,   2003-2004;
-# S.Bakker, November 2004;
+# S.Bakker, 2004-2010;
 #
 ###############################################################################
 package M6::ARP::Sponge;
@@ -30,7 +30,7 @@ use IO::File;
 
 BEGIN {
 	use Exporter;
-	our $VERSION = 1.04;
+	our $VERSION = 1.05;
 	our @ISA = qw( Exporter );
 
 	my @states = qw( STATIC DEAD ALIVE PENDING );
@@ -85,7 +85,7 @@ sub user {
 	my $self = shift;
 	my $user = $self->{'user'};
 
-	return $user unless @_;
+	return $user if @_ == 0;
 
 	my $attr = shift;
 	my $oldval = $user->{$attr};
@@ -169,13 +169,14 @@ sub new {
 	while (@_ >= 2) {
 		my $k = shift @_;
 		my $v = shift @_;
+        $k =~ s/^-//;
 		$self->{lc $k} = $v;
 	
 	}
 	bless $self, $type;
 
-	$self->{queuedepth}   = '@DFL_QUEUEDEPTH@' unless $self->queuedepth;
-	unless (length $self->syslog_ident) {
+	$self->{queuedepth}   = $M6::ARP::Queue::DFL_DEPTH if !$self->queuedepth;
+	if (length $self->syslog_ident == 0) {
 		my ($prog) = $0 =~ m|([^/]+)$|;
 		$self->syslog_ident($prog);
 	}
@@ -191,7 +192,7 @@ sub new {
 
 	$self->{'ip_all'} = { map { $_ => 1 } $self->get_ip_all };
 
-	$self->loglevel('info') unless length $self->loglevel;
+	$self->loglevel('info') if length $self->loglevel == 0;
 
 	$self->{'arp_table'} = {
 		$self->my_ip => [ $self->my_mac, time ]
@@ -219,7 +220,7 @@ sub new {
 sub arp_table {
 	my $self = shift;
 
-	return $self->{'arp_table'} unless @_;
+	return $self->{'arp_table'} if @_ == 0;
 
 	my $ip   = shift;
 
@@ -284,7 +285,7 @@ sub get_ip {
 	if (ref $dev) { $dev = $dev->device }
 	my $ip = `ifconfig $dev 2>/dev/null`;
 
-	unless ($ip =~ s/^.*inet addr:(\S+).*$/$1/s) {
+	if ($ip !~ s/^.*inet addr:(\S+).*$/$1/s) {
 		$ip = '0.0.0.0';
 	}
 	return $ip;
@@ -422,7 +423,7 @@ sub set_dead {
 sub set_alive {
 	my ($self, $ip, $mac) = @_;
 
-	return unless $self->is_my_network($ip);
+	return if ! $self->is_my_network($ip);
 
 	if ($self->get_state($ip) == DEAD) {
 		$self->print_log("unsponging: %s [found at %s]", $ip, $mac);
@@ -471,7 +472,7 @@ sub verbose {
 		$self = shift;
 		$verbose = $self->is_verbose;
 	}
-	$verbose = $::opt_verbose unless $verbose;
+	$verbose = $::opt_verbose if ! $verbose;
 
 	my $level = shift;
 
@@ -490,7 +491,7 @@ sub print_log_level {
 		$self = shift;
 		$syslog = $self->syslog_ident;
 	}
-	$syslog = $0 unless length $syslog;
+	$syslog = $0 if ! length $syslog;
 
 	my ($level, $format, @args) = @_;
 	if ($self->is_dummy || $self->is_verbose) {
@@ -532,7 +533,7 @@ sub print_notify {
 	elsif (UNIVERSAL::isa($_[0], 'IO::Handle')) {
 		$fh = shift;
 	}
-	return unless defined $fh;
+	return if ! defined $fh;
 
 	my $format = shift @_;
 
