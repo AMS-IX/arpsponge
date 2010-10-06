@@ -8,7 +8,8 @@
 #
 # See the LICENSE file that came with this package.
 #
-# A.Vijn, S.Bakker.
+# A.Vijn,   2003-2004;
+# S.Bakker, 2004-2010;
 #
 ###############################################################################
 package M6::ARP::Queue;
@@ -16,14 +17,16 @@ package M6::ARP::Queue;
 use strict;
 
 BEGIN {
-	our $VERSION = 1.02;
+	our $VERSION = 1.03;
 }
+
+our $DFL_DEPTH = 1000;
 
 =pod
 
 =head1 NAME
 
-M6::ARP::Queue - ARP query timestamp queue.
+M6::ARP::Queue - ARP query queue.
 
 =head1 SYNOPSIS
 
@@ -31,55 +34,58 @@ M6::ARP::Queue - ARP query timestamp queue.
 
  $q = new M6::ARP::Queue($max_depth);
 
- $q->clear($some_ip);
- $q->add($some_ip, $timestamp);
+ $q->clear($dst_ip);
+ $q->add($dst_ip, $src_ip, $timestamp);
 
- while ( ! $q->is_full($some_ip) ) {
+ while ( ! $q->is_full($dst_ip) ) {
 	...
  }
 
- $q_depth   = $q->depth($some_ip);
- $q_first   = $q->get($some_ip, 0);
- $q_last    = $q->get($some_ip, -1);
+ $q_depth_1 = $q->depth($dst_ip);
+ $q->reduce($dst_ip, 0.750);
+ $q_depth_2 = $q->depth($dst_ip);
+ $q_first   = $q->get($dst_ip, 0);
+ $q_last    = $q->get($dst_ip, -1);
 
- $q_per_min = $q->rate($some_ip);
+ $q_per_min = $q->rate($dst_ip);
 
- $listref = $q->get_queue($some_ip);
- print "timestamps: ", join(", ", @{$listref}), "\n";
+ $listref = $q->get_queue($dst_ip);
+ print "timestamps: ", join(", ", map { $_->[1] } @{$listref}), "\n";
 
 =head1 DESCRIPTION
 
-This object class is mainly used by the L<M6::ARP::Sponge|M6::ARP::Sponge>
-module to store timestamps for ARP queries. 
+This object class is used by the L<M6::ARP::Sponge|M6::ARP::Sponge>
+module to store [source, timestamp] tuples for ARP queries. 
 
 The object holds a collection of circular buffers that are accessed by 
-unique keys (IP address strings in the typical usage scenario). Timestamps
-are added to a queue until its size reaches the maximum depth, at which
-point newly added values cause the oldest values to be shifted off the
-queue.
+unique keys (IP address strings in the typical usage scenario). Pairs
+of source IP and timestamp data added to a queue until its size reaches
+the maximum depth, at which point newly added values cause the oldest
+values to be shifted off the queue.
 
-Although primarily used for storing timestamps of ARP queries
-for IP addresses, it can be used for more general work as well.
-Any string can be used as a queue key and arbitrary data can be
-added to the queues.
+=head1 VARIABLES
 
-Only the L</rate|rate> method makes assumptions about the data
-(i.e. that they are timestamps in seconds).
+=over
+
+=item X<$M6::ARP::Queue::DFL_DEPTH>I<$M6::ARP::Queue::DFL_DEPTH>
+
+Default maximum depth for queue objects (1000).
 
 =head1 CONSTRUCTOR
 
 =over
 
-=item X<new>B<new> ( I<MAXDEPTH> )
+=item X<new>B<new> ( [ I<MAXDEPTH> ] )
 
 Create a new object instance. Each queue will have a maximum depth
-of I<MAXDEPTH>. Returns a reference to the newly created object.
+of I<MAXDEPTH> (or I<$M6::ARP::Queue::DFL_DEPTH> if not given).
+Returns a reference to the newly created object.
 
 =cut
 
 sub new {
 	my $type = shift;
-	my $max_depth = shift;
+	my $max_depth = @_ ? shift : $DFL_DEPTH;
 
 	if (ref $type) { $type = ref $type }
 	bless {'max_depth' => $max_depth}, $type;
@@ -154,8 +160,8 @@ per minute.
 sub rate {
 	my $q = $_[0]->{$_[1]};
 	return undef unless defined($q) && @$q > 1;
-	my $first = $q->[0];
-	my $last  = $q->[$#$q];
+	my $first = $q->[0]->[1];
+	my $last  = $q->[$#$q]->[1];
 	my $time  = ($first < $last) ? $last-$first : 1;
 	my $n = int(@$q)-1;
 	return ($n / $time) * 60;
@@ -177,29 +183,30 @@ Return whether or not the queue for I<IP> is full, i.e. is wrapping.
 
 sub is_full { $_[0]->depth($_[1]) >= $_[0]->max_depth }
 
-=item X<add>B<add> ( I<IP>, I<TIMESTAMP> )
+=item X<add>B<add> ( I<IP>, I<SRC_IP>, I<TIMESTAMP> )
 
-Add I<TIMESTAMP> to the queue for I<IP>, wrapping the buffer ring if
-necessary. Returns the new queue depth.
+Add [I<SRC_IP>, I<TIMESTAMP>] to the queue for I<IP>,
+wrapping the buffer ring if necessary. Returns the new
+queue depth.
 
 =cut
 
 sub add {
-	my ($self, $ip, $val) = @_;
+	my ($self, $ip, $src_ip, $val) = @_;
 	if ($self->depth($ip) >= $self->max_depth) {
 		shift @{$self->{$ip}};
 	}
-	push @{$self->{$ip}}, $val;
+	push @{$self->{$ip}}, [ $src_ip, $val ];
 	return int(@{$self->{$ip}});
 }
 
 
 =item X<get>B<get> ( I<IP> [, I<INDEX>] )
 
-Return the data value at position I<INDEX> in the queue for I<IP>.
-Zero (0) is the oldest; positive values for I<INDEX> give increasingly
-more recent values. Negative numbers count from the end of the queue,
-so C<-1> gives the most recently added value.
+Return the [I<SRC_IP>, I<TIMESTAMP>] data tuple at position I<INDEX>
+in the queue for I<IP>.  Zero (0) is the oldest; positive values for
+I<INDEX> give increasingly more recent values. Negative numbers count
+from the end of the queue, so C<-1> gives the most recently added value.
 
 Compare:
 
@@ -224,6 +231,23 @@ sub get {
 	return $self->{$ip}->[$index];
 }
 
+=item X<get_timestamp>B<get> ( I<IP> [, I<INDEX>] )
+
+Return the I<TIMESTAMP> at position I<INDEX>
+in the queue for I<IP>. The value of I<INDEX> has the same meaning
+as for C<get()|/get> above.
+
+=cut
+
+sub get_timestamp {
+	my ($self, $ip, $index) = @_;
+
+    if (my $entry = $self->get($ip, $index)) {
+        return $entry->[1];
+    }
+    return undef;
+}
+
 
 =item X<get_queue>B<get_queue> ( I<IP> )
 
@@ -238,6 +262,43 @@ sub get_queue {
 	return $self->{$ip};
 }
 
+=item X<reduce>B<reduce> ( I<IP>, I<MIN_DELTA> )
+
+Reduce the queue for I<IP> by comparing subsequent pairs of entries for
+each source IP and removing the older one if the time delta between the
+two is below I<MIN_DELTA>. This can mitigate the effects of broadcast
+storms (e.g. due to loops) or DoS attacking.
+
+Returns the new queue depth after reducing.
+
+=cut
+
+sub reduce {
+	my ($self, $ip, $min_delta) = @_;
+
+    my $q = $self->{$ip};
+    if (!$q || @{$q} == 0) {
+        return 0;
+    }
+    
+    my @sorted = sort { $$a[0] cmp $$b[0] || $$a[1] <=> $$b[1] } @$q;
+    my @reduced = ();
+    my $prev_entry = undef;
+    for my $entry (@sorted) {
+        if ($prev_entry) {
+            if ($entry->[0] ne $prev_entry->[0] or
+                $entry->[1] - $prev_entry->[1] >= $min_delta)
+            {
+                push @reduced, $prev_entry;
+            }
+        }
+        $prev_entry = $entry;
+    }
+    push @reduced, $prev_entry;
+    @$q = sort { $$a[1] <=> $$b[1] } @reduced;
+    return int(@reduced);
+}
+
 1;
 
 __END__
@@ -250,7 +311,9 @@ __END__
  use Time::HiRes qw( usleep );
  use POSIX qw( strftime );
 
- my $some_ip = '10.1.1.1';
+ my $some_ip   = '10.1.1.1';
+ my $src_ip    = '10.1.1.2';
+ my $min_delta = 0.750;
 
  $q = new M6::ARP::Queue(100);
 
@@ -258,14 +321,22 @@ __END__
 
  $q->clear($some_ip);
  while (!$q->is_full($some_ip)) {
-	$q->add($some_ip, time);
+	$q->add($some_ip, $src_ip, time);
 	print STDERR sprintf("\rdepth: %3d", $q->depth($some_ip));
 	usleep(rand(5e5));
  }
- printf("\rdepth: %3d\n", $q->depth($some_ip));
- print strftime("first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
- print strftime("last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
- printf("rate: %0.2f queries/minute\n", $q->rate($some_ip));
+ print "\rBefore reduce:\n";
+         printf(" depth: %3d\n", $q->depth($some_ip));
+ print strftime(" first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
+ print strftime(" last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
+         printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
+
+ $q->reduce($some_ip, $min_delta);
+ print "\rAfter reduce:\n";
+         printf(" depth: %3d\n", $q->depth($some_ip));
+ print strftime(" first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
+ print strftime(" last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
+         printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
 
 =head1 SEE ALSO
 
