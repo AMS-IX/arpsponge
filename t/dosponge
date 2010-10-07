@@ -1,3 +1,8 @@
+#!/bin/sh
+#
+# @(#)$Id$
+#
+
 #IPADDR/PREFIXLEN dev IFNAME
 
 rm -f sponge.out sponge.status
