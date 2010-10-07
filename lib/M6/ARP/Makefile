@@ -10,6 +10,7 @@ include $(TOPDIR)/config.mk
 INSTALLDIR	=	$(INSTLIB)/M6/ARP
 
 INSTALLFILES		=	\
+				$(INSTALLDIR)/Base.pm		\
 				$(INSTALLDIR)/Queue.pm		\
 				$(INSTALLDIR)/Sponge.pm		\
 				$(INSTALLDIR)/Table.pm		\
