@@ -158,7 +158,7 @@ sub _define_accessor {
             . " if (\@_ < 2) { return \$_[0]->{'$key'} }\n"
             . " else {\n"
             . "  my \$s = shift;\n"
-            . "  \$->{'$key'} = shift;\n"
+            . "  \$s->{'$key'} = shift;\n"
             . "  return \$s;\n"
             . " }\n"
             . "}\n"
