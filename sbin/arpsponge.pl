@@ -11,7 +11,7 @@
 # See the LICENSE file that came with this package.
 #
 # A.Vijn,   2003-2004;
-# S.Bakker, November 2004;
+# S.Bakker, 2004-2010;
 #
 # Yes, this file is BIG. There's a POD at the end.
 #
@@ -42,34 +42,44 @@ $0 =~ s|.*/||g;
 
 use constant SYSLOG_IDENT => '@NAME@';
 
-my $DFL_LOGLEVEL   = '@DFL_LOGLEVEL@';
-my $DFL_RATE       = '@DFL_RATE@';
-my $DFL_ARP_AGE    = '@DFL_ARP_AGE@';
-my $DFL_PENDING    = '@DFL_PENDING@';
-my $DFL_LEARN      = '@DFL_LEARN@';
-my $DFL_QUEUEDEPTH = '@DFL_QUEUEDEPTH@';
-my $DFL_PROBERATE  = '@DFL_PROBERATE@';
-my $DFL_INIT       = '@DFL_INIT@';
+my $DFL_LOGLEVEL         = '@DFL_LOGLEVEL@';
+my $DFL_RATE             = '@DFL_RATE@';
+my $DFL_ARP_AGE          = '@DFL_ARP_AGE@';
+my $DFL_PENDING          = '@DFL_PENDING@';
+my $DFL_LEARN            = '@DFL_LEARN@';
+my $DFL_QUEUEDEPTH       = '@DFL_QUEUEDEPTH@';
+my $DFL_PROBERATE        = '@DFL_PROBERATE@';
+my $DFL_FLOOD_PROTECTION = '@DFL_FLOOD_PROTECTION@';
+my $DFL_INIT             = '@DFL_INIT@';
 
 $::USAGE=<<EOF;
 Usage: $0 [options] IPADDR/PREFIXLEN dev IFNAME
 
 Options:
-  --verbose[=n]     - be verbose; print information on STDOUT; turns off syslog
-  --dummy           - dummy operation (simulate sponging); turns off syslog
-  --daemon=pidfile  - put process in background, write pid to pidfile
-  --loglevel=level  - syslog logging level ("$DFL_LOGLEVEL")
-  --queuedepth=n    - number of ARP queries before we take notice ($DFL_QUEUEDEPTH)
-  --rate=n          - ARP threshold rate in queries/min ($DFL_RATE)
-  --pending=n       - number of seconds we send ARP queries before sponging ($DFL_PENDING)
-  --init=state      - how to initialize (default: $DFL_INIT)
-  --learning=secs   - number of seconds to spend in LEARN state
-  --proberate=n     - number queries/sec we send when learning or sweeping ($DFL_PROBERATE)
-  --notify=file     - print notifications of sponge actions to file
-  --age=secs        - time until we consider an ARP entry "stale" ($DFL_ARP_AGE)
-  --statusfile=file - write status to "file" when receiving HUP or USR1 signal
-  --sweep=sec/thr   - periodically sweep for "quiet" IP addresses
-  --sponge-network  - sponge the network address as well
+  --age=secs              - time in seconds until we consider an ARP entry
+                           "stale" ($DFL_ARP_AGE)
+  --daemon=pidfile        - put process in background, write pid to pidfile
+  --dummy                 - simulate sponging; turns off syslog
+  --flood-protection=n    - protect against floods from single sources;
+                            queries from a source coming in faster than
+                            "n" (q/sec) are ignored.
+  --init=state            - how to initialize (default: $DFL_INIT)
+  --learning=secs         - number of seconds to spend in LEARN state
+  --loglevel=level        - syslog logging level ("$DFL_LOGLEVEL")
+  --notify=file           - print notifications of sponge actions to file
+  --pending=n             - number of seconds we send ARP queries before
+                            sponging ($DFL_PENDING)
+  --proberate=n           - number queries/sec we send when learning or
+                            sweeping ($DFL_PROBERATE)
+  --queuedepth=n          - number of ARP queries before we take notice
+                            ($DFL_QUEUEDEPTH)
+  --rate=n                - ARP threshold rate in queries/min ($DFL_RATE)
+  --sponge-network        - sponge the network address as well
+  --statusfile=file       - write status to "file" when receiving HUP or
+                            USR1 signal
+  --sweep=sec/thr         - periodically sweep for "quiet" IP addresses
+  --verbose[=n]           - be verbose; print information on STDOUT;
+                           turns off syslog
 
 See also "perldoc $0".
 EOF
@@ -113,31 +123,33 @@ sub Main {
 	my $verbose    = undef;
 	my $help       = undef;
 	my $man        = undef;
-	my $sweep_sec       = undef;
-	my $sponge_net      = undef;
-	my $sweep_threshold = undef;
+	my $sweep_sec        = undef;
+	my $sponge_net       = undef;
+	my $sweep_threshold  = undef;
+	my $flood_protection = undef;
 
 	####################################################################
 
 	GetOptions(
-		'verbose:i'      => sub { $verbose = defined($_[1]) ? $_[1] : 1 },
-		'help|?'         => \$help,
-		'man'            => \$man,
-		'dummy!'         => \$dummy,
-		'loglevel=s'     => \$loglevel,
-		'rate=i'         => \$rate,
-		'pending=i'      => \$pending,
-		'init=s'         => \$init,
-		'learning=i'     => \$learning,
-		'proberate=i'    => \$proberate,
-		'statusfile=s'   => \$statusfile,
-		'daemon=s'       => \$daemon,
-		'queuedepth=i'   => \$queuedepth,
-		'notify=s'       => \$notify,
-		'age=i'          => \$age,
-		'sweep=s'        => \$sweep_sec,
-		'sponge-network' => \$sponge_net,
-		'gratuitous!'    => \$gratuitous,
+		'verbose:i'          => sub { $verbose = defined($_[1]) ? $_[1] : 1 },
+		'help|?'             => \$help,
+		'man'                => \$man,
+		'dummy!'             => \$dummy,
+		'flood-protection=f' => \$flood_protection,
+		'loglevel=s'         => \$loglevel,
+		'rate=f'             => \$rate,
+		'pending=i'          => \$pending,
+		'init=s'             => \$init,
+		'learning=i'         => \$learning,
+		'proberate=i'        => \$proberate,
+		'statusfile=s'       => \$statusfile,
+		'daemon=s'           => \$daemon,
+		'queuedepth=i'       => \$queuedepth,
+		'notify=s'           => \$notify,
+		'age=i'              => \$age,
+		'sweep=s'            => \$sweep_sec,
+		'sponge-network'     => \$sponge_net,
+		'gratuitous!'        => \$gratuitous,
 	) or pod2usage(2);
 
 	if ($dummy && $daemon) {
@@ -209,19 +221,20 @@ sub Main {
 	$| = ($verbose > 0 ? 1 : 0);
 
 	my $sponge = new M6::ARP::Sponge(
-			verbose      => $verbose,
-			dummy        => $dummy,
-			queuedepth   => $queuedepth,
-			device       => $device,
-			notify       => $notify_fh,
-			loglevel     => $loglevel,
-			network      => $network,
-			netmask      => $netmask,
-			max_pending  => $pending,
-			max_rate     => $rate,
-			arp_age      => $age,
-			gratuitous   => $gratuitous,
-			syslog_ident => SYSLOG_IDENT
+			verbose          => $verbose,
+			dummy            => $dummy,
+			queuedepth       => $queuedepth,
+			device           => $device,
+			notify           => $notify_fh,
+			loglevel         => $loglevel,
+			network          => $network,
+			netmask          => $netmask,
+			max_pending      => $pending,
+			max_rate         => $rate,
+			arp_age          => $age,
+			gratuitous       => $gratuitous,
+			flood_protection => $flood_protection,
+			syslog_ident     => SYSLOG_IDENT,
 		);
 
 	$sponge->user('start_time', time);
@@ -600,13 +613,15 @@ sub process_pkt {
 	# Don't do anything else if we are still learning.
 	return if $sponge->user('learning');
 
-	$sponge->queue->add($dst_ip, time);
+	$sponge->queue->add($dst_ip, $src_ip, time);
 
 	if (defined $state) {
 		if ($state == ALIVE) {
 			if ($sponge->queue->is_full($dst_ip)) {
-				if ($sponge->queue->rate($dst_ip) > $sponge->max_rate) {
-					$state = $sponge->set_pending($dst_ip, 0);
+                $sponge->queue->reduce($sponge->flood_protection);
+                if ($sponge->queue->is_full($dst_ip) &&
+                    $sponge->queue->rate($dst_ip) > $sponge->max_rate) {
+                        $state = $sponge->set_pending($dst_ip, 0);
 				}
 			}
 		}
@@ -745,17 +760,18 @@ sub do_status {
 		"started:       ",
 			strftime("%Y-%m-%d %H:%M:%S", localtime($start_time)),
 			" [", int($start_time), "]\n",
-		"network:       ", $sponge->network, "/", $sponge->netmask, "\n",
-		"interface:     ", $sponge->device, "\n",
-		"IP/MAC:        ", $sponge->my_ip, " [", $sponge->my_mac, "]\n",
-		"queue depth:   ", $sponge->queuedepth, "\n",
-		"max rate:      ", $sponge->max_rate, "\n",
-		"max pending:   ", $sponge->max_pending, "\n",
-		"sweep period:  ", $sponge->user('sweep_sec'), " sec\n",
-		"sweep age:     ", $sponge->user('sweep_age'), " sec\n",
-		"proberate:     ", int(1/$sponge->user('probesleep')), "\n",
-		"next sweep in: ", int($sponge->user('next_sweep')-time()), " sec\n",
-		"learning:      ", $learning, "\n",
+		"network:          ", $sponge->network, "/", $sponge->netmask, "\n",
+		"interface:        ", $sponge->device, "\n",
+		"IP/MAC:           ", $sponge->my_ip, " [", $sponge->my_mac, "]\n",
+		"queue depth:      ", $sponge->queuedepth, "\n",
+		"max rate:         ", sprintf("%0.2f\n", $sponge->max_rate),
+		"flood protection: ", sprintf("%0.2f\n", $sponge->flood_protection),
+		"max pending:      ", $sponge->max_pending, "\n",
+		"sweep period:     ", $sponge->user('sweep_sec'), " sec\n",
+		"sweep age:        ", $sponge->user('sweep_age'), " sec\n",
+		"proberate:        ", int(1/$sponge->user('probesleep')), "\n",
+		"next sweep in:    ", int($sponge->user('next_sweep')-$now), " sec\n",
+		"learning:         ", $learning, "\n",
 		"\n"
 	);
 
@@ -868,7 +884,8 @@ I<Options>:
     --sponge-network
     --learning=secs
     --queuedepth=n
-    --rate=n
+    --rate=r
+    --flood-protection=r
     --pending=n
     --proberate=n
     --sweep=interval/threshold
@@ -1092,11 +1109,27 @@ Number of ARP queries over which to calculate average rate (default
 @DFL_QUEUEDEPTH@).
 Sponging is not triggered until at least this number of ARP queries are seen.
 
-=item X<--rate>B<--rate>=I<n>
+=item X<--rate>B<--rate>=I<r>
 
 ARP threshold rate in queries/min (default @DFL_RATE@). If the ARP queue
 (see above) is full, and the average rate of incoming queries per second
-exceeds I<n>, we move the target IP to I<PENDING> state.
+exceeds I<r>, we move the target IP to I<PENDING> state (but see also
+L<--flood-protection|/--flood-protection>.
+
+=item X<--flood-protection>B<--flood-protection>=I<r>
+
+ARP threshold rate in queries/sec (default @DFL_FLOOD_PROTECTION@) above
+which we ignore ARP queries from a particular source.
+
+If there is a ARP broadcast storm on the platform (e.g. loops or DoS),
+it's possible that one or more IP addresses originate large amounts
+of (bogus) ARP queries.
+
+As an example, suppose we set flood protection to "3", and I<SRC_IP>
+sends over 100 ARP queries/sec for I<DST_IP>. Rather than putting
+I<DST_IP> in pending mode after a few second of this, we would check
+the ARP rate of I<SRC_IP> and see that it exceeds 3 and immediately
+reduce the queue back to 1.
 
 =item X<--pending>B<--pending>=I<n>
 
@@ -1132,7 +1165,7 @@ the time spent in a probing sweep:
   Tmax =   ---------
            PROBERATE
 
-So a sweep over 100 addresses a probe rate of 50 takes about 2 seconds.
+So a sweep over 100 addresses with a probe rate of 50 takes about 2 seconds.
 
 The CPU can usually throw ICMP packets at an interface much faster than
 the actual wire-speed, so many do not make it onto the wire.
