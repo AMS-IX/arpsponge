@@ -16,22 +16,22 @@ package M6::ARP::Sponge;
 
 use strict;
 
-use M6::ARP::Queue;
-use M6::ARP::Util qw( :all );
+use base qw( M6::ARP::Base Exporter );
 
-use POSIX qw( strftime );
+use M6::ARP::Queue;
+use M6::ARP::Util       qw( :all );
+
+use POSIX               qw( strftime );
 use NetPacket::Ethernet qw( :types );
-use NetPacket::ARP qw( ARP_OPCODE_REQUEST );
+use NetPacket::ARP      qw( ARP_OPCODE_REQUEST );
 use NetPacket::IP;
 use Net::ARP;
 use Sys::Syslog;
-use Net::IPv4Addr qw( :all );
+use Net::IPv4Addr       qw( :all );
 use IO::File;
 
 BEGIN {
-	use Exporter;
 	our $VERSION = 1.05;
-	our @ISA = qw( Exporter );
 
 	my @states = qw( STATIC DEAD ALIVE PENDING );
 	my @log    = qw( print_log print_notify );
@@ -47,30 +47,21 @@ BEGIN {
 	0 if 0 && $::opt_verbose;
 }
 
+# State constants/macros
 use constant STATIC  => -3;
 use constant DEAD    => -2;
 use constant ALIVE   => -1;
 
 sub PENDING	{ 0 + $_[$#_] };
 
-# $val = _getset($field, $sponge [, $val]);
-#
-#   Help routine for setting/getting fields.
-#	When the object instance is a hash ref, simple object attributes
-#	are easily defined:
-#
-#		sub myfield { _getset('myfield', @_) }
-#
-sub _getset {
-	my $field = shift;
-	my $self  = shift;
-
-	my $v = $self->{$field};
-	if (@_) {
-		$self->{$field} = shift;
-	}
-	return $v;
-}
+# Accessors; use the factory :-)
+__PACKAGE__->mk_accessors(qw( 
+                syslog_ident    is_verbose  is_dummy
+                queuedepth      my_ip       my_mac
+                network         netmask     loglevel
+                max_pending     notify      max_rate
+                arp_age         gratuitous  flood_protection
+        ));
 
 ###############################################################################
 #
@@ -101,26 +92,12 @@ sub user {
 #					Object Attributes
 #
 ###############################################################################
-sub queue        { $_[0]->{'queue'} }
-sub device       { $_[0]->{'device'} }
-sub phys_device  { $_[0]->{'phys_device'} }
-sub pending      { $_[0]->{'pending'} }
+sub queue            { shift->{'queue'} }
+sub device           { shift->{'device'} }
+sub phys_device      { shift->{'phys_device'} }
+sub pending          { shift->{'pending'} }
 
-sub syslog_ident { _getset('syslog_ident', @_) }
-sub is_verbose   { _getset('verbose', @_) }
-sub is_dummy     { _getset('dummy', @_) }
-sub queuedepth   { _getset('queuedepth', @_) }
-sub my_ip        { _getset('my_ip', @_) }
-sub is_my_ip     { $_[0]->{'ip_all'}->{$_[1]} }
-sub my_mac       { _getset('my_mac', @_) }
-sub network      { _getset('network', @_) }
-sub netmask      { _getset('netmask', @_) }
-sub loglevel     { _getset('loglevel', @_) }
-sub max_pending  { _getset('max_pending', @_) }
-sub notify       { _getset('notify', @_) }
-sub max_rate     { _getset('max_rate', @_) }
-sub arp_age      { _getset('arp_age', @_) }
-sub gratuitous   { _getset('gratuitous', @_) }
+sub is_my_ip         { $_[0]->{'ip_all'}->{$_[1]} }
 
 sub state_atime      { $_[0]->{state_atime}->{$_[1]} }
 sub set_state_atime  { $_[0]->{state_atime}->{$_[1]} = $_[2] }
@@ -128,8 +105,8 @@ sub set_state_atime  { $_[0]->{state_atime}->{$_[1]} = $_[2] }
 sub state_mtime      { $_[0]->{state_mtime}->{$_[1]} }
 sub set_state_mtime  { $_[0]->{state_mtime}->{$_[1]} = $_[2] }
 
-sub state_table  { $_[0]->{state} }
-sub get_state    { $_[0]->{state}->{$_[1]} }
+sub state_table      { shift->{state} }
+sub get_state        { $_[0]->{state}->{$_[1]} }
 
 sub set_state    {
 	my ($self, $ip, $state) = @_;
