@@ -617,11 +617,16 @@ sub process_pkt {
 
 	if (defined $state) {
 		if ($state == ALIVE) {
-			if ($sponge->queue->is_full($dst_ip)) {
+			if ($sponge->queue->is_full($dst_ip) &&
+                $sponge->queue->rate($dst_ip) > $sponge->max_rate)
+            {
+                # Instead of just moving to pending, reduce the queue
+                # by removing flooding sources, then check again...
                 $sponge->queue->reduce($sponge->flood_protection);
                 if ($sponge->queue->is_full($dst_ip) &&
-                    $sponge->queue->rate($dst_ip) > $sponge->max_rate) {
-                        $state = $sponge->set_pending($dst_ip, 0);
+                    $sponge->queue->rate($dst_ip) > $sponge->max_rate)
+                {
+                    $state = $sponge->set_pending($dst_ip, 0);
 				}
 			}
 		}
