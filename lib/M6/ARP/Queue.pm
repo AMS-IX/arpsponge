@@ -173,7 +173,7 @@ Return the maximum depth of the queues.
 
 =cut
 
-sub max_depth { $_[0]->{'max_depth'} }
+sub max_depth { shift->{'max_depth'} }
 
 =item X<is_full>B<is_full> ( I<IP> )
 
@@ -201,7 +201,7 @@ sub add {
 }
 
 
-=item X<get>B<get> ( I<IP> [, I<INDEX>] )
+=item X<get_entry>B<get_entry> ( I<IP> [, I<INDEX>] )
 
 Return the [I<SRC_IP>, I<TIMESTAMP>] data tuple at position I<INDEX>
 in the queue for I<IP>.  Zero (0) is the oldest; positive values for
@@ -220,7 +220,7 @@ Also:
 
 =cut
 
-sub get {
+sub get_entry {
 	my ($self, $ip, $index) = @_;
 
 	$index = 0 unless defined($index);
@@ -233,6 +233,8 @@ sub get {
 
 =item X<get_timestamp>B<get> ( I<IP> [, I<INDEX>] )
 
+=item X<get>B<get> ( I<IP> [, I<INDEX>] )
+
 Return the I<TIMESTAMP> at position I<INDEX>
 in the queue for I<IP>. The value of I<INDEX> has the same meaning
 as for C<get()|/get> above.
@@ -242,12 +244,20 @@ as for C<get()|/get> above.
 sub get_timestamp {
 	my ($self, $ip, $index) = @_;
 
-    if (my $entry = $self->get($ip, $index)) {
+    if (my $entry = $self->get_entry($ip, $index)) {
         return $entry->[1];
     }
     return undef;
 }
 
+sub get {
+	my ($self, $ip, $index) = @_;
+
+    if (my $entry = $self->get_entry($ip, $index)) {
+        return $entry->[1];
+    }
+    return undef;
+}
 
 =item X<get_queue>B<get_queue> ( I<IP> )
 
@@ -257,30 +267,34 @@ that you don't inadvertently modify it.
 
 =cut
 
-sub get_queue {
-	my ($self, $ip) = @_;
-	return $self->{$ip};
-}
+sub get_queue { return $_[0]->{$_[1]} }
 
-=item X<reduce>B<reduce> ( I<IP>, I<MIN_DELTA> )
+=item X<reduce>B<reduce> ( I<IP>, I<MAX_RATE> )
 
 Reduce the queue for I<IP> by comparing subsequent pairs of entries for
 each source IP and removing the older one if the time delta between the
-two is below I<MIN_DELTA>. This can mitigate the effects of broadcast
-storms (e.g. due to loops) or DoS attacking.
+two is below 1/I<MAX_RATE>. This effectively means that a source that's
+sending more than I<MAX_RATE> ARP queries per second will be largely
+ignored. This can mitigate the effects of broadcast storms (e.g. due
+to loops) or DoS attacking.
 
 Returns the new queue depth after reducing.
 
 =cut
 
 sub reduce {
-	my ($self, $ip, $min_delta) = @_;
+	my ($self, $ip, $max_rate) = @_;
 
     my $q = $self->{$ip};
     if (!$q || @{$q} == 0) {
         return 0;
     }
-    
+    if ($max_rate <= 0) {
+        return int(@$q);
+    }
+
+    my $min_delta = 1/$max_rate;
+
     my @sorted = sort { $$a[0] cmp $$b[0] || $$a[1] <=> $$b[1] } @$q;
     my @reduced = ();
     my $prev_entry = undef;
@@ -307,36 +321,65 @@ __END__
 
 =head1 EXAMPLE
 
- use M6::ARP::Queue;
- use Time::HiRes qw( usleep );
- use POSIX qw( strftime );
+    use M6::ARP::Queue;
+    use Time::HiRes qw( usleep time );
+    use POSIX qw( strftime );
 
- my $some_ip   = '10.1.1.1';
- my $src_ip    = '10.1.1.2';
- my $min_delta = 0.750;
+    my $some_ip   = '10.1.1.1';
+    my @src_ip    = ('10.1.1.2', '10.1.1.3', '10.1.1.4');
+    my $max_rate  = 10;
 
- $q = new M6::ARP::Queue(100);
+    $q = new M6::ARP::Queue(100);
 
- printf("filling queue for $some_ip (max %d)\n", $q->max_depth);
+    printf("Filling queue for $some_ip (max %d)\n", $q->max_depth);
 
- $q->clear($some_ip);
- while (!$q->is_full($some_ip)) {
-	$q->add($some_ip, $src_ip, time);
-	print STDERR sprintf("\rdepth: %3d", $q->depth($some_ip));
-	usleep(rand(5e5));
- }
- print "\rBefore reduce:\n";
-         printf(" depth: %3d\n", $q->depth($some_ip));
- print strftime(" first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
- print strftime(" last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
-         printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
+    $q->clear($some_ip);
+    my $n = 0;
+    while (!$q->is_full($some_ip)) {
+            my $src_ip = $src_ip[$n];
+            $n = ($n + 1) % int(@src_ip);
+            $q->add($some_ip, $src_ip, time);
+            print STDERR sprintf("\rdepth: %3d", $q->depth($some_ip));
+            usleep(rand(5e4));
+    }
+    print "\rBefore reduce:\n";
+            printf(" depth: %3d\n", $q->depth($some_ip));
+    print strftime(" first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
+    print strftime(" last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
+            printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
 
- $q->reduce($some_ip, $min_delta);
- print "\rAfter reduce:\n";
-         printf(" depth: %3d\n", $q->depth($some_ip));
- print strftime(" first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
- print strftime(" last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
-         printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
+    #$" = ",";
+    #foreach $entry (@{$q->get_queue($some_ip)}) {
+    #   print qq{[@$entry]\n};
+    #}
+
+    $q->reduce($some_ip, $max_rate);
+    print "\nAfter reduce:\n";
+            printf(" depth: %3d\n", $q->depth($some_ip));
+    print strftime(" first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
+    print strftime(" last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
+            printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
+
+    #foreach $entry (@{$q->get_queue($some_ip)}) {
+    #   print qq{[@$entry]\n};
+    #}
+
+
+Output:
+
+    Filling queue for 10.1.1.1 (max 100)
+    100
+    Before reduce:
+     depth: 100
+     first: 00:43:44
+     last:  08:43:04
+     rate:  2451.50 queries/minute
+
+    After reduce:
+     depth:  18
+     first: 00:18:08
+     last:  08:43:04
+     rate:  438.50 queries/minute
 
 =head1 SEE ALSO
 
