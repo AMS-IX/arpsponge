@@ -15,21 +15,22 @@
 # ----------------------------------------------------------------------------
 
     # Where's perl on your system?
-           PERL 	=	/usr/bin/perl
+                PERL 	=	/usr/bin/perl
 
 
-       IFCONFIG		=	/sbin/ifconfig
-       DFL_RATE		=	50
- DFL_QUEUEDEPTH		= 	1000
-    DFL_ARP_AGE		=	600
-    DFL_PENDING		=	5
-  DFL_PROBERATE		=	100
-       DFL_INIT		=	ALIVE
-      DFL_LEARN		=	5
-   DFL_LOGLEVEL		=	info
+            IFCONFIG	=	/sbin/ifconfig
+            DFL_RATE	=	50
+      DFL_QUEUEDEPTH	= 	1000
+         DFL_ARP_AGE	=	600
+         DFL_PENDING	=	5
+       DFL_PROBERATE	=	100
+DFL_FLOOD_PROTECTION	=	3.0
+            DFL_INIT	=	ALIVE
+           DFL_LEARN	=	5
+        DFL_LOGLEVEL	=	info
 
- SPONGE_OPTIONS		=	--age=$(DFL_ARP_AGE)
-     SPONGE_VAR		=	/var/run/$(NAME)
+      SPONGE_OPTIONS	=	--age=$(DFL_ARP_AGE)
+          SPONGE_VAR	=	/var/run/$(NAME)
 
   # ----------------------------
   # --- Installation details ---

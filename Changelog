@@ -2,6 +2,36 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - alpha - steven
+
+  * 07.oct.2010 - steven
+
+    Added flood protection by limiting the significance of
+    ARP queries if they all come from the same source.
+
+    Add src_ip to the queue as well, and when the queue is full, collapse
+    entries of the same source if they are timed too closely together 
+    (less than 1/$flood_protection_rate).
+
+        * Take list:
+            [t0, s1], [t1, s2], [t2, s2], [t3, s1], [t4, s2], [t5, s2]
+
+        * Sort by SRC, then TIMESTAMP:
+            [t0, s1], [t3, s1], [t1, s2], [t2, s2], [t4, s2], [t5, s2]
+
+        * Reduce closely spaced entries from the same SRC:
+            [t0, s1], [t3, s1], [t1, s2], [t4, s2]
+
+        * Sort by TIMESTAMP again:
+            [t0, s1], [t1, s2], [t3, s1], [t4, s2]
+
+    Advantage: works even if multiple sources are spamming us with
+    ARP queries. Flood protection overhead only kicks in when queue
+    is full and apparent rate (i.e. pre-reduce) > max-rate.
+
+    Disadvantage: more state to keep, more processing when queue is
+    full.
+
 3.9.5 - 10.aug.2010 - steven
 
   * 10.aug.2010 - steven
