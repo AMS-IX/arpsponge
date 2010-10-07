@@ -1,5 +1,6 @@
 @(#) $Id$
 
+--------------------------------------------------
 Wish list for future enhancements:
 
 * setuid() to unprivileged user after opening relevant streams.
@@ -22,3 +23,43 @@ Wish list for future enhancements:
 
 	Sweeper:    waits for Learner to finish, then periodically probes
                 "quiet" IPs.
+
+--------------------------------------------------
+Thu Oct  7 09:16:50 CEST 2010
+
+[Implemented first approach]
+
+    Add flood protection by somehow limiting the significance of
+    ARP queries if they all come from the same source.
+
+    Possible approaches:
+
+    * Add src_ip to the queue as well, and when the queue is full, collapse
+      entries of the same source if they are timed too closely together (say,
+      less than 750ms).
+
+        * Take list:
+            [t0, s1], [t1, s2], [t2, s2], [t3, s1], [t4, s2], [t5, s2]
+
+        * Sort by SRC, then TIMESTAMP:
+            [t0, s1], [t3, s1], [t1, s2], [t2, s2], [t4, s2], [t5, s2]
+
+        * Reduce closely spaced entries from the same SRC:
+            [t0, s1], [t3, s1], [t1, s2], [t4, s2]
+
+        * Sort by TIMESTAMP again:
+            [t0, s1], [t1, s2], [t3, s1], [t4, s2]
+
+      Advantage: works even if multiple sources are spamming us with
+      ARP queries.
+
+      Disadvantage: more state to keep, more processing when queue is
+      full
+
+    * Add "last_src" to Queue. An ARP is only added if the source
+      does not match last_src, OR the difference in timestamps is
+      > 750ms.
+
+      Advantage:    less state to keep, less processing when queue is full
+      Disadvantage: multiple flooding sources can still cause sponging,
+                    extra overhead for adding _each_ entry to the queue.
