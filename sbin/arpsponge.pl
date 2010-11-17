@@ -88,7 +88,7 @@ EOF
 
 my $wrote_pid = 0;
 my $daemon    = undef;
-my $flag_hup = 0;
+my $flag_hup  = 0;
 my $flag_usr1 = 0;
 my $flag_alrm = 0;
 
@@ -268,7 +268,6 @@ sub Main {
 	$::SIG{'TERM'} = sub { process_signal($sponge, 'TERM') };
 	$::SIG{'USR1'} = sub { $flag_usr1 = 1; };
 	$::SIG{'HUP'}  = sub { $flag_hup = 1; };
-
 	$::SIG{'ALRM'} = sub { $flag_alrm = 1; };
 
     packet_capture_loop($sponge);
@@ -355,12 +354,9 @@ sub packet_capture_loop {
             if (vec($rbits_out, $pcap_fd, 1)) {
                 # This should process all buffered packets, but
                 # it seems to only process one packet.
-                my $old_usr1 = $::SIG{'USR1'};
-                my $old_hup  = $::SIG{'HUP'};
-                $::SIG{'USR1'} = $::SIG{'HUP'} = 'IGNORE';
+                local $SIG{'USR1'} = local $SIG{'HUP'}
+                        = local $SIG{'ALRM'} = 'IGNORE';
                 pcap_dispatch($pcap_h, -1, \&process_pkt, $sponge);
-                $::SIG{'USR1'} = $old_usr1;
-                $::SIG{'HUP'}  = $old_hup;
             }
             else {
                 if (!$err_count) {
