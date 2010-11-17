@@ -73,8 +73,8 @@ start_sponge() {
         status="${SPONGE_VAR}/${DEVICE}/status"
         pidfile="${SPONGE_VAR}/${DEVICE}/pid"
 
-        opts="--statusfile='${status}'"
-        eval_bool ${NOTIFY}         && opts="$opts --notify ${notify}"
+        opts="--statusfile=${status}"
+        eval_bool ${NOTIFY}         && opts="$opts --notify=${notify}"
         eval_bool ${SPONGE_NETWORK} && opts="$opts --sponge-network"
         eval_bool ${GRATUITOUS}     && opts="$opts --gratuitous"
         [ -n "${INIT_MODE}" ]       && opts="$opts --init=${INIT_MODE}"
@@ -95,7 +95,7 @@ start_sponge() {
             opts="$opts --dummy"
             SPONGE_DEBUG=true
         else
-            opts="$opts --daemon='${pidfile}'"
+            opts="$opts --daemon=${pidfile}"
         fi
 
         if [ ! -n "${DEVICE}" ]
