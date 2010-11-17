@@ -25,9 +25,19 @@ SPONGE_VAR=@SPONGE_VAR@
 SPONGE_OPTIONS="@SPONGE_OPTIONS@"
 
 # Program defaults
-export DUMMY_MODE INIT_MODE SPONGE_NETWORK LEARNING
-export QUEUE_DEPTH RATE PENDING SWEEP GRATUITOUS AGE
-export PROBERATE NOTIFY
+export  AGE \
+        DUMMY_MODE \
+        FLOOD_PROTECTION \
+        GRATUITOUS \
+        INIT_MODE \
+        LEARNING \
+        NOTIFY \
+        PENDING \
+        PROBERATE \
+        QUEUE_DEPTH \
+        RATE \
+        SPONGE_NETWORK \
+        SWEEP
 
 # Defaults for all sponges.
 if test -f /etc/default/${PROG}/defaults ; then
@@ -63,9 +73,8 @@ start_sponge() {
         status="${SPONGE_VAR}/${DEVICE}/status"
         pidfile="${SPONGE_VAR}/${DEVICE}/pid"
 
-        opts=''
+        opts="--statusfile='${status}'"
         eval_bool ${NOTIFY}         && opts="$opts --notify ${notify}"
-        eval_bool ${DUMMY_MODE}     && opts="$opts --dummy"
         eval_bool ${SPONGE_NETWORK} && opts="$opts --sponge-network"
         eval_bool ${GRATUITOUS}     && opts="$opts --gratuitous"
         [ -n "${INIT_MODE}" ]       && opts="$opts --init=${INIT_MODE}"
@@ -76,6 +85,18 @@ start_sponge() {
         [ -n "${SWEEP}" ]           && opts="$opts --sweep=${SWEEP}"
         [ -n "${PROBERATE}" ]       && opts="$opts --proberate=${PROBERATE}"
         [ -n "${AGE}" ]             && opts="$opts --age=${AGE}"
+		if [ -n "${FLOOD_PROTECTION}" ]; then
+            opts="$opts --flood-protection=${FLOOD_PROTECTION}"
+        fi
+
+        # DUMMY_MODE and --daemon are mutually exclusive
+        # so make DUMMY_MODE imply SPONGE_DEBUG
+        if eval_bool ${DUMMY_MODE}; then
+            opts="$opts --dummy"
+            SPONGE_DEBUG=true
+        else
+            opts="$opts --daemon='${pidfile}'"
+        fi
 
         if [ ! -n "${DEVICE}" ]
         then
@@ -91,10 +112,7 @@ start_sponge() {
             echo "** DEBUG MODE:"
             echo "** command line:"
             echo "----"
-            echo ${BINDIR}/${PROG} ${opts} \
-                    --daemon="${pidfile}" \
-                    --statusfile="${status}" \
-                    ${NETWORK} dev "${DEVICE}"
+            echo ${BINDIR}/${PROG} ${opts} ${NETWORK} dev "${DEVICE}"
             echo "----"
             echo "** DEBUG MODE: not executing"
             exit 0
@@ -114,10 +132,7 @@ start_sponge() {
 
         printf "  %-10s " "${DEVICE}"
 
-        ${BINDIR}/${PROG} ${opts} \
-            --daemon="${pidfile}" \
-            --statusfile="${status}" \
-            ${NETWORK} dev "${DEVICE}" 2>/dev/null
+        ${BINDIR}/${PROG} ${opts} ${NETWORK} dev "${DEVICE}" 2>/dev/null
     
         [ $? -eq 0 ] && echo "[Ok]" || echo "[FAILED]"
     )

@@ -108,25 +108,25 @@ sub start_daemon($$);
 # Main program code :-)
 ###############################################################################
 sub Main {
-	my $loglevel   = $DFL_LOGLEVEL;
-	my $queuedepth = $DFL_QUEUEDEPTH;
-	my $pending    = $DFL_PENDING;
-	my $learning   = $DFL_LEARN;
-	my $init       = $DFL_INIT;
-	my $rate       = $DFL_RATE;
-	my $age        = $DFL_ARP_AGE;
-	my $proberate  = $DFL_PROBERATE;
-	my $notify     = undef;
-	my $gratuitous = undef;
-	my $dummy      = undef;
-	my $statusfile = undef;
-	my $verbose    = undef;
-	my $help       = undef;
-	my $man        = undef;
+	my $loglevel         = $DFL_LOGLEVEL;
+	my $queuedepth       = $DFL_QUEUEDEPTH;
+	my $pending          = $DFL_PENDING;
+	my $learning         = $DFL_LEARN;
+	my $init             = $DFL_INIT;
+	my $rate             = $DFL_RATE;
+	my $age              = $DFL_ARP_AGE;
+	my $proberate        = $DFL_PROBERATE;
+	my $flood_protection = $DFL_FLOOD_PROTECTION;
+	my $notify           = undef;
+	my $gratuitous       = undef;
+	my $dummy            = undef;
+	my $statusfile       = undef;
+	my $verbose          = undef;
+	my $help             = undef;
+	my $man              = undef;
 	my $sweep_sec        = undef;
 	my $sponge_net       = undef;
 	my $sweep_threshold  = undef;
-	my $flood_protection = undef;
 
 	####################################################################
 
@@ -621,14 +621,27 @@ sub process_pkt {
 			if ($sponge->queue->is_full($dst_ip) &&
                 $sponge->queue->rate($dst_ip) > $sponge->max_rate)
             {
-                # Instead of just moving to pending, reduce the queue
-                # by removing flooding sources, then check again...
-                $sponge->queue->reduce($sponge->flood_protection);
-                if ($sponge->queue->is_full($dst_ip) &&
-                    $sponge->queue->rate($dst_ip) > $sponge->max_rate)
-                {
+                if (my $fprate = $sponge->flood_protection) {
+                    # Instead of just moving to pending, reduce the queue
+                    # by removing flooding sources, then check again...
+                    my $d1 = $sponge->queue->depth($dst_ip);
+                    my $r1 = $sponge->queue->rate($dst_ip);
+                    my $d2 = $sponge->queue->reduce($dst_ip, $fprate);
+                    my $r2 = $sponge->queue->rate($dst_ip);
+                    $sponge->print_log(
+                            "%s queue reduced: [depth,rate] = "
+                            ."[%d,%0.1f] -> [%d,%0.1f]",
+                            $dst_ip, $d1, $r1, $d2, $r2
+                        );
+                    if ($sponge->queue->is_full($dst_ip) &&
+                        $r2 > $sponge->max_rate)
+                    {
+                        $state = $sponge->set_pending($dst_ip, 0);
+                    }
+                }
+                else {
                     $state = $sponge->set_pending($dst_ip, 0);
-				}
+                }
 			}
 		}
 
@@ -758,12 +771,12 @@ sub do_status {
 	}
 
 	$fh->print(
-		"id:            ", $sponge->syslog_ident, "\n",
-		"version:       ", '@RELEASE@', "\n",
-		"date:          ",
+		"id:               ", $sponge->syslog_ident, "\n",
+		"version:          ", '@RELEASE@', "\n",
+		"date:             ",
 			strftime("%Y-%m-%d %H:%M:%S", localtime($now)),
 			" [", int($now), "]\n",
-		"started:       ",
+		"started:          ",
 			strftime("%Y-%m-%d %H:%M:%S", localtime($start_time)),
 			" [", int($start_time), "]\n",
 		"network:          ", $sponge->network, "/", $sponge->netmask, "\n",

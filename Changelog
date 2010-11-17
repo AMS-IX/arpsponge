@@ -4,6 +4,14 @@
 
 3.10 - alpha - steven
 
+  * 17.nov.2010 - steven
+    Backported fixes from mon-eun-014 for the signal handling.
+
+    Notify FIFO no longer default on init startup.
+
+    More robust init script. Don't execute the daemon if
+    SPONGE_DEBUG or SPONGE_DUMMY is set.
+
   * 07.oct.2010 - steven
 
     Added flood protection by limiting the significance of
