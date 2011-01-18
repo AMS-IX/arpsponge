@@ -20,7 +20,8 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 
-use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno pcap_setnonblock );
+use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
+                  pcap_get_selectable_fd pcap_setnonblock );
 
 use NetPacket::Ethernet qw( :types );
 use NetPacket::ARP      qw( ARP_OPCODE_REQUEST );
@@ -28,7 +29,7 @@ use NetPacket::IP;
 
 use Time::HiRes         qw( time sleep );
 use Net::IPv4Addr       qw( :all );
-use POSIX               qw( strftime );
+use POSIX               qw( strftime :signal_h );
 
 use Sys::Syslog;
 use IO::File;
@@ -86,11 +87,9 @@ EOF
 
 ###############################################################################
 
-my $wrote_pid = 0;
-my $daemon    = undef;
-my $flag_hup  = 0;
-my $flag_usr1 = 0;
-my $flag_alrm = 0;
+my $wrote_pid    = 0;
+my $daemon       = undef;
+my $block_sigset = POSIX::SigSet->new(SIGUSR1, SIGHUP, SIGALRM);
 
 # ============================================================================
 END {
@@ -266,9 +265,9 @@ sub Main {
 	$::SIG{'INT'}  = sub { process_signal($sponge, 'INT')  };
 	$::SIG{'QUIT'} = sub { process_signal($sponge, 'QUIT') };
 	$::SIG{'TERM'} = sub { process_signal($sponge, 'TERM') };
-	$::SIG{'USR1'} = sub { $flag_usr1 = 1; };
-	$::SIG{'HUP'}  = sub { $flag_hup = 1; };
-	$::SIG{'ALRM'} = sub { $flag_alrm = 1; };
+	$::SIG{'USR1'} = sub { do_status('USR1', $sponge)      };
+	$::SIG{'HUP'}  = sub { do_status('HUP',  $sponge)      };
+    # $::SIG{'ALRM'} = sub { do_timer($sponge)               };
 
     packet_capture_loop($sponge);
 
@@ -309,7 +308,15 @@ sub packet_capture_loop {
         die("$0: $msg\n");
     }
 
-    my $pcap_fd = pcap_fileno($pcap_h);
+    #my $pcap_fd = pcap_fileno($pcap_h);
+
+    my $pcap_fd = pcap_get_selectable_fd($pcap_h);
+    
+    if ($pcap_fd < 0) {
+        my $msg = "cannot get selectable fd for ".$sponge->device;
+        $sponge->print_log($msg);
+        die("$0: $msg\n");
+    }
 
     my $rbits = '';
     vec($rbits, $pcap_fd, 1) = 1;
@@ -333,12 +340,10 @@ sub packet_capture_loop {
             $timeleft = 1.0;
         }
 
+        sigprocmask(SIG_BLOCK, $block_sigset);
         (my $nfound, $timeleft)
                 = select($rbits_out, undef, $ebits_out, $timeleft);
-
-        # First handle any pending signal(s).
-        if($flag_usr1) { $flag_usr1 = 0; do_status('USR1', $sponge) };
-        if($flag_hup)  { $flag_hup  = 0; do_status('HUP',  $sponge) };
+        sigprocmask(SIG_UNBLOCK, $block_sigset);
 
         my $now = time;
 
@@ -354,9 +359,9 @@ sub packet_capture_loop {
             if (vec($rbits_out, $pcap_fd, 1)) {
                 # This should process all buffered packets, but
                 # it seems to only process one packet.
-                local $SIG{'USR1'} = local $SIG{'HUP'}
-                        = local $SIG{'ALRM'} = 'IGNORE';
+                sigprocmask(SIG_BLOCK, $block_sigset);
                 pcap_dispatch($pcap_h, -1, \&process_pkt, $sponge);
+                sigprocmask(SIG_UNBLOCK, $block_sigset);
             }
             else {
                 if (!$err_count) {
