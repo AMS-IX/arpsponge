@@ -29,7 +29,7 @@ use NetPacket::IP;
 
 use Time::HiRes         qw( time sleep );
 use Net::IPv4Addr       qw( :all );
-use POSIX               qw( strftime :signal_h );
+use POSIX               qw( strftime :signal_h :errno_h );
 
 use Sys::Syslog;
 use IO::File;
@@ -90,6 +90,7 @@ EOF
 my $wrote_pid    = 0;
 my $daemon       = undef;
 my $block_sigset = POSIX::SigSet->new(SIGUSR1, SIGHUP, SIGALRM);
+my $timer_cycle  = 1.0;
 
 # ============================================================================
 END {
@@ -308,8 +309,6 @@ sub packet_capture_loop {
         die("$0: $msg\n");
     }
 
-    #my $pcap_fd = pcap_fileno($pcap_h);
-
     my $pcap_fd = pcap_get_selectable_fd($pcap_h);
     
     if ($pcap_fd < 0) {
@@ -318,53 +317,84 @@ sub packet_capture_loop {
         die("$0: $msg\n");
     }
 
+    # Prepare the bit vector for the select() calls.
     my $rbits = '';
     vec($rbits, $pcap_fd, 1) = 1;
 
-
-    # Keep track of how many errors we've seen and how when
-    # we logged the last error. This is used to suppress too
-    # much logging.
+    # Keep track of how many errors we've seen and when we logged the
+    # last error. This is used to suppress too much logging.
     my $err_count = 0;
     my $last_err  = 0;
 
-    # Schedule our next periodic task run.
-    my $next_alarm = time + 1.0;
+    # [1] We keep track of the alarms ourselves rather than setting timers
+    #     with alarm(), since the ALRM signal handler may be delayed, which
+    #     would cause subsequent alarm() settings to be delayed as well.
+    #
+    # [2] Rather than just waiting for the select() to time out, we check
+    #     the remaining timeout just before going into the select() call.
+    #
+    # [3] We rely on select() with a max. timeout of (next_alarm - now).
+    #
+    # [4] If packets come in before the timer expires, we process them and
+    #     adjust the timeout in the next round.
 
-    my $timeleft = 1.0;
+    # [1] Schedule our next periodic task run.
+    my $next_alarm = time + $timer_cycle;
 
     while (1) {
         my $rbits_out = my $ebits_out = $rbits;
 
-        if ($timeleft <= 0.02) {
-            $timeleft = 1.0;
-        }
-
-        sigprocmask(SIG_BLOCK, $block_sigset);
-        (my $nfound, $timeleft)
-                = select($rbits_out, undef, $ebits_out, $timeleft);
-        sigprocmask(SIG_UNBLOCK, $block_sigset);
-
         my $now = time;
 
-        if ($nfound) {
-            if ($last_err + 15 < $now) {
-                if ($err_count > 1) {
-                    $sponge->print_log("select error repeated ",
-                                $err_count-1, " time(s)");
-                }
-                $err_count = 0;
-            }
+        if ($now >= $next_alarm) {  # [2]
+            # We've overrun our timer during the previous iteration,
+            # so let's handle that now.
+            do_timer($sponge);  # Run our periodic task.
 
-            if (vec($rbits_out, $pcap_fd, 1)) {
-                # This should process all buffered packets, but
-                # it seems to only process one packet.
-                sigprocmask(SIG_BLOCK, $block_sigset);
-                pcap_dispatch($pcap_h, -1, \&process_pkt, $sponge);
-                sigprocmask(SIG_UNBLOCK, $block_sigset);
+            $now = time; # Re-check the current time.
+
+            # Keep the intervals as steady as possible by keying off
+            # of the previous alarm time if possible.
+            if ($next_alarm + $timer_cycle > $now) {
+                $next_alarm += $timer_cycle; # [1]
             }
             else {
-                if (!$err_count) {
+                # We've been dragging our feet. Rather than setting
+                # a new alarm time that's already in the past, adjust
+                # to offset from current time. This is not elegant,
+                # but it's better than running do_timer() in tight
+                # circles.
+                $sponge->print_log("timer event LAG:",
+                    strftime(" planned=%H:%M:%S;",
+                            localtime($next_alarm+$timer_cycle)),
+                    strftime(" adjusted=%H:%M:%S\n",
+                            localtime($now+$timer_cycle)),
+                );
+                $next_alarm = $now + $timer_cycle; # [1]
+            }
+        }
+
+        # [3] Adjust the timeout for select().
+        my $timeleft = $next_alarm - $now;
+
+        # Wait for something to happen (timeout, signal or packet).
+        (my $nfound, $timeleft)
+                = select($rbits_out, undef, $ebits_out, $timeleft);
+
+        $now = time; # Update time.
+
+        if ($err_count > 1 && $now > $last_err + 15) {
+            # We've seen multiple select errors in the last 15 seconds.
+            # Only the first was logged. Log the number of repetitions.
+            $sponge->print_log("select error repeated ",
+                               $err_count-1, " time(s)");
+            $err_count = 0;
+        }
+
+        if ($nfound < 0) {
+            # A signal or another error.
+            if ($! == EINTR) { # Ignore EINTR errors; they are expected.
+                if (!$err_count) { # Suppress multiple errors.
                     $sponge->print_log("error in select():",
                             qq{ nfound=$nfound; },
                             qq{ rbits=}, unpack("b*", $rbits_out), q{;},
@@ -375,16 +405,28 @@ sub packet_capture_loop {
                 }
                 $err_count++;
             }
-            # Check if we need to run our periodic task.
-            if ( ($now = time) >= $next_alarm ) {
-                do_timer($sponge);
-                $next_alarm = $now + 1.0;
-            }
         }
-        else {
-            # select() timeout.
-            do_timer($sponge);
-            $next_alarm = $now + 1.0;
+        elsif ($nfound > 0) {
+            if (vec($rbits_out, $pcap_fd, 1)) { # [4]
+                # This should process all buffered packets, but
+                # it seems to only process one packet. *shrug*
+                sigprocmask(SIG_BLOCK, $block_sigset);
+                pcap_dispatch($pcap_h, -1, \&process_pkt, $sponge);
+                sigprocmask(SIG_UNBLOCK, $block_sigset);
+            }
+            else {
+                # There's something, but it's not what we expect.
+                if (!$err_count) {
+                    $sponge->print_log("error in select():",
+                            qq{ nfound=$nfound; },
+                            qq{ rbits=}, unpack("b*", $rbits_out), q{;},
+                            qq{ ebits=}, unpack("b*", $ebits_out), q{;},
+                            qq{ err=unexpected 0 bit for packet FD\n}
+                        );
+                    $last_err = $now;
+                }
+                $err_count++;
+            }
         }
     }
 
@@ -405,6 +447,7 @@ sub do_timer($) {
 	my $sponge = shift;
 
 	my $learning = $sponge->user('learning');
+    #$sponge->print_log("timer; learning:$learning");
 	if ($learning > 0) {
 		do_learn($sponge);
 		$sponge->user('learning', $learning-1);
