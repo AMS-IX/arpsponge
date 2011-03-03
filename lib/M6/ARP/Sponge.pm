@@ -31,7 +31,7 @@ use Net::IPv4Addr       qw( :all );
 use IO::File;
 
 BEGIN {
-	our $VERSION = 1.05;
+	our $VERSION = 1.06;
 
 	my @states = qw( STATIC DEAD ALIVE PENDING );
 	my @log    = qw( print_log print_notify );
@@ -119,6 +119,7 @@ sub set_state    {
 	else {
 		delete $self->{'pending'}->{$ip};
 	}
+    return $state;
 }
 
 ###############################################################################
@@ -289,9 +290,10 @@ sub is_my_network {
 ###############################################################################
 sub set_pending {
 	my ($self, $target_ip, $n) = @_;
-	$self->set_state($target_ip, PENDING($n));
+    my $state = $self->set_state($target_ip, PENDING($n));
 	$self->print_log("pending: %s (state %d)", $target_ip, $n);
 	$self->print_notify("action=pending;ip=%s;state=%d", $target_ip, $n);
+    return $state;
 }
 
 ###############################################################################
@@ -302,7 +304,8 @@ sub set_pending {
 ###############################################################################
 sub incr_pending {
 	my ($self, $target_ip) = @_;
-	$self->set_state($target_ip, $self->get_state($target_ip)+1);
+    my $pending = $self->get_state($target_ip) - PENDING(0);
+	return $self->set_pending($target_ip, $pending+1);
 }
 
 ###############################################################################
