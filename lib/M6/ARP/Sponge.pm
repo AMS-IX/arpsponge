@@ -382,7 +382,7 @@ sub send_reply {
 ###############################################################################
 sub set_dead {
     my ($self, $ip) = @_;
-    my $rate = $self->queue->rate($ip);
+    my $rate = $self->queue->rate($ip) // 0.0;
 
     $self->print_log("sponging: %s (%0.1f q/min)", $ip, $rate);
     $self->print_notify("action=sponge;ip=%s;mac=%s", $ip, $self->my_mac);
