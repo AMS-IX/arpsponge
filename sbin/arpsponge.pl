@@ -547,7 +547,8 @@ sub do_sweep($) {
 	my $hi = ip2int(ipv4_broadcast($net, $mask))-1;
 
 	my $nprobe = 0;
-	my $v = $sponge->is_verbose($sponge->is_verbose-1);
+	my $v = $sponge->is_verbose;
+    $sponge->is_verbose($v-1) if $v;
 	for (my $num = $lo; $num <= $hi; $num++) {
 		my $ip = int2ip($num);
 		my $age = time - $sponge->state_mtime($ip);
