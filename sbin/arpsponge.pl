@@ -394,7 +394,8 @@ sub packet_capture_loop {
         if ($nfound < 0) {
             # A signal or another error.
             if ($! == EINTR) { # Ignore EINTR errors; they are expected.
-                if (!$err_count) { # Suppress multiple errors.
+                $err_count++;
+                if ($err_count == 1) { # Suppress multiple errors.
                     $sponge->print_log("error in select():",
                             qq{ nfound=$nfound; },
                             qq{ rbits=}, unpack("b*", $rbits_out), q{;},
@@ -403,7 +404,6 @@ sub packet_capture_loop {
                         );
                     $last_err = $now;
                 }
-                $err_count++;
             }
         }
         elsif ($nfound > 0) {
