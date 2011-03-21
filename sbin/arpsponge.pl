@@ -34,8 +34,11 @@ use POSIX               qw( strftime :signal_h :errno_h );
 use Sys::Syslog;
 use IO::File;
 
+use IO::Select;
+
 use M6::ARP::Sponge     qw( :states );
 use M6::ARP::Util       qw( :all );
+use M6::ARP::Control;
 
 ###############################################################################
 $0 =~ s|.*/||g;
@@ -67,7 +70,6 @@ Options:
   --init=state            - how to initialize (default: $DFL_INIT)
   --learning=secs         - number of seconds to spend in LEARN state
   --loglevel=level        - syslog logging level ("$DFL_LOGLEVEL")
-  --notify=file           - print notifications of sponge actions to file
   --pending=n             - number of seconds we send ARP queries before
                             sponging ($DFL_PENDING)
   --proberate=n           - number queries/sec we send when learning or
@@ -78,9 +80,10 @@ Options:
   --sponge-network        - sponge the network address as well
   --statusfile=file       - write status to "file" when receiving HUP or
                             USR1 signal
+  --control=socket        - location of the control socket
   --sweep=sec/thr         - periodically sweep for "quiet" IP addresses
   --verbose[=n]           - be verbose; print information on STDOUT;
-                           turns off syslog
+                            turns off syslog
 
 See also "perldoc $0".
 EOF
@@ -117,7 +120,6 @@ sub Main {
 	my $age              = $DFL_ARP_AGE;
 	my $proberate        = $DFL_PROBERATE;
 	my $flood_protection = $DFL_FLOOD_PROTECTION;
-	my $notify           = undef;
 	my $gratuitous       = undef;
 	my $dummy            = undef;
 	my $statusfile       = undef;
@@ -145,7 +147,6 @@ sub Main {
 		'statusfile=s'       => \$statusfile,
 		'daemon=s'           => \$daemon,
 		'queuedepth=i'       => \$queuedepth,
-		'notify=s'           => \$notify,
 		'age=i'              => \$age,
 		'sweep=s'            => \$sweep_sec,
 		'sponge-network'     => \$sponge_net,
@@ -201,23 +202,6 @@ sub Main {
 
 	####################################################################
 
-	my ($notify_fh);
-
-	if (defined $notify) {
-
-		# Open the notification file as read/write, non-blocking,
-		# and don't buffer anything. This is useful if the destination
-		# is a FIFO and there is not always a reader.
-
-		$notify_fh = new IO::File($notify, O_RDWR|O_CREAT)
-			or die("$0: cannot write to $notify: $!\n");
-		$notify_fh->truncate(0);
-		$notify_fh->autoflush(1);
-		$notify_fh->blocking(0);
-	}
-
-	####################################################################
-
 	$| = ($verbose > 0 ? 1 : 0);
 
 	my $sponge = new M6::ARP::Sponge(
@@ -225,7 +209,6 @@ sub Main {
 			dummy            => $dummy,
 			queuedepth       => $queuedepth,
 			device           => $device,
-			notify           => $notify_fh,
 			loglevel         => $loglevel,
 			network          => $network,
 			netmask          => $netmask,
@@ -275,10 +258,6 @@ sub Main {
     exit(0);
 }
 
-
-Main;
-
-
 ###############################################################################
 # packet_capture_loop($sponge);
 #
@@ -310,16 +289,26 @@ sub packet_capture_loop {
     }
 
     my $pcap_fd = pcap_get_selectable_fd($pcap_h);
+    my $pcap_fh = IO::Handle->new();
     
     if ($pcap_fd < 0) {
         my $msg = "cannot get selectable fd for ".$sponge->device;
         $sponge->print_log($msg);
         die("$0: $msg\n");
     }
+    elsif (!$pcap_fh->fdopen($pcap_fd, "r")) {
+        my $msg = "fdopen($pcap_fd, 'r') for "
+                . $sponge->device
+                . " failed: $!"
+                ;
+        $sponge->print_log($msg);
+        die("$0: $msg\n");
+    }
 
     # Prepare the bit vector for the select() calls.
-    my $rbits = '';
-    vec($rbits, $pcap_fd, 1) = 1;
+    my $select = IO::Select->new($pcap_fh);
+
+# FIXME Add code for client socket handling.
 
     # Keep track of how many errors we've seen and when we logged the
     # last error. This is used to suppress too much logging.
@@ -342,8 +331,6 @@ sub packet_capture_loop {
     my $next_alarm = time + $timer_cycle;
 
     while (1) {
-        my $rbits_out = my $ebits_out = $rbits;
-
         my $now = time;
 
         if ($now >= $next_alarm) {  # [2]
@@ -370,6 +357,12 @@ sub packet_capture_loop {
                     strftime(" adjusted=%H:%M:%S\n",
                             localtime($now+$timer_cycle)),
                 );
+                $sponge->print_notify("action=lag;",
+                    strftime("planned=%H:%M:%S;",
+                            localtime($next_alarm+$timer_cycle)),
+                    strftime("adjusted=%H:%M:%S",
+                            localtime($now+$timer_cycle)),
+                );
                 $next_alarm = $now + $timer_cycle; # [1]
             }
         }
@@ -378,8 +371,7 @@ sub packet_capture_loop {
         my $timeleft = $next_alarm - $now;
 
         # Wait for something to happen (timeout, signal or packet).
-        (my $nfound, $timeleft)
-                = select($rbits_out, undef, $ebits_out, $timeleft);
+        my @ready = $select->can_read($timeleft);
 
         $now = time; # Update time.
 
@@ -388,44 +380,40 @@ sub packet_capture_loop {
             # Only the first was logged. Log the number of repetitions.
             $sponge->print_log("select error repeated ",
                                $err_count-1, " time(s)");
+            $sponge->print_notify("action=repeat;count=", $err_count-1);
             $err_count = 0;
         }
 
-        if ($nfound < 0) {
+        if (@ready == 0) {
             # A signal or another error.
             if ($! == EINTR) { # Ignore EINTR errors; they are expected.
                 $err_count++;
                 if ($err_count == 1) { # Suppress multiple errors.
-                    $sponge->print_log("error in select():",
-                            qq{ nfound=$nfound; },
-                            qq{ rbits=}, unpack("b*", $rbits_out), q{;},
-                            qq{ ebits=}, unpack("b*", $ebits_out), q{;},
-                            qq{ err=$!\n}
-                        );
+                    $sponge->print_log("error in select(): $!");
+                    $sponge->print_notify("error in select(): $!");
                     $last_err = $now;
                 }
             }
         }
-        elsif ($nfound > 0) {
-            if (vec($rbits_out, $pcap_fd, 1)) { # [4]
-                # This should process all buffered packets, but
-                # it seems to only process one packet. *shrug*
-                sigprocmask(SIG_BLOCK, $block_sigset);
-                pcap_dispatch($pcap_h, -1, \&process_pkt, $sponge);
-                sigprocmask(SIG_UNBLOCK, $block_sigset);
-            }
-            else {
-                # There's something, but it's not what we expect.
-                if (!$err_count) {
-                    $sponge->print_log("error in select():",
-                            qq{ nfound=$nfound; },
-                            qq{ rbits=}, unpack("b*", $rbits_out), q{;},
-                            qq{ ebits=}, unpack("b*", $ebits_out), q{;},
-                            qq{ err=unexpected 0 bit for packet FD\n}
-                        );
-                    $last_err = $now;
+        else {
+            for my $fh (@ready) {
+                if ($fh->fileno == $pcap_fd) { # [4]
+                    # This should process all buffered packets, but
+                    # it seems to only process one packet. *shrug*
+                    sigprocmask(SIG_BLOCK, $block_sigset);
+                    pcap_dispatch($pcap_h, -1, \&process_pkt, $sponge);
+                    sigprocmask(SIG_UNBLOCK, $block_sigset);
                 }
-                $err_count++;
+                else {
+# FIXME Add code for client socket handling.
+                    # There's something, but it's not what we expect.
+                    if (!$err_count) {
+                        $sponge->print_log("error in select(): $!");
+                        $sponge->print_notify("error in select(): $!");
+                        $last_err = $now;
+                    }
+                    $err_count++;
+                }
             }
         }
     }
@@ -618,7 +606,7 @@ sub process_pkt {
 
 		$sponge->print_log("misplaced ARP for %s from %s\@%s",
 								$dst_ip, $src_ip, $src_mac);
-		$sponge->print_notify("action=misfit;src=%s;mac=%s;dst=%s",
+		$sponge->print_notify("action=misfit;src.ip=%s;src.mac=%s;dst.ip=%s",
 								$src_ip, $src_mac, $dst_ip);
 
 		return; # b-bye...
@@ -796,8 +784,7 @@ sub do_status {
 
 	# Open the status file as read/write, non-blocking,
 	# and don't buffer anything. This is useful if the destination
-	# is a FIFO and there is not always a reader. Same thing as
-	# the $notify_fh case, really.
+	# is a FIFO and there is not always a reader.
 
 	my $fh = new IO::File($filename, O_RDWR|O_CREAT);
 
@@ -925,6 +912,7 @@ sub do_status {
 						$nalive, $ndead, $npending, $nmac);
 }
 
+Main;
 
 1;
 
@@ -944,7 +932,6 @@ I<Options>:
 
     --verbose[=n]
     --dummy | --daemon=pidfile
-    --notify=file
     --loglevel=level
     --status=file
 
@@ -1050,10 +1037,9 @@ hosts.
 The program writes sponge/unsponge events to L<syslogd(8)|syslogd> with
 priority C<info>.
 
-It can also write more detailed event info to a file or fifo (see
-B<--notify> below) and when the B<--statusfile> argument is given, it will
-write a summary of its current state upon receiving a C<HUP> or C<USR1>
-signal.
+It can also write more detailed event to clients on the control socket
+and when the B<--statusfile> argument is given, it will write a summary
+of its current state upon receiving a C<HUP> or C<USR1> signal.
 
 =head1 OPTIONS
 
@@ -1163,13 +1149,6 @@ Do (not) send gratuitous ARP queries when sponging an address.
 =item X<--loglevel>B<--loglevel>=I<level>
 
 Logging level for L<syslogd(8)|syslogd> logging. Default is C<info>.
-
-=item X<--notify>B<--notify>=I<file>
-
-Print notifications of sponge actions to I<file>. The I<file> can grow quite
-large, so this is really meant for writing to a FIFO (see L<mkfifo(1)|mkfifo>).
-
-See also L<NOTIFICATIONS> below.
 
 =item X<--queuedepth>B<--queuedepth>=I<n>
 
@@ -1372,7 +1351,6 @@ To use the event notification, do:
    mkfifo --mode=644 /var/run/sponge.out
 
    @NAME@ --daemon=/var/run/sponge.pid \
-             --notify=/var/run/sponge.event \
              193.194.136.128/25 dev eth0 
 
    cat /var/run/sponge.event
@@ -1443,8 +1421,8 @@ Contains a network definition for the sponge on I<ethX>.
 
 For every I<ethX> file the script finds, it starts a sponge daemon on
 the I<ethX> interface. The sponge daemon will write its status file to
-F<$SPONGE_VAR/ethX/status> and the notifications to the
-F<$SPONGE_VAR/ethX/notify> FIFO.
+F<$SPONGE_VAR/ethX/status> and create a control socket in
+F<$SPONGE_VAR/ethX/control>.
 
 =head2 Init Variables
 
@@ -1539,9 +1517,9 @@ This is used by the sponge's L<init(1)|init> script.
 Status file for the sponge daemon that runs on interface I<ethX>.
 This is set up by the sponge's L<init(1)|init> script.
 
-=item F<@SPONGE_VAR@/ethX/notify>
+=item F<@SPONGE_VAR@/ethX/control>
 
-Notification FIFO for the sponge daemon that runs on interface I<ethX>.
+Control socket for L<asctl>(1).
 This is set up by the sponge's L<init(1)|init> script.
 
 =item F<@SPONGE_VAR@/ethX/pid>

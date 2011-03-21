@@ -14,6 +14,7 @@ INSTALLFILES		=	\
 				$(INSTALLDIR)/Queue.pm		\
 				$(INSTALLDIR)/Sponge.pm		\
 				$(INSTALLDIR)/Table.pm		\
+				$(INSTALLDIR)/Control.pm	\
 				$(INSTALLDIR)/Util.pm
 
 include $(TOPDIR)/rules.mk
