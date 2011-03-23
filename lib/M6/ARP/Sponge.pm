@@ -29,20 +29,19 @@ use Net::ARP;
 use Sys::Syslog;
 use Net::IPv4Addr       qw( :all );
 use IO::File;
+use IO::Select;
 
 BEGIN {
     our $VERSION = 1.06;
 
     my @states = qw( STATIC DEAD ALIVE PENDING );
-    my @log    = qw( print_log print_notify );
 
-    our @EXPORT_OK = ( @states, @log );
+    our @EXPORT_OK = ( @states );
     our @EXPORT    = ();
 
     our %EXPORT_TAGS = ( 
             'states' => \@states,
-            'log'    => \@log,
-            'all'    => [ @log, @states ]
+            'all'    => [ @states ]
         );
     0 if 0 && $::opt_verbose;
 }
@@ -54,13 +53,19 @@ use constant ALIVE   => -1;
 
 sub PENDING { 0 + $_[$#_] };
 
+my %state_name_map = (
+        STATIC() => 'STATIC',
+        DEAD()   => 'DEAD',
+        ALIVE()  => 'ALIVE',
+    );
+
 # Accessors; use the factory :-)
 __PACKAGE__->mk_accessors(qw( 
                 syslog_ident    is_verbose  is_dummy
                 queuedepth      my_ip       my_mac
                 network         netmask     loglevel
-                max_pending     notify      max_rate
                 arp_age         gratuitous  flood_protection
+                max_rate        max_pending
         ));
 
 ###############################################################################
@@ -85,6 +90,20 @@ sub user {
         $user->{$attr} = $val;
     }
     return $oldval;
+}
+
+sub state_name {
+    my $self  = shift;
+    my $state = shift;
+    if (!defined $state) {
+        return 'UNKNOWN';
+    }
+    elsif ($state < PENDING(0)) {
+        return $state_name_map{$state} // 'ILLEGAL';
+    }
+    else {
+        return sprintf("PENDING(%d)", $state - PENDING(0));
+    }
 }
 
 ###############################################################################
@@ -123,18 +142,6 @@ sub set_state    {
 }
 
 ###############################################################################
-# $sponge->DESTROY
-#
-#   Destructor. Called by Perl's garbage collection.
-###############################################################################
-sub DESTROY {
-    my $self = shift;
-    if ($self->notify) {
-        $self->notify->close;
-    }
-}
-
-###############################################################################
 # $sponge = new M6::ARP::Sponge(ARG => VAL ...)
 #
 #    Create a new Sponge object.
@@ -159,6 +166,7 @@ sub new {
         $self->syslog_ident($prog);
     }
     $self->{user}        = {};
+    $self->{notify}      = IO::Select->new();
     $self->{pending}     = {};
     $self->{state}       = {};
     $self->{state_mtime} = {};
@@ -185,6 +193,36 @@ sub new {
         $self->verbose(1, "IP:     ", $self->my_ip, "\n");
     }
     return $self;
+}
+
+###############################################################################
+# $sponge->add_notify($fh);
+#
+#   Add $fh to the list of notification handles. $fh is assumed
+#   to be a M6::ARP::Control::Server reference.
+#
+#   Returns the $fh argument.
+#
+###############################################################################
+sub add_notify {
+    my ($self, $fh) = @_;
+    $self->{'notify'}->add($fh);
+    return $fh;
+}
+
+###############################################################################
+# $sponge->remove_notify($fh);
+#
+#   Remove $fh from the list of notification handles. $fh is assumed
+#   to be a M6::ARP::Control::Server reference.
+#
+#   Returns the $fh argument.
+#
+###############################################################################
+sub remove_notify {
+    my ($self, $fh) = @_;
+    $self->{'notify'}->remove($fh);
+    return $fh;
 }
 
 ###############################################################################
@@ -292,7 +330,6 @@ sub set_pending {
     my ($self, $target_ip, $n) = @_;
     my $state = $self->set_state($target_ip, PENDING($n));
     $self->print_log("pending: %s (state %d)", $target_ip, $n);
-    $self->print_notify("action=pending;ip=%s;state=%d", $target_ip, $n);
     return $state;
 }
 
@@ -385,7 +422,6 @@ sub set_dead {
     my $rate = $self->queue->rate($ip) // 0.0;
 
     $self->print_log("sponging: %s (%0.1f q/min)", $ip, $rate);
-    $self->print_notify("action=sponge;ip=%s;mac=%s", $ip, $self->my_mac);
 
     $self->gratuitous_arp($ip) if $self->gratuitous;
     $self->set_state($ip, DEAD);
@@ -405,35 +441,28 @@ sub set_alive {
 
     return if ! $self->is_my_network($ip);
 
+    my @arp = $self->arp_table($ip);
+
+    $mac //= $arp[0] // hex2mac(0);
+
     if ($self->get_state($ip) == DEAD) {
-        $self->print_log("unsponging: %s [found at %s]", $ip, $mac);
-        $self->print_notify("action=unsponge;ip=%s;mac=%s", $ip, $mac);
+        $self->print_log("unsponging: %s mac=%s", $ip, $mac);
     }
     elsif ($self->get_state($ip) >= PENDING(0)) {
-        $self->print_log("clearing: %s [found at %s]", $ip, $mac);
-        $self->print_notify("action=clear;ip=%s;mac=%s", $ip, $mac);
+        $self->print_log("clearing: %s mac=%s", $ip, $mac);
     }
     elsif ($self->queue->depth($ip) > 0) {
-        $self->verbose(1, "Clearing: $ip [found at $mac]\n");
-        $self->print_notify("action=clear;ip=%s;mac=%s", $ip, $mac);
+        $self->verbose(1, "Clearing: $ip mac=$mac\n");
     }
 
     $self->queue->clear($ip);
     $self->set_state($ip, ALIVE);
 
-    my @arp = $self->arp_table($ip);
-
     if (!@arp) {
-        $self->verbose(1, "Learned: $ip [found at $mac]\n");
-        $self->print_notify("action=learn;ip=%s;mac=%s", $ip, $mac);
+        $self->verbose(1, "Learned: $ip new=$mac\n");
     }
     elsif ($arp[0] ne $mac) {
-        $self->verbose(1, "Flip: $ip [found at $mac]\n");
-        $self->print_notify("action=flip;ip=%s;mac=%s", $ip, $mac);
-    }
-    elsif (time - $arp[1] > $self->arp_age) {
-        $self->print_notify("action=refresh;ip=%s;mac=%s",
-                            $ip, $mac);
+        $self->verbose(1, "Flip: $ip new=$mac old=$arp[0]\n");
     }
     $self->arp_table($ip, $mac, time);
 }
@@ -485,6 +514,7 @@ sub print_log_level {
         syslog($level, $format, @args);
         closelog;
     }
+    $self->print_notify("[$$] $format", @args);
 }
 
 ###############################################################################
@@ -499,26 +529,32 @@ sub print_log {
 }
 
 ###############################################################################
-# $sponge->print_notify($format, ...);
-# print_notify($fh, $format, ...);
+# $sponge->log_fatal($format, ...);
 #
-#   Notify of sponge actions on the notify handle.
+#   Log $format, ... to syslog and dies() with the same message. Syntax is
+#   identical to that of printf().  Prints to STDOUT if verbose or dummy,
+#   so you may see duplicate messages in that case.
+###############################################################################
+sub log_fatal {
+    my ($self, $format, @args) = @_;
+    chomp(my $msg = sprintf($format, @args));
+    $self->print_log('%s', $msg);
+    die "$msg\n";
+}
+
+###############################################################################
+# $sponge->print_notify($format, ...);
+#
+#   Notify of sponge actions on the notify handles.
 ###############################################################################
 sub print_notify {
-    my ($self, $fh);
-    if (UNIVERSAL::isa($_[0], 'M6::ARP::Sponge')) {
-        $self = shift;
-        $fh = $self->notify;
-    }
-    elsif (UNIVERSAL::isa($_[0], 'IO::Handle')) {
-        $fh = shift;
-    }
-    return if ! defined $fh;
+    my $self = shift;
+    my $format = shift;
 
-    my $format = shift @_;
-
-    $fh->print(int(time), ";id=",
-            $self->syslog_ident, ";", sprintf($format, @_), "\n");
+    my $msg = sprintf($format, @_);
+    for my $fh ($self->{'notify'}->can_write(0)) {
+        $fh->send_log($msg);
+    }
 }
 
 1;
