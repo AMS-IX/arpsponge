@@ -1,6 +1,74 @@
 @(#) $Id$
 
 --------------------------------------------------
+Wed Mar 23 17:45:17 CET 2011
+
+* speed improvements:
+
+    MAC and IP addresses already come in as hex strings.
+    We currently use "hex2ip" and "hex2mac" to convert them
+    before storing them in the relevant hashes.
+
+    Why not keep them in hex form and convert to proper strings
+    when needed?
+
+    Also, using hex form only, there's a smart algorithm
+    for checking whether an IP address is in a network, which
+    dramatically cuts down on the packet handling loop.
+
+
+#!/usr/bin/perl
+
+use M6::ARP::Util qw( :all );
+use Benchmark qw( cmpthese );
+use Net::IPv4Addr qw( :all );                                             
+
+my $ip   = '193.194.136.192';
+my $net  = '193.194.136.128';
+my $mask = '255.255.255.128';
+my $len  = 25;
+
+if (1) {
+    my $hexip  = ip2hex($ip);
+    my $hexnet = ip2hex($net);
+    cmpthese($count, {
+        'ipv4_in_network' =>
+            sub {
+                my $bool = ipv4_in_network($net, $mask, $ip);
+            },
+        'addr_in_net' =>
+            sub {
+                my $bool = addr_in_net(ip2hex($ip), ip2hex($net), $len)
+            },
+        'addr_in_net2' =>
+            sub {
+                my $bool = addr_in_net($hexip, $hexnet, $len)
+            },
+    });
+}
+
+sub addr_in_net {
+    my ($addr, $net, $len) = @_;
+
+    my $nibbles = int($len / 4);
+
+    if ($nibbles) {
+        if (substr($addr, 0, $nibbles) ne substr($net, 0, $nibbles)) {
+            return;
+        }
+    }
+
+    $len = $len % 4;
+
+    return 1 if !$len;
+
+    my $mask = 0xf & ~( 1<<(4-$len) - 1 );
+    my $a = hex(substr($addr,$nibbles,1));
+    my $n = hex(substr($net,$nibbles,1));
+    return ($a & $mask) == $n;
+}
+
+--------------------------------------------------
 Wish list for future enhancements:
 
 * setuid() to unprivileged user after opening relevant streams.
