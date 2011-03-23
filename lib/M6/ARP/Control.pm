@@ -64,7 +64,8 @@ sub _send_data {
 #   Wrapper around "sysread" on a socket handle. This normally
 #   implements a non-blocking read on a socket, regardless of
 #   what the current blocking mode on the socket is. Returns
-#   "undef" if there is no data. Reads at most $BUFSIZ bytes.
+#   "undef" if there is no data. Tries to read no more than $BUFSIZ
+#   bytes, but may run over that if the last character is not a newline.
 #
 #       $data = $handle->_get_data($blocking);
 #
@@ -75,6 +76,14 @@ sub _get_data {
     my $buf;
     my $old_blocking = $self->blocking($blocking);
     my $n = $self->sysread($buf, $BUFSIZ);
+
+    if ($buf !~ /\n\Z/) {
+        my $char;
+        while ($self->sysread($char, 1)) {
+            $buf .= $char;
+            last if $char eq "\n";
+        }
+    }
     $self->blocking($old_blocking);
     return $n ? $buf : undef;
 }
