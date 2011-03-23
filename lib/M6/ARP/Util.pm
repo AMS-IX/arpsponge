@@ -13,13 +13,19 @@
 ###############################################################################
 package M6::ARP::Util;
 
+use strict;
+use POSIX qw( strftime );
+
 BEGIN {
 	use Exporter;
 
 	our $VERSION = 1.02;
 	our @ISA = qw( Exporter );
 
-	our @EXPORT_OK = qw( int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac );
+	our @EXPORT_OK = qw( 
+            int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
+            format_time
+        );
 	our @EXPORT    = ();
 
 	our %EXPORT_TAGS = ( 
@@ -27,6 +33,7 @@ BEGIN {
 		);
 
 }
+
 
 =pod
 
@@ -45,6 +52,8 @@ M6::ARP::Util - IP/MAC utility routines
  $mac = hex2mac( $hex );
  $hex = mac2hex( $mac );
  $mac = mac2mac( $mac );
+
+ $str = format_time(time);
 
 =head1 DESCRIPTION
 
@@ -172,6 +181,27 @@ returns "a1:b2:03:04:e5:f6"
 
 sub mac2mac {
 	hex2mac(mac2hex($_[0]));
+}
+
+###############################################################################
+
+=item X<format_time>B<format_time> ( I<TIME> )
+
+Convert I<TIME> (seconds since epoch) to a "YYYY-mm-dd@HH:MM:SS"
+string in the local timezone.
+If I<TIME> is undefined or 0, it returns C<never>.
+
+Example: format_time(1300891278)
+returns "2011-03-23@15:41:18"
+
+=cut
+
+sub format_time {
+	my $time = shift;
+    if (defined $time && $time > 0) {
+        return strftime('%Y-%m-%d@%H:%M:%S', localtime($time));
+    }
+    return 'never';
 }
 
 1;
