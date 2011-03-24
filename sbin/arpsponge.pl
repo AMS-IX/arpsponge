@@ -540,6 +540,7 @@ sub cmd_status {
 
     my @response = (
         "id:               ", $sponge->syslog_ident, "\n",
+        "pid:              $$\n",
         "version:          ", '@RELEASE@', "\n",
         "date:             ", format_time($now),
             " [", int($now), "]\n",

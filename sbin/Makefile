@@ -13,10 +13,12 @@ TOPDIR		=	..
 INSTALLDIRS	=	$(BINDIR)
 
 TARGETS		=	\
-			$(NAME)
+			arpsponge \
+			asctl
 
 INSTALLFILES	=	\
-			$(BINDIR)/$(NAME)
+			$(BINDIR)/arpsponge \
+			$(BINDIR)/asctl
 
 include ../rules.mk
 
