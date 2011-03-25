@@ -1,0 +1,100 @@
+@(#)$Id$
+
+Overview of commands / communication between client and server.
+
+Basic (socket-level) Communications
+-----------------------------------
+
+    LF    = line-feed (\n)
+    FF    = line-feed (\f)
+    TAB   = tab (\t)
+
+    log   = FF + "LOG" + TAB
+
+* Client sends single-line commands to server, terminated by LF.
+
+* Server sends two kinds of reply:
+
+  reply          := log_msg | command_output
+  log_msg        := log_hdr + text + LF
+  log_hdr        := FF + "LOG" + TAB
+  command_output := ( text + LF )* + ready_prompt
+  ready_prompt   : = FF + "READY" + LF
+
+  1. Log messages:
+
+     Should be read by the client and buffered internally. Show log
+     and clear log display and clear this internal buffer.
+
+  2. Command output:
+
+     All text up to (but not including) the ready_prompt.
+
+Command mappings
+----------------
+
+Client              Server
+-----------------------------------
+quit                quit
+ping                ping
+sponge X            set-dead    X
+unsponge X          set-alive   X
+clear ip X          forget-ip   X
+clear log           -
+set ip X pending Y  set-pending X Y
+set ip X alive [Y]  set-alive   X Y
+set ip X dead       set-dead    X
+set ip X mac Y      set-alive   X Y
+set ip X queue Y    set-queue   X Y
+set ip X rate Y     set-rate    X Y
+
+show status         status
+show version        status
+show uptime         status
+show log            -
+show ip X           show-ip X
+show ip X state     show-ip X
+show ip X mac       show-ip X
+show ip X queue     show-ip X
+show ip X rate      show-ip X
+
+Data Types
+----------
+
+Server:
+    Time stamps are sent as seconds since epoch.
+    Mac addresses are sent/received as hex strings.
+    IP addresses are sent/received as hex strings.
+    Boolean values are sent as 0 or 1.
+
+    Output is sent as <key> <space> <val>:
+
+        ip 1c201a6f
+        state ALIVE
+        queue 0
+        rate 0.0
+        mac 000cdbfd2300
+        mac_changed 1301071000
+        state_mtime 1301071508
+        state_atime 1301071567
+        [OK]
+
+        id arpsponge
+        version 3.10-alpha2
+        date 1301071803
+        started 1300897051
+        network 5bc81100/26
+        interface eth0
+        ip 5bc81128
+        mac fe000096000a
+        max_queue 200
+        max_rate 30.00
+        flood_protection 5.00
+        max_pending 10
+        sweep_period 900
+        sweep_age 3600
+        proberate 100
+        next_sweep 38
+        learning 0
+        dummy 1
+        [OK]

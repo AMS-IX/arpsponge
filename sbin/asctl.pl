@@ -105,14 +105,16 @@ sub do_command {
 
     given ($command) {
         when ('show') {
+            do_show(@args);
         }
         when ('set') {
+            do_set(@args);
         }
         when ('clear') {
+            do_clear(@args);
         }
         when ('sponge') {
-        }
-        when ('sponge') {
+            do_sponge(@args);
         }
     }
 
