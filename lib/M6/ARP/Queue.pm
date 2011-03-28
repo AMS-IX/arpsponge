@@ -17,7 +17,7 @@ package M6::ARP::Queue;
 use strict;
 
 BEGIN {
-	our $VERSION = 1.03;
+	our $VERSION = 1.04;
 }
 
 our $DFL_DEPTH = 1000;
@@ -63,6 +63,14 @@ of source IP and timestamp data added to a queue until its size reaches
 the maximum depth, at which point newly added values cause the oldest
 values to be shifted off the queue.
 
+=head1 IP AND MAC ADDRESS REPRESENTATION
+
+Although the L<arpsponge>(8) stores IP and MAC addresses as hexadecimal
+strings, and this object module is designed to do the same, there is in
+fact no implicit knowledge about the format of the IP and MAC addresses
+in this module; I<ip-address> could stand for I<arbitrary-key> and
+I<mac-address> could stand for I<arbitrary-value>.
+
 =head1 VARIABLES
 
 =over
@@ -70,6 +78,8 @@ values to be shifted off the queue.
 =item X<$M6::ARP::Queue::DFL_DEPTH>I<$M6::ARP::Queue::DFL_DEPTH>
 
 Default maximum depth for queue objects (1000).
+
+=back
 
 =head1 CONSTRUCTOR
 
@@ -322,31 +332,35 @@ __END__
 =head1 EXAMPLE
 
     use M6::ARP::Queue;
+    use M6::ARP::Util qw( :all );
     use Time::HiRes qw( usleep time );
     use POSIX qw( strftime );
 
-    my $some_ip   = '10.1.1.1';
-    my @src_ip    = ('10.1.1.2', '10.1.1.3', '10.1.1.4');
+    my $some_ip_s = '10.1.1.1';
+    my $some_ip   = ip2hex($some_ip_s);
+    my @src_ip    = map { ip2hex($_) } qw(10.1.1.2 10.1.1.3 10.1.1.4);
     my $max_rate  = 10;
 
     $q = new M6::ARP::Queue(100);
 
-    printf("Filling queue for $some_ip (max %d)\n", $q->max_depth);
+    printf("Filling queue for $some_ip_s (max %d)\n", $q->max_depth);
 
     $q->clear($some_ip);
     my $n = 0;
     while (!$q->is_full($some_ip)) {
-            my $src_ip = $src_ip[$n];
-            $n = ($n + 1) % int(@src_ip);
-            $q->add($some_ip, $src_ip, time);
-            print STDERR sprintf("\rdepth: %3d", $q->depth($some_ip));
-            usleep(rand(5e4));
+        my $src_ip = $src_ip[$n];
+        $n = ($n + 1) % int(@src_ip);
+        $q->add($some_ip, $src_ip, time);
+        print STDERR sprintf("\rdepth: %3d", $q->depth($some_ip));
+        usleep(rand(5e4));
     }
     print "\rBefore reduce:\n";
-            printf(" depth: %3d\n", $q->depth($some_ip));
-    print strftime(" first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
-    print strftime(" last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
-            printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
+    printf(" depth: %3d\n", $q->depth($some_ip));
+    print strftime(" first: %H:%M:%S\n",
+                   localtime($q->get($some_ip, 0)));
+    print strftime(" last:  %H:%M:%S\n",
+                   localtime($q->get($some_ip, -1)));
+    printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
 
     #$" = ",";
     #foreach $entry (@{$q->get_queue($some_ip)}) {
@@ -355,10 +369,12 @@ __END__
 
     $q->reduce($some_ip, $max_rate);
     print "\nAfter reduce:\n";
-            printf(" depth: %3d\n", $q->depth($some_ip));
-    print strftime(" first: %H:%M:%S\n", localtime($q->get($some_ip, 0)));
-    print strftime(" last:  %H:%M:%S\n", localtime($q->get($some_ip, -1)));
-            printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
+    printf(" depth: %3d\n", $q->depth($some_ip));
+    print strftime(" first: %H:%M:%S\n",
+                   localtime($q->get($some_ip, 0)));
+    print strftime(" last:  %H:%M:%S\n",
+                   localtime($q->get($some_ip, -1)));
+    printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
 
     #foreach $entry (@{$q->get_queue($some_ip)}) {
     #   print qq{[@$entry]\n};
@@ -383,7 +399,8 @@ Output:
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>, L<M6::ARP::Sponge(3)|M6::ARP::Sponge>.
+L<perl(1)|perl>, L<M6::ARP::Sponge(3)|M6::ARP::Sponge>,
+L<M6::ARP::Util(3)|M6::ARP::Util>.
 
 =head1 AUTHORS
 
