@@ -16,7 +16,7 @@ package M6::ARP::Table;
 use Time::HiRes qw( time );
 
 BEGIN {
-	our $VERSION = 1.02;
+	our $VERSION = 1.03;
 }
 
 =pod
@@ -96,23 +96,23 @@ sub arp	{ $_[0]->{'arp'}->{$_[1]} }
 
 =item X<rarp>B<rarp> ( I<MAC> )
 
-Return a sorted list of IP addresses that are mapped to I<MAC>.
+Return an unsorted list of IP addresses that are mapped to I<MAC>.
 
 =cut
 
-sub rarp { sort { ip_sort($a, $b) } keys %{$_[0]->{'rarp'}->{$_[1]}} }
+sub rarp { keys %{$_[0]->{'rarp'}->{$_[1]}} }
 
 =item X<ip_list>B<ip_list>
 
-Return a sorted list of IP addresses that are present in the ARP table.
+Return an unsorted list of IP addresses that are present in the ARP table.
 
 =cut
 
-sub ip_list { sort { ip_sort($a, $b) } keys %{$_[0]->{'arp'}} }
+sub ip_list { keys %{$_[0]->{'arp'}} }
 
 =item X<mac_list>B<mac_list>
 
-Return a sorted list of MAC addresses that are present in the ARP table.
+Return an unsorted list of MAC addresses that are present in the ARP table.
 
 =cut
 
@@ -128,7 +128,7 @@ Returns the timestamp.
 
 sub add {
 	my ($self, $ip, $mac, $timestamp) = @_;
-	$timestamp = time unless defined($timestamp);
+	$timestamp //= time;
 	$self->clear($ip);
 	$self->{'arp'}->{$ip} = $mac;
 	$self->{'rarp'}->{$mac}->{$ip} = $timestamp;
