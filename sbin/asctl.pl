@@ -103,6 +103,7 @@ sub do_command {
     $command = lc $command;
     $input = join(' ', $command, @args);
 
+    if (0) {
     given ($command) {
         when ('show') {
             do_show(@args);
@@ -116,6 +117,7 @@ sub do_command {
         when ('sponge') {
             do_sponge(@args);
         }
+    }
     }
 
     if ($input =~ /^\s*show\s+log\s*$/) {

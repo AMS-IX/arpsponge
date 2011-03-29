@@ -50,7 +50,7 @@ $0 =~ s|.*/||g;
 
 use constant SYSLOG_IDENT => '@NAME@';
 
-my ($REVISION)           = '$Revision$' =~ /^Revision: (\d+)\s*\$/;
+my ($REVISION)           = '$Revision$' =~ /^.Revision: (\d+) \$$/;
 
 my $VERSION              = '@RELEASE@'."($REVISION)";
 my $NULL_IP              = ip2hex('0.0.0.0');
@@ -530,31 +530,31 @@ sub get_status_info_s {
     my $learning = $sponge->user('learning');
 
     my @response = (
-        sprintf("%-17s %s\n", 'id', $sponge->syslog_ident),
-        sprintf("%-17s %d\n", 'pid', $$),
-        sprintf("%-17s %s\n", 'version', $VERSION),
-        sprintf("%-17s %s [%d]\n", 'date', format_time($now), $now),
-        sprintf("%-17s %s [%d]\n", 'started',
+        sprintf("%-17s %s\n", 'id:', $sponge->syslog_ident),
+        sprintf("%-17s %d\n", 'pid:', $$),
+        sprintf("%-17s %s\n", 'version:', $VERSION),
+        sprintf("%-17s %s [%d]\n", 'date:', format_time($now), $now),
+        sprintf("%-17s %s [%d]\n", 'started:',
                 format_time($start_time), $start_time),
-        sprintf("%-17s %s/%d\n", 'network',
+        sprintf("%-17s %s/%d\n", 'network:',
                 $sponge->network_s, $sponge->prefixlen),
-        sprintf("%-17s %s\n", 'interface', $sponge->device),
-        sprintf("%-17s %s [%s]\n", 'ip/mac',
+        sprintf("%-17s %s\n", 'interface:', $sponge->device),
+        sprintf("%-17s %s [%s]\n", 'ip/mac:',
                 $sponge->my_ip_s, $sponge->my_mac_s),
-        sprintf("%-17s %d\n", 'queue depth', $sponge->queuedepth),
-        sprintf("%-17s %0.2f\n", 'max rate', $sponge->max_rate),
-        sprintf("%-17s %0.2f\n", 'flood protection',
+        sprintf("%-17s %d\n", 'queue depth:', $sponge->queuedepth),
+        sprintf("%-17s %0.2f\n", 'max rate:', $sponge->max_rate),
+        sprintf("%-17s %0.2f\n", 'flood protection:',
                 $sponge->flood_protection),
-        sprintf("%-17s %d\n", 'max pending', $sponge->max_pending),
-        sprintf("%-17s %d sec\n", 'sweep period', $sponge->user('sweep_sec')),
-        sprintf("%-17s %d sec\n", 'sweep age', $sponge->user('sweep_age')),
-        sprintf("%-17s %d sec\n", 'proberate',
+        sprintf("%-17s %d\n", 'max pending:', $sponge->max_pending),
+        sprintf("%-17s %d sec\n", 'sweep period:', $sponge->user('sweep_sec')),
+        sprintf("%-17s %d sec\n", 'sweep age:', $sponge->user('sweep_age')),
+        sprintf("%-17s %d sec\n", 'proberate:',
                 1/$sponge->user('probesleep')),
-        sprintf("%-17s %d sec\n", 'next sweep in',
+        sprintf("%-17s %d sec\n", 'next sweep in:',
                 $sponge->user('next_sweep')-$now),
-        sprintf("%-17s %s\n", 'learning',
+        sprintf("%-17s %s\n", 'learning:',
                 $learning ? "yes ($learning sec left)" : "no"),
-        sprintf("%-17s %s\n", 'dummy',
+        sprintf("%-17s %s\n", 'dummy:',
                 $sponge->is_dummy ? "yes" : "no", "\n"),
     );
     return join('', @response);
@@ -603,9 +603,9 @@ sub get_ip_state_table_s {
             ));
     }
     $fh->print("</STATE>\n");
-    $fh->print(sprintf("\n[OK] alive=%d dead=%d pending=%d\n",
-                        $nalive, $ndead, $npending));
-    return ($nalive, $ndead, $npending, ${$fh->string_ref});
+    return (
+        ${$fh->string_ref}, $nalive, $ndead, $npending,
+    );
 }
 
 sub get_arp_table_s {
@@ -650,9 +650,10 @@ sub cmd_show_state {
         return $socket->send_response("[ERR] show-state");
     }
 
-    my ($nalive, $ndead, $npending, $nmac, $state_table_s)
-            = get_ip_state_table_s($sponge);
-    return $socket->send_response( $state_table_s );
+    return $socket->send_response(
+        sprintf("%s\n[OK] alive=%d dead=%d pending=%d\n",
+                get_ip_state_table_s($sponge))
+    );
 }
 
 sub cmd_show_arp {
@@ -1148,7 +1149,7 @@ sub do_status {
     ##########################################################################
     $fh->print( get_status_info_s($sponge), "\n" );
     ##########################################################################
-    my ($nalive, $ndead, $npending, $state_table_s)
+    my ($state_table_s, $nalive, $ndead, $npending)
             = get_ip_state_table_s($sponge);
     $fh->print( $state_table_s, "\n" );
     ##########################################################################
