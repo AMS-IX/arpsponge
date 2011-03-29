@@ -1,4 +1,4 @@
-##############################################################################
+#############################################################################
 # @(#)$Id$
 ##############################################################################
 #
@@ -20,7 +20,7 @@ use IO::Socket;
 use Scalar::Util qw( blessed );
 
 BEGIN {
-	our $VERSION = '0.01';
+	our $VERSION = '0.02';
 }
 
 our $Error       = undef;
@@ -96,15 +96,34 @@ use base qw( M6::ARP::Control );
 
 use IO::Socket;
 
-sub new {
-    my ($type, $sockname) = @_;
+sub create_server {
+    my $type = shift @_;
+       $type = ref $type || $type;
+
+    my $socketname = shift;
     my $maxclients = @_ ? shift : 5;
 
+    print STDERR "M6::ARP::Control::create_server($socketname, $maxclients)\n";
+    # Fill in some harmless defaults...
+    #my $self = $type->new(
     my $self = IO::Socket::UNIX->new(
-                    Local => $sockname,
-                    Type  => SOCK_STREAM,
+                    Local  => $socketname,
+                    Type   => SOCK_STREAM,
                     Listen => $maxclients,
-                ) or return $type->_set_error($!);
+             ) or return $type->_set_error($!);
+
+    $self->blocking(0); # Make sure we never hang as a server.
+    bless $self, $type;
+}
+
+sub new {
+    my $type = shift @_;
+       $type = ref $type || $type;
+
+    print STDERR "M6::ARP::Control::Server::new($type, @_)\n";
+
+    my %args = @_;
+    my $self = IO::Socket::UNIX->new(%args) or return $type->_set_error($!);
 
     $self->blocking(0); # Make sure we never hang as a server.
     bless $self, $type;
@@ -137,7 +156,7 @@ sub send_log {
     my $log  = join('', @_);
     chomp($log);
     my $tstamp = strftime("%Y-%m-%d %H:%M:%S", localtime(time));
-    my @log = map { "\014LOG\t$tstamp $_\n" } split(/\n/, $log);
+    my @log = map { "\014LOG\t$tstamp [$$] $_\n" } split(/\n/, $log);
     return $self->_send_data(@log);
 }
 
@@ -278,12 +297,19 @@ sub _get_response {
     return $ok ? $response : undef;
 }
 
-sub new {
+sub create_client {
     my ($type, $sockfile) = @_;
-    my $self = IO::Socket::UNIX->new(
+    my $self = IO::Socket::Client->new(
                         Peer      => $sockfile,
                         Type      => SOCK_STREAM,
-                    ) or return $type->_set_error($!);
+                    ) or return;
+
+    return bless $self, $type;
+}
+
+sub new {
+    my ($type, @args) = @_;
+    my $self = IO::Socket::UNIX->new(@args) or return $type->_set_error($!);
 
     bless $self, $type;
     $self->_log_buffer([]);
@@ -319,7 +345,14 @@ M6::ARP::Control - client/server implementation for arpsponge control
 
  use M6::ARP::Control;
 
- $server = M6::ARP::Control::Server->new($socket_file);
+ $server = M6::ARP::Control::Server->create_server($socket_file);
+
+ # Alternative method (equivalent to above):
+ $server = M6::ARP::Control::Server->new(
+                    Local  => $socket_file,
+                    Type   => SOCK_STREAM,
+                    Listen =>5
+                );
 
  $conn = $server->accept();
 
@@ -337,7 +370,13 @@ M6::ARP::Control - client/server implementation for arpsponge control
 
  # ---------------------------------------------
 
- $client = M6::ARP::Control::Client->new($socket_file);
+ $client = M6::ARP::Control::Client->create_client($socket_file);
+
+ # Alternative method (equivalent to above):
+ $client = M6::ARP::Control::Client->new(
+                        Peer      => $socket_file,
+                        Type      => SOCK_STREAM,
+                    );
 
  $reply = $client->send_command('something important');
 
@@ -392,15 +431,49 @@ class is designed with single-threaded servers in mind that uses a
 C<select()> loop to detect input on a socket. Hence, the default
 I/O mode these objects is non-blocking.
 
+=head2 Constructor
+
+=over
+
+=item X<new>B<new> ( I<%ARGS> )
+
+Create a new object instance and return a reference to it. Because
+this object inherits from L<IO::Socket>(3), we must keep the same
+semantics for the arguments.
+
+The L</create_server> method is preferred.
+
+=item X<create_server>B<create_server> ( I<SOCKNAME> [, I<MAXCLIENTS> ] )
+
+Create a new server instance, listening on I<SOCKNAME> and returning
+a reference to the client object.
+
+On error, returns C<undef> and sets the module's error field.
+
+=cut
+
+=back
+
 =head1 M6::ARP::Control::Client
 
 =head2 Constructor
 
 =over
 
-=item X<new>B<new>
+=item X<new>B<new> ( I<%ARGS> )
 
-Create a new object instance and return a reference to it.
+Create a new object instance and return a reference to it. Because
+this object inherits from L<IO::Socket>(3), we must keep the same
+semantics for the arguments.
+
+The L</create_client> method is preferred.
+
+=item X<create_client>B<create_client> ( I<SOCKNAME> )
+
+Create a new client instance, connecting to I<SOCKNAME> and return
+a reference to the client object.
+
+On error, returns C<undef> and sets the module's error field.
 
 =cut
 
@@ -419,7 +492,8 @@ See the L</SYNOPSIS> section.
 =head1 SEE ALSO
 
 L<perl(1)|perl>, L<arpsponge|arpsponge>(8),
-L<M6::ARP::Sponge(3)|M6::ARP::Sponge>.
+L<M6::ARP::Sponge|M6::ARP::Sponge>(3),
+L<IO::Socket|IO::Socket>(3).
 
 =head1 AUTHORS
 
