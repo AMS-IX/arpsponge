@@ -27,9 +27,9 @@ use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
 use NetPacket::Ethernet qw( :types );
 use NetPacket::ARP      qw( ARP_OPCODE_REQUEST );
 use NetPacket::IP;
+use NetAddr::IP         qw( :lower );
 
 use Time::HiRes         qw( time sleep );
-use Net::IPv4Addr       qw( :all );
 use POSIX               qw( strftime :signal_h :errno_h );
 
 use File::Path          qw( mkpath );
@@ -49,6 +49,12 @@ $0 =~ s|.*/||g;
 ###############################################################################
 
 use constant SYSLOG_IDENT => '@NAME@';
+
+my ($REVISION)           = '$Revision$' =~ /^Revision: (\d+)\s*\$/;
+
+my $VERSION              = '@RELEASE@'."($REVISION)";
+my $NULL_IP              = ip2hex('0.0.0.0');
+my $NULL_MAC             = mac2hex('0:0:0:0:0:0');
 
 my $SPONGE_VAR           = '@SPONGE_VAR@';
 my $DFL_LOGLEVEL         = '@DFL_LOGLEVEL@';
@@ -175,18 +181,11 @@ sub Main {
 
     ####################################################################
 
-    my ($network, $netmask);
-
     die("Not enough parameters\n$::USAGE") if @ARGV < 3;
     die("Too many parameters\n$::USAGE")   if @ARGV > 3;
 
-    die("Bad IP address \"$ARGV[0]\"\n")    
-        unless Net::IPv4Addr::ipv4_chkip($ARGV[0]);
-
-    ($network, $netmask) = ipv4_network($ARGV[0]);
-
-    die("Bad network mask or prefix length in \"$ARGV[0]\"\n")
-        unless $netmask > 0;
+    my $network = NetAddr::IP->new($ARGV[0])
+        or die qq{"Bad network address or prefix length in "$ARGV[0]"\n};
 
     ####################################################################
 
@@ -230,7 +229,7 @@ sub Main {
         }
     }
 
-    my $control_fh = M6::ARP::Control::Server->new($control_socket)
+    my $control_fh = M6::ARP::Control::Server->create_server($control_socket)
                         or die M6::ARP::Control->error;
 
     ####################################################################
@@ -243,8 +242,8 @@ sub Main {
             queuedepth       => $queuedepth,
             device           => $device,
             loglevel         => $loglevel,
-            network          => $network,
-            netmask          => $netmask,
+            network          => ip2hex($network->addr),
+            prefixlen        => $network->masklen,
             max_pending      => $pending,
             max_rate         => $rate,
             arp_age          => $age,
@@ -256,6 +255,8 @@ sub Main {
     $sponge->is_dummy($dummy);
     $sponge->is_verbose($verbose);
 
+    $sponge->user('net_lo', $network->first->numeric);
+    $sponge->user('net_hi', $network->last->numeric);
     $sponge->user('start_time', time);
     $sponge->user('statusfile', $statusfile);
     $sponge->user('learning', $learning);
@@ -273,7 +274,7 @@ sub Main {
     init_state($sponge, $init);
 
     $sponge->print_log("Initializing $0 on [%s, %s, %s]",
-                    $sponge->device, $sponge->my_ip, $sponge->my_mac);
+                    $sponge->device, $sponge->my_ip_s, $sponge->my_mac_s);
 
     # If we have to run in daemon mode, do so.
     start_daemon($sponge, $pidfile) if $daemon;
@@ -520,57 +521,47 @@ sub cmd_show_ip {
     return $fh->send_response("$response\n[OK] $state");
 }
 
-sub cmd_status {
-    my ($sponge, $fh, @args) = @_;
-
-    if (@args >= 1) {
-        return $fh->send_response("[ERR] status");
-    }
+sub get_status_info_s {
+    my $sponge = shift;
 
     my $now = time;
     my $start_time = $sponge->user('start_time');
 
     my $learning = $sponge->user('learning');
-    if ($learning) {
-        $learning = "yes ($learning sec left)";
-    }
-    else {
-        $learning = 'no';
-    }
 
     my @response = (
-        "id:               ", $sponge->syslog_ident, "\n",
-        "pid:              $$\n",
-        "version:          ", '@RELEASE@', "\n",
-        "date:             ", format_time($now),
-            " [", int($now), "]\n",
-        "started:          ", format_time($start_time),
-            " [", int($start_time), "]\n",
-        "network:          ", $sponge->network, "/", $sponge->netmask, "\n",
-        "interface:        ", $sponge->device, "\n",
-        "ip/mac:           ", $sponge->my_ip, " [", $sponge->my_mac, "]\n",
-        "queue depth:      ", $sponge->queuedepth, "\n",
-        "max rate:         ", sprintf("%0.2f\n", $sponge->max_rate),
-        "flood protection: ", sprintf("%0.2f\n", $sponge->flood_protection),
-        "max pending:      ", $sponge->max_pending, "\n",
-        "sweep period:     ", $sponge->user('sweep_sec'), " sec\n",
-        "sweep age:        ", $sponge->user('sweep_age'), " sec\n",
-        "proberate:        ", int(1/$sponge->user('probesleep')), "\n",
-        "next sweep in:    ", int($sponge->user('next_sweep')-$now), " sec\n",
-        "learning:         ", $learning, "\n",
-        "dummy:            ", $sponge->is_dummy ? "yes" : "no", "\n",
-        "\n",
-        "[OK]",
+        sprintf("%-17s %s\n", 'id', $sponge->syslog_ident),
+        sprintf("%-17s %d\n", 'pid', $$),
+        sprintf("%-17s %s\n", 'version', $VERSION),
+        sprintf("%-17s %s [%d]\n", 'date', format_time($now), $now),
+        sprintf("%-17s %s [%d]\n", 'started',
+                format_time($start_time), $start_time),
+        sprintf("%-17s %s/%d\n", 'network',
+                $sponge->network_s, $sponge->prefixlen),
+        sprintf("%-17s %s\n", 'interface', $sponge->device),
+        sprintf("%-17s %s [%s]\n", 'ip/mac',
+                $sponge->my_ip_s, $sponge->my_mac_s),
+        sprintf("%-17s %d\n", 'queue depth', $sponge->queuedepth),
+        sprintf("%-17s %0.2f\n", 'max rate', $sponge->max_rate),
+        sprintf("%-17s %0.2f\n", 'flood protection',
+                $sponge->flood_protection),
+        sprintf("%-17s %d\n", 'max pending', $sponge->max_pending),
+        sprintf("%-17s %d sec\n", 'sweep period', $sponge->user('sweep_sec')),
+        sprintf("%-17s %d sec\n", 'sweep age', $sponge->user('sweep_age')),
+        sprintf("%-17s %d sec\n", 'proberate',
+                1/$sponge->user('probesleep')),
+        sprintf("%-17s %d sec\n", 'next sweep in',
+                $sponge->user('next_sweep')-$now),
+        sprintf("%-17s %s\n", 'learning',
+                $learning ? "yes ($learning sec left)" : "no"),
+        sprintf("%-17s %s\n", 'dummy',
+                $sponge->is_dummy ? "yes" : "no", "\n"),
     );
-    return $fh->send_response( join('', @response) );
+    return join('', @response);
 }
 
-sub cmd_show_state {
-    my ($sponge, $socket, @args) = @_;
-
-    if (@args >= 1) {
-        return $socket->send_response("[ERR] show-state");
-    }
+sub get_ip_state_table_s {
+    my $sponge = shift;
 
     my $fh = IO::String->new;
     $fh->print("<STATE>\n");
@@ -582,10 +573,10 @@ sub cmd_show_state {
     my $states = $sponge->state_table;
     my $queue = $sponge->queue;
 
-    my ($nalive, $ndead, $npending, $nmac) = (0,0,0,0);
+    my ($nalive, $ndead, $npending) = (0,0,0);
     
     my $ip;
-    for $ip (sort { ip2int($a) <=> ip2int($b) } keys %$states) {
+    for $ip (sort { $a cmp $b } keys %$states) {
         my $state = $$states{$ip};
         next unless defined $state;
 
@@ -605,24 +596,20 @@ sub cmd_show_state {
             }
         }
 
-        $stamp = format_time($stamp);
         $fh->print(
-            sprintf("%-17s %-12s %7d %8.3f     %s\n",
-                $ip, $sponge->state_name($state), $depth, $rate, $stamp)
-        );
+            sprintf("%-17s %-12s %7d %8.3f     %s\n", hex2ip($ip),
+                    $sponge->state_name($state), $depth, $rate,
+                    format_time($stamp)
+            ));
     }
     $fh->print("</STATE>\n");
     $fh->print(sprintf("\n[OK] alive=%d dead=%d pending=%d\n",
                         $nalive, $ndead, $npending));
-    return $socket->send_response( ${$fh->string_ref} );
+    return ($nalive, $ndead, $npending, ${$fh->string_ref});
 }
 
-sub cmd_show_arp {
-    my ($sponge, $socket, @args) = @_;
-
-    if (@args >= 1) {
-        return $socket->send_response("[ERR] status");
-    }
+sub get_arp_table_s {
+    my $sponge = shift;
 
     my $fh = IO::String->new;
 
@@ -632,22 +619,53 @@ sub cmd_show_arp {
         );
 
     my $nmac = 0;
-    for my $ip (sort { ip2hex($a) cmp ip2hex($b) } keys %{$sponge->arp_table})
-    {
+    for my $ip (sort { $a cmp $b } keys %{$sponge->arp_table}) {
         my ($mac, $time) = @{$sponge->arp_table->{$ip}};
-
         $nmac++;
-
         $fh->print(sprintf("%-17s %-17s %-11d %s\n",
-                        $mac, $ip, int($time), format_time($time)
+                        hex2mac($mac), hex2ip($ip), $time, format_time($time)
                 ));
     }
 
     $fh->print("</ARP-TABLE>\n");
 
-    ##########################################################################
-    $fh->print(sprintf("\n[OK] ARP_entries=%d\n", $nmac));
-    return $socket->send_response( ${$fh->string_ref} );
+    return ($nmac, ${$fh->string_ref});
+}
+
+
+sub cmd_status {
+    my ($sponge, $fh, @args) = @_;
+
+    if (@args >= 1) {
+        return $fh->send_response("[ERR] status");
+    }
+
+    return $fh->send_response( get_status_info_s($sponge)."\n[OK]" );
+}
+
+sub cmd_show_state {
+    my ($sponge, $socket, @args) = @_;
+
+    if (@args >= 1) {
+        return $socket->send_response("[ERR] show-state");
+    }
+
+    my ($nalive, $ndead, $npending, $nmac, $state_table_s)
+            = get_ip_state_table_s($sponge);
+    return $socket->send_response( $state_table_s );
+}
+
+sub cmd_show_arp {
+    my ($sponge, $socket, @args) = @_;
+
+    if (@args >= 1) {
+        return $socket->send_response("[ERR] status");
+    }
+
+    my ($nmac, $arp_table_s) = get_arp_table_s($sponge);
+    return $socket->send_response(
+                $arp_table_s.sprintf("\n[OK] ARP_entries=%d\n", $nmac)
+            );
 }
 
 ###############################################################################
@@ -800,13 +818,10 @@ sub init_state($) {
 
     $state = { DEAD=>DEAD, ALIVE=>ALIVE, PENDING=>PENDING(0) }->{$state};
 
-    my ($net, $mask) = ($sponge->network, $sponge->netmask);
-    
-    my $lo = ip2int(ipv4_network($net, $mask))+1;
-    my $hi = ip2int(ipv4_broadcast($net, $mask))-1;
-
+    my $lo = $sponge->user('net_lo');
+    my $hi = $sponge->user('net_hi');
     for (my $num = $lo; $num <= $hi; $num++) {
-        my $ip = int2ip($num);
+        my $ip = sprintf("%08x", $num);
         $sponge->set_state($ip, $state);
     }
 }
@@ -843,27 +858,31 @@ sub do_sweep($) {
     my ($net, $mask) = ($sponge->network, $sponge->netmask);
     $sponge->print_log("sweeping for quiet entries on $net/$mask");
     
-    my $lo = ip2int(ipv4_network($net, $mask))+1;
-    my $hi = ip2int(ipv4_broadcast($net, $mask))-1;
+    my $lo = $sponge->user('net_lo');
+    my $hi = $sponge->user('net_hi');
 
     my $nprobe = 0;
-    my $v = $sponge->is_verbose;
-    $sponge->is_verbose($v-1) if $v;
+    my $verbose = $sponge->is_verbose;
+    $sponge->is_verbose($verbose-1) if $verbose>0;
     for (my $num = $lo; $num <= $hi; $num++) {
-        my $ip = int2ip($num);
+        my $ip = sprintf("%08x", $num);
         my $age = time - $sponge->state_mtime($ip);
         if ($age >= $threshold) {
-            $sponge->verbose(1, "DO PROBE $ip ($age >= $threshold)\n");
-
+            if ($verbose>1) {
+                $sponge->sverbose(1, "DO PROBE %s (%d >= %d)\n",
+                                hex2ip($ip), $age, $threshold);
+            }
             $sponge->send_probe($ip);
             $sponge->set_state_mtime($ip, time);
             $nprobe++;
             sleep($sleep);
-        } else {
-            $sponge->verbose(1, "SKIP PROBE $ip ($age < $threshold)\n");
+        }
+        elsif ($verbose>1) {
+                $sponge->sverbose(1, "SKIP PROBE %s (%d < %d)\n",
+                                hex2ip($ip), $age, $threshold);
         }
     }
-    $sponge->is_verbose($v);
+    $sponge->is_verbose($verbose);
     $sponge->print_log("probed $nprobe IP address(es)");
 }
 
@@ -882,7 +901,7 @@ sub do_sweep($) {
 sub process_pkt {
     my ($sponge, $hdr, $pkt) = @_;
     my $eth_obj = NetPacket::Ethernet->decode($pkt);
-    my $src_mac = hex2mac($eth_obj->{src_mac});
+    my $src_mac = $eth_obj->{src_mac};
 
     # Self-generated packets are not relevant.
     return if $src_mac eq $sponge->my_mac;
@@ -890,34 +909,45 @@ sub process_pkt {
     # Always "unsponge" the source IP address!
     if ($eth_obj->{type} == ETH_TYPE_IP) {
         my $ip_obj  = NetPacket::IP->decode($eth_obj->{data});
-        my $src_ip  = $ip_obj->{src_ip};
+        my $src_ip  = ip2hex($ip_obj->{src_ip});
         $sponge->set_alive($src_ip, $src_mac);
         return;
     }
     else {
-        return unless $eth_obj->{type} == ETH_TYPE_ARP;
+        return if $eth_obj->{type} != ETH_TYPE_ARP;
     }
 
     # From this point on, we have an ARP packet.
 
     my $arp_obj = NetPacket::ARP->decode($eth_obj->{data}, $eth_obj);
-    my $dst_ip  = hex2ip($arp_obj->{tpa});
-    my $src_ip  = hex2ip($arp_obj->{spa});
+    my $dst_ip  = $arp_obj->{tpa};
+    my $src_ip  = $arp_obj->{spa};
 
     # Always "unsponge" the source IP address!
     $sponge->set_alive($src_ip, $src_mac);
 
     # Ignore anything that is not an ARP "WHO-HAS" request.
-    return unless $arp_obj->{opcode} == ARP_OPCODE_REQUEST;
+    return if $arp_obj->{opcode} != ARP_OPCODE_REQUEST;
 
     # From this point on, we have an ARP "WHO-HAS" request.
 
-    unless ( $sponge->is_my_network($dst_ip) )
-    {
+    if ( $arp_obj->{sha} ne $src_mac ) {
+        # Interesting ...
+        $sponge->print_log(
+            "ARP spoofing: src.mac=%s arp.sha=%s arp.spa=%s arp.tpa=%s",
+            hex2mac($src_mac), hex2mac($arp_obj->{sha}),
+            hex2ip($src_ip),   hex2ip($dst_ip),
+        );
+    }
+
+    if ( ! $sponge->is_my_network($dst_ip) ) {
         # We only store/sponge ARPs for our "local" IP addresses.
 
-        $sponge->print_log("misplaced ARP src.ip=%s src.mac=%s dst.ip=%s",
-                            $src_ip, $src_mac, $dst_ip);
+        $sponge->print_log("misplaced ARP: src.mac=%s arp.spa=%s arp.tpa=%s",
+                        hex2mac($src_mac),
+                        hex2ip($src_ip),
+                        hex2ip($dst_ip),
+                    );
 
         return; # b-bye...
     }
@@ -927,16 +957,19 @@ sub process_pkt {
     if ($sponge->is_my_ip($dst_ip)) {
         # ARPs for our IPs require no action (handled by the kernel),
         # except for maybe updating our internal ARP table.
-        $sponge->verbose(1, "ARP from $src_ip for our $dst_ip\n");
+        if ($sponge->is_verbose) {
+            $sponge->sverbose(1, "ARP WHO HAS %s TELL %s (for our IP)\n",
+                                hex2ip($dst_ip), hex2ip($src_ip));
+        }
         $sponge->set_alive($dst_ip, $sponge->my_mac);
         return;
     }
-    elsif ($src_ip eq '0.0.0.0') {
+    elsif ($src_ip eq $NULL_IP) {
         # DHCP duplicate IP detection.
         # See RFC 2131, p38, bottom.
-        $sponge->verbose(1, "DHCP duplicate IP detection",
-                " from $src_ip\@$src_mac",
-                " for $dst_ip\n"
+        $sponge->print_log(
+                "DHCP duplicate IP detection: src.mac=%s arp.tpa=%s\n",
+                hex2mac($src_mac), hex2ip($dst_ip)
             );
 
         # Mmmh, don't let go completely yet... If all is well,
@@ -948,12 +981,16 @@ sub process_pkt {
         return;
     }
 
-    $sponge->verbose(2, "ARP WHO HAS $dst_ip TELL $src_ip ");
-    if ($state <= DEAD) {
-        my $age = time-$sponge->state_mtime($dst_ip);
-        $sponge->verbose(2, "[sponged=yes; ", int($age), " secs ago]\n");
-    } else {
-        $sponge->verbose(2, "[sponged=no]\n");
+    if ($sponge->is_verbose >= 2) {
+        $sponge->sverbose(2, "ARP WHO HAS %s TELL %s ",
+                          hex2ip($dst_ip), hex2ip($src_ip));
+        if ($state <= DEAD) {
+            my $age = time - $sponge->state_mtime($dst_ip);
+            $sponge->sverbose(2, "[sponged=yes; %d secs ago]\n", $age);
+        }
+        else {
+            $sponge->verbose(2, "[sponged=no]\n");
+        }
     }
 
     my $query_time = time;
@@ -978,7 +1015,7 @@ sub process_pkt {
                     $sponge->print_log(
                             "%s queue reduced: [depth,rate] = "
                             ."[%d,%0.1f] -> [%d,%0.1f]",
-                            $dst_ip, $d1, $r1, $d2, $r2
+                            hex2ip($dst_ip), $d1, $r1, $d2, $r2
                         );
                     if ($sponge->queue->is_full($dst_ip) &&
                         $r2 > $sponge->max_rate)
@@ -1051,6 +1088,8 @@ sub start_daemon($$) {
     close STDOUT;
     close STDERR;
     close STDIN;
+
+    # Verbosity and dummyness have no place in a daemon.
     $sponge->is_verbose(0);
     $sponge->is_dummy(0);
     return undef;
@@ -1085,7 +1124,7 @@ sub do_status {
     my $filename = $sponge->user('statusfile');
     my $start_time = $sponge->user('start_time');
 
-    unless (length($filename)) {
+    if (!length($filename)) {
         $filename = '/dev/null';
     }
 
@@ -1106,105 +1145,15 @@ sub do_status {
     $fh->autoflush(1);
     $fh->blocking(0);
 
-    my $now = time;
-    my $learning = $sponge->user('learning');
-    if ($learning) {
-        $learning = "yes ($learning sec left)";
-    }
-    else {
-        $learning = 'no';
-    }
-
-    $fh->print(
-        "id:               ", $sponge->syslog_ident, "\n",
-        "version:          ", '@RELEASE@', "\n",
-        "date:             ",
-            strftime("%Y-%m-%d %H:%M:%S", localtime($now)),
-            " [", int($now), "]\n",
-        "started:          ",
-            strftime("%Y-%m-%d %H:%M:%S", localtime($start_time)),
-            " [", int($start_time), "]\n",
-        "network:          ", $sponge->network, "/", $sponge->netmask, "\n",
-        "interface:        ", $sponge->device, "\n",
-        "IP/MAC:           ", $sponge->my_ip, " [", $sponge->my_mac, "]\n",
-        "queue depth:      ", $sponge->queuedepth, "\n",
-        "max rate:         ", sprintf("%0.2f\n", $sponge->max_rate),
-        "flood protection: ", sprintf("%0.2f\n", $sponge->flood_protection),
-        "max pending:      ", $sponge->max_pending, "\n",
-        "sweep period:     ", $sponge->user('sweep_sec'), " sec\n",
-        "sweep age:        ", $sponge->user('sweep_age'), " sec\n",
-        "proberate:        ", int(1/$sponge->user('probesleep')), "\n",
-        "next sweep in:    ", int($sponge->user('next_sweep')-$now), " sec\n",
-        "learning:         ", $learning, "\n",
-        "\n"
-    );
-
     ##########################################################################
-    $fh->print(
-            "<STATE>\n",
-             sprintf("%-17s %-12s %7s %12s %7s\n",
-                     "# IP", "State", "Queue", "Rate (q/min)", "Updated")
-         );
-
-    my $states = $sponge->state_table;
-    my $queue = $sponge->queue;
-
-    my ($nalive, $ndead, $npending, $nmac) = (0,0,0,0);
-    
-    my $ip;
-    for $ip (sort { ip2int($a) <=> ip2int($b) } keys %$states) {
-        my $state = $$states{$ip};
-        next unless defined $state;
-
-        my $depth = $queue->depth($ip);
-        my $rate  = $queue->rate($ip);
-        my $stamp = $sponge->state_mtime($ip);
-
-        given ($state) {
-            when (DEAD) {
-                $ndead++;
-            }
-            when (ALIVE) {
-                $nalive++;
-            }
-            when ($state >= PENDING(0)) {
-                $npending++;
-            }
-        }
-
-        if ($stamp > 0) {
-            $stamp = strftime("%Y-%m-%d %H:%M:%S", localtime($stamp));
-        }
-        else {
-            $stamp = 'never';
-        }
-        $fh->print(
-            sprintf("%-17s %-12s %7d %8.3f     %s\n",
-                $ip, $sponge->state_name($state), $depth, $rate, $stamp)
-        );
-    }
-    $fh->print("</STATE>\n\n");
-
+    $fh->print( get_status_info_s($sponge), "\n" );
     ##########################################################################
-
-    $fh->print(
-            "<ARP-TABLE>\n",
-            sprintf("%-17s %-17s %-11s %s\n", "# MAC", "IP", "Epoch", "Time")
-        );
-
-    for $ip (sort { ip2hex($a) cmp ip2hex($b) } keys %{$sponge->arp_table}) {
-        my ($mac, $time) = @{$sponge->arp_table->{$ip}};
-
-        $nmac++;
-
-        $fh->print(
-            sprintf("%-17s %-17s %-11d ", $mac, $ip, int($time)),
-            strftime("%Y-%m-%d %H:%M:%S\n", localtime($time))
-        );
-    }
-
-    $fh->print("</ARP-TABLE>\n");
-
+    my ($nalive, $ndead, $npending, $state_table_s)
+            = get_ip_state_table_s($sponge);
+    $fh->print( $state_table_s, "\n" );
+    ##########################################################################
+    my ($nmac, $arp_table_s) = get_arp_table_s($sponge);
+    $fh->print( $arp_table_s );
     ##########################################################################
     $fh->print(sprintf("\nalive=%d dead=%d pending=%d ARP_entries=%d\n",
                         $nalive, $ndead, $npending, $nmac));
