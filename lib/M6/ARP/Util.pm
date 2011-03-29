@@ -19,21 +19,19 @@ use POSIX qw( strftime );
 BEGIN {
 	use Exporter;
 
-	our $VERSION = 1.02;
+	our $VERSION = 1.03;
 	our @ISA = qw( Exporter );
 
 	our @EXPORT_OK = qw( 
             int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
-            format_time
+            format_time decode_ip hex_addr_in_net
         );
 	our @EXPORT    = ();
 
 	our %EXPORT_TAGS = ( 
 			'all'    => [ @EXPORT_OK ]
 		);
-
 }
-
 
 =pod
 
@@ -203,6 +201,42 @@ sub format_time {
     }
     return 'never';
 }
+
+###############################################################################
+
+=item X<hex_addr_in_net>B<hex_addr_in_net> ( I<ADDR>, I<NET>, I<PREFIXLEN> )
+
+Check whether I<ADDR> is a part of I<NET>/I<PREFIXLEN>. The
+I<ADDR> and I<NET> parameters are IP addresses in hexadecimal
+notation.
+
+Returns 1 if I<ADDR> is part of I<NET>/I<PREFIX>, C<undef> otherwise.
+
+=cut 
+
+sub hex_addr_in_net {
+    my ($addr, $net, $len) = @_;
+
+    my $nibbles = $len >> 2;
+
+    if ($nibbles) {
+        if (substr($addr, 0, $nibbles) ne substr($net, 0, $nibbles)) {
+            return;
+        }
+    }
+
+    $len = $len % 4;
+
+    return 1 if !$len;
+
+    #my $mask = 0xf & ~( 1<<(4-$len) - 1 );
+    my $mask = (0,1,3,7)[$len];
+    my $addr_nibble = hex(substr($addr, $nibbles, 1));
+    my $net_nibble  = hex(substr($net,  $nibbles, 1));
+    return ($addr_nibble & $mask) == $net_nibble;
+}
+
+
 
 1;
 
