@@ -28,9 +28,10 @@ $0 =~ s|.*/||g;
 use feature ':5.10';
 use strict;
 use warnings;
-use Getopt::Long;
+use Getopt::Long qw( GetOptions GetOptionsFromArray );
 use Pod::Usage;
-use M6::ARP::Control;
+use M6::ARP::Control::Client;
+use M6::ARP::Util qw( :all );
 use Term::ReadLine;
 
 my $SPONGE_VAR    = '@SPONGE_VAR@';
@@ -66,8 +67,8 @@ sub Main {
     }
 
     verbose "connecting to arpsponge on $sockname\n";
-    my $conn = M6::ARP::Control::Client->new($sockname)
-                or die M6::ARP::Control->error;
+    my $conn = M6::ARP::Control::Client->create_client($sockname)
+                or die M6::ARP::Control::Client->error."\n";
 
     my $err = 0;
 
@@ -96,48 +97,217 @@ sub Main {
     exit $err;
 }
 
-sub do_command {
-    my $conn  = shift;
-    my $input = shift;
-    my ($command, @args) = split(' ', $input);
-    $command = lc $command;
-    $input = join(' ', $command, @args);
+sub check_send_command {
+    my $conn = shift;
+    my $command = join(' ', @_);
 
-    if (0) {
-    given ($command) {
-        when ('show') {
-            do_show(@args);
-        }
-        when ('set') {
-            do_set(@args);
-        }
-        when ('clear') {
-            do_clear(@args);
-        }
-        when ('sponge') {
-            do_sponge(@args);
-        }
-    }
-    }
+    my $reply = $conn->send_command($command) or return;
+       $reply =~ s/^\[(\S+)\]\s*\Z//m;
 
-    if ($input =~ /^\s*show\s+log\s*$/) {
-        if (my $log = $conn->get_log_buffer(-order => -1)) {
-            print_output($log);
-        }
-    }
-    elsif ($input =~ /^\s*clear\s+log\s*$/) {
-        $conn->clear_log_buffer;
+    if ($1 eq 'OK') {
+        return $reply;
     }
     else {
-        my $reply = $conn->send_command($input);
-        if (!defined $reply) {
-            print STDERR "ERROR: ", $conn->error, "\n";
+        return print_error($reply);
+    }
+}
+
+sub dispatch {
+    my $conn    = shift;
+    my $parsed  = shift;
+    my $args    = shift;
+    my $valid   = shift;
+
+    my $prefix = join('', map { $_.'_' } @$parsed);
+    my %commands = map { $_ => eval '\&do_'.$prefix.$_ } @$valid;
+
+    my $command = lc shift @$args;
+    push @$parsed, $command;
+    if (exists $commands{lc $command}) {
+        my $func = $commands{lc $command};
+        if (defined &$func) {
+            return $func->($conn, $parsed, $args);
         }
         else {
-            print_output($reply);
+            print_error("[INTERNAL] @$parsed: not implemented!");
         }
     }
-    return $command;
+    else {
+        print_error("@$parsed: command unknown");
+    }
+    return 0;
+}
+
+sub do_command {
+    my $conn  = shift;
+    my @args = split(' ', shift);
+
+    dispatch($conn,
+                    [],
+                    [ @args ],
+                    [ qw( quit status show set clear sponge unsponge ) ]
+           );
+
+    return $args[0];
+}
+
+sub check_arg_count {
+    my ($min, $max, $command, $args) = @_;
+
+    $min //= int(@$args);
+    $max //= int(@$args);
+
+    return 1 if @$args >= $min && @$args <= $max;
+
+    my $arguments = $max==1 ? "argument" : "arguments";
+    if ($min == $max) {
+        if (!$min) {
+            return print_error(qq{"$command" takes no arguments});
+        }
+        return print_error(qq{"$command" needs $min $arguments});
+    }
+    if ($min+1 == $max) {
+        return print_error(qq{"$command" needs $min or $max $arguments});
+    }
+    if (@$args < $min) {
+        my $arguments = $min==1 ? "argument" : "arguments";
+        return print_error(qq{"$command" needs at least $min $arguments});
+    }
+    if ($min) {
+        return print_error("$command: specify $min-$max $arguments");
+    }
+    return print_error("$command: specify up to $max $arguments");
+}
+
+sub do_quit {
+    my ($conn, $parsed, $args) = @_;
+    my $reply = check_send_command($conn, 'quit') or return;
+    print_output($reply);
+}
+
+sub do_show {
+    my ($conn, $parsed, $args) = @_;
+    my $format = 1;
+    my $command = join(' ', @$parsed);
+
+    check_arg_count(1,undef,$command, $args) or return;
+
+    return dispatch($conn,
+                    $parsed,
+                    $args,
+                    [ qw( status log arp version uptime ip ) ]
+           );
+}
+
+sub do_clear {
+    my ($conn, $parsed, $args) = @_;
+    my $format = 1;
+    my $command = join(' ', @$parsed);
+
+    check_arg_count(1,undef,$command, $args) or return;
+
+    return dispatch($conn,
+                    $parsed,
+                    $args,
+                    [ qw( ip arp log ) ]
+           );
+}
+
+sub do_show_log {
+    my ($conn, $parsed, $args) = @_;
+    my $format = 1;
+
+    GetOptionsFromArray($args,
+                'raw!'    => \(my $raw = 0),
+                'format!' => \$format,
+                'nf'      => sub { $format = 0 },
+            ) or return;
+
+    $format &&= !$raw;
+
+    check_arg_count(0,0,"@$parsed", $args) or return;
+
+    my $log = $conn->get_log_buffer(-order => -1) or return;
+    if ($format) {
+        $log =~ s/^(\d+)\t(\d+)\t/format_time($1,' ')." [$2] "/gme;
+    }
+    print_output($log);
+}
+
+sub do_clear_log {
+    my ($conn, $parsed, $args) = @_;
+    my $format = 1;
+
+    check_arg_count(0,0,"@$parsed", $args) or return;
+
+    my $log = $conn->get_log_buffer(-order => -1);
+    $conn->clear_log_buffer;
+    print_output(length($log)." bytes cleared");
+}
+
+sub do_show_status {
+    return do_status(@_);
+}
+
+sub do_status {
+    my ($conn, $parsed, $args) = @_;
+    my $format = 1;
+
+    GetOptionsFromArray($args,
+                'raw!'    => \(my $raw = 0),
+                'format!' => \$format,
+                'nf'      => sub { $format = 0 },
+            ) or return;
+
+    $format &&= !$raw;
+
+    check_arg_count(0,0,"@$parsed", $args) or return;
+    
+    my $reply = check_send_command($conn, 'get_status') or return;
+
+    if (!$raw) {
+        $reply =~ s/^(network|ip)=([\da-f]+)$/"$1=".hex2ip($2)/gme;
+        $reply =~ s/^(mac)=([\da-f]+)$/"$1=".hex2mac($2)/gme;
+    }
+    if (!$format) {
+        print_output($reply);
+    }
+    else {
+        my %info = map { split(/=/, $_) } split("\n", $reply);
+        my $taglen = 0;
+        foreach (keys %info) {
+            $taglen = length($_) if length($_) > $taglen;
+        }
+        $taglen++;
+        my $tag = "%-${taglen}s ";
+        print_output(
+            sprintf("$tag%s\n", 'id:', $info{id}),
+            sprintf("$tag%s\n", 'version:', $info{version}),
+            sprintf("$tag%s [%d]\n", 'date:',
+                    format_time($info{date}), $info{date}),
+            sprintf("$tag%s [%d]\n", 'started:',
+                    format_time($info{started}), $info{started}),
+            sprintf("$tag%s/%d\n", 'network:',
+                    $info{network}, $info{prefixlen}),
+            sprintf("$tag%s\n", 'interface:', $info{interface}),
+            sprintf("$tag%s\n", 'IP:', $info{ip}),
+            sprintf("$tag%s\n", 'MAC:', $info{mac}),
+            sprintf("$tag%d\n", 'queue depth:', $info{queue_depth}),
+            sprintf("$tag%0.2f\n", 'max rate:', $info{max_rate}),
+            sprintf("$tag%0.2f\n", 'flood protection:',
+                    $info{flood_protection}),
+            sprintf("$tag%0.2f\n", 'max pending:', $info{max_pending}),
+            sprintf("$tag%d\n", 'sweep period:', $info{sweep_period}),
+            sprintf("$tag%d\n", 'sweep age:', $info{sweep_age}),
+            sprintf("$tag%d\n", 'proberate:', $info{proberate}),
+            sprintf("$tag%s (in %d secs) [%d]\n", 'next sweep:',
+                    format_time($info{next_sweep}),
+                    $info{next_sweep}-$info{date},
+                    $info{next_sweep}),
+            sprintf("$tag%s\n", 'learning', $info{learning}?'yes':'no'),
+            sprintf("$tag%s\n", 'dummy', $info{dummy}?'yes':'no'),
+        );
+    }
 }
 
 sub initialise {
@@ -176,14 +346,21 @@ sub initialise {
     return ($sockname, [@ARGV]);
 }
 
+sub print_error {
+    my $out = join('', @_);
+       $out .= "\n" if $out !~ /\n\Z/;
+    print STDERR $out;
+    return;
+}
+
 sub print_output {
     my $out = join('', @_);
-       $out =~ s/\n+\[OK\]\s*\Z//s;
+       $out .= "\n" if $out !~ /\n\Z/;
 
     if (-t $OUT) {
         open(MORE, "|less"
-                   ." --no-lessopen --no-init --dumb"
-                   ." --quit-at-eof --quit-if-one-screen");
+                ." --no-lessopen --no-init --dumb"
+                ." --quit-at-eof --quit-if-one-screen");
         print MORE $out;
         close MORE;
     }

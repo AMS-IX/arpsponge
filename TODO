@@ -1,9 +1,43 @@
 @(#) $Id$
 
 --------------------------------------------------
+Tue Mar 29 23:13:42 CEST 2011
+
+Internal storage of IP and MAC addresses is now done
+as hex strings.
+
+Need to rework the client/server protocol, so the
+client also sends and receives HEX strings. See the
+doc/command_mapping.txt file.
+
+--------------------------------------------------
+Wish list for future enhancements:
+
+* setuid() to unprivileged user after opening relevant streams.
+
+* use ithreads for better real-time behaviour:
+	
+	- process
+	- learner
+	- sweeper
+	- prober
+
+	Process:    Always active, listens to packets on the wire.
+                Handles ALIVE->PENDING and DEAD->ALIVE, manages
+                the ARP table.
+
+	Learner:    stays active for "n" iterations, then finishes.
+
+	Prober:     waits for Learner to finish, then every second, probes
+                the IPs that are PENDING, moving them to DEAD if necessary.
+
+	Sweeper:    waits for Learner to finish, then periodically probes
+                "quiet" IPs.
+
+--------------------------------------------------
 Wed Mar 23 17:45:17 CET 2011
 
-* speed improvements:
+* DONE: speed improvements:
 
     MAC and IP addresses already come in as hex strings.
     We currently use "hex2ip" and "hex2mac" to convert them
@@ -15,7 +49,6 @@ Wed Mar 23 17:45:17 CET 2011
     Also, using hex form only, there's a smart algorithm
     for checking whether an IP address is in a network, which
     dramatically cuts down on the packet handling loop.
-
 
 #!/usr/bin/perl
 
@@ -68,29 +101,6 @@ sub addr_in_net {
     return ($a & $mask) == $n;
 }
 
---------------------------------------------------
-Wish list for future enhancements:
-
-* setuid() to unprivileged user after opening relevant streams.
-
-* use ithreads for better real-time behaviour:
-	
-	- process
-	- learner
-	- sweeper
-	- prober
-
-	Process:    Always active, listens to packets on the wire.
-                Handles ALIVE->PENDING and DEAD->ALIVE, manages
-                the ARP table.
-
-	Learner:    stays active for "n" iterations, then finishes.
-
-	Prober:     waits for Learner to finish, then every second, probes
-                the IPs that are PENDING, moving them to DEAD if necessary.
-
-	Sweeper:    waits for Learner to finish, then periodically probes
-                "quiet" IPs.
 
 --------------------------------------------------
 Thu Oct  7 09:16:50 CEST 2010

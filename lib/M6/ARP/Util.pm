@@ -183,11 +183,14 @@ sub mac2mac {
 
 ###############################################################################
 
-=item X<format_time>B<format_time> ( I<TIME> )
+=item X<format_time>B<format_time> ( I<TIME> [, I<SEPARATOR>] )
 
 Convert I<TIME> (seconds since epoch) to a "YYYY-mm-dd@HH:MM:SS"
 string in the local timezone.
 If I<TIME> is undefined or 0, it returns C<never>.
+
+If I<SEPARATOR> is specified, it is used as the string that
+separates the date part from the time part (by default an at-sign: "@").
 
 Example: format_time(1300891278)
 returns "2011-03-23@15:41:18"
@@ -196,8 +199,9 @@ returns "2011-03-23@15:41:18"
 
 sub format_time {
 	my $time = shift;
+    my $separator = @_ ? shift : '@';
     if (defined $time && $time > 0) {
-        return strftime('%Y-%m-%d@%H:%M:%S', localtime($time));
+        return strftime("%Y-%m-%d${separator}%H:%M:%S", localtime($time));
     }
     return 'never';
 }

@@ -250,12 +250,18 @@ sub arp_table {
 
     return $self->{'arp_table'} if @_ == 0;
 
-    my $ip   = shift;
+    my $ip        = shift;
+    my $arp_table = $self->{'arp_table'};
 
     if (@_) {
         my $mac = shift;
         my $time = @_ ? shift : time;
-        $self->{'arp_table'}->{$ip} = [ $mac, $time ];
+        if (defined $mac) {
+            $self->{'arp_table'}->{$ip} = [ $mac, $time ];
+        }
+        else {
+            delete $self->{'arp_table'}->{$ip};
+        }
     }
     return $self->{'arp_table'}->{$ip} ? @{$self->{'arp_table'}->{$ip}} : ();
 }

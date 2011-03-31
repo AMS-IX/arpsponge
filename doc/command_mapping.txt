@@ -9,11 +9,9 @@ Basic (socket-level) Communications
     FF    = line-feed (\f)
     TAB   = tab (\t)
 
-    log   = FF + "LOG" + TAB
-
 * Client sends single-line commands to server, terminated by LF.
 
-* Server sends two kinds of reply:
+* Server sends two kinds of reply "log_msg" and "command_output":
 
   reply          := log_msg | command_output
   log_msg        := log_hdr + text + LF
@@ -30,6 +28,26 @@ Basic (socket-level) Communications
 
      All text up to (but not including) the ready_prompt.
 
+  Log messages are sent by the server whenever it has something to log.
+  Hence, a client may receive zero or more log messages when it waits
+  for command output.
+
+Server commands
+---------------
+
+quit
+ping
+get_status
+get_arp     [X]
+clear_arp   X
+get_ip      [X]
+clear_ip    X
+set_dead    X
+set_alive   X [Y]
+set_pending X Y
+set_queue   X Y
+set_rate    X Y
+
 Command mappings
 ----------------
 
@@ -37,64 +55,82 @@ Client              Server
 -----------------------------------
 quit                quit
 ping                ping
-sponge X            set-dead    X
-unsponge X          set-alive   X
-clear ip X          forget-ip   X
+sponge X            set_dead   X
+unsponge X          set_alive  X
+clear ip X          clear_ip   X
+clear arp X         clear_arp  X
 clear log           -
-set ip X pending Y  set-pending X Y
-set ip X alive [Y]  set-alive   X Y
-set ip X dead       set-dead    X
-set ip X mac Y      set-alive   X Y
-set ip X queue Y    set-queue   X Y
-set ip X rate Y     set-rate    X Y
+set ip X pending Y  set_pending X Y
+set ip X alive [Y]  set_alive   X Y
+set ip X dead       set_dead    X
+set ip X mac Y      set_alive   X Y
+set ip X queue Y    set_queue   X Y
+set ip X rate Y     set_rate    X Y
 
 show status         status
-show version        status
-show uptime         status
+show arp [X]        get_arp [X]
+show version        get_status
+show uptime         get_status
 show log            -
-show ip X           show-ip X
-show ip X state     show-ip X
-show ip X mac       show-ip X
-show ip X queue     show-ip X
-show ip X rate      show-ip X
+show ip             get_ip
+show ip X           get_ip X, get_arp X
+show ip X state     get_ip X
+show ip X mac       get_arp X
+show ip X queue     get_ip X
+show ip X rate      get_ip X
 
 Data Types
 ----------
 
+IP addresses are sent as hexadecimal strings.
+MAC addresses are sent as hexadecimal strings.
+Boolean values are sent as 0 or 1.
+Time stamps are sent as seconds since epoch.
+
 Server:
-    Time stamps are sent as seconds since epoch.
-    Mac addresses are sent/received as hex strings.
-    IP addresses are sent/received as hex strings.
-    Boolean values are sent as 0 or 1.
 
-    Output is sent as <key> <space> <val>:
+    Output is sent as <key>=<val> <LF> <key=val>, with
+    <LF><LF> between records.
 
-        ip 1c201a6f
-        state ALIVE
-        queue 0
-        rate 0.0
-        mac 000cdbfd2300
-        mac_changed 1301071000
-        state_mtime 1301071508
-        state_atime 1301071567
+        -----------------------------
+
+        ip=1c201a6f
+        state=ALIVE
+        queue=0
+        rate=0.0
+        state_mtime=1301071508
+        state_atime=1301071567
+
+        ip=1c201a70
+        state=DEAD
+        queue=500
+        rate=60.0
+        state_mtime=1301071402
+        state_atime=1301071663
+
         [OK]
 
-        id arpsponge
-        version 3.10-alpha2
-        date 1301071803
-        started 1300897051
-        network 5bc81100/26
-        interface eth0
-        ip 5bc81128
-        mac fe000096000a
-        max_queue 200
-        max_rate 30.00
-        flood_protection 5.00
-        max_pending 10
-        sweep_period 900
-        sweep_age 3600
-        proberate 100
-        next_sweep 38
-        learning 0
-        dummy 1
+        -----------------------------
+
+        id=arpsponge
+        pid=3456
+        version=3.10-alpha2(110)
+        date=1301071803
+        started=1300897051
+        network=5bc81100
+        prefixlen=26
+        interface=eth0
+        ip=5bc81128
+        mac=fe000096000a
+        max_queue=200
+        max_rate=30.00
+        flood_protection=5.00
+        max_pending=10
+        sweep_period=900
+        sweep_age=3600
+        proberate=100
+        next_sweep=38
+        learning=0
+        dummy=1
+
         [OK]

@@ -42,7 +42,7 @@ use IO::Socket;
 
 use M6::ARP::Sponge     qw( :states );
 use M6::ARP::Util       qw( :all );
-use M6::ARP::Control;
+use M6::ARP::Control::Server;
 
 ###############################################################################
 $0 =~ s|.*/||g;
@@ -255,6 +255,7 @@ sub Main {
     $sponge->is_dummy($dummy);
     $sponge->is_verbose($verbose);
 
+    $sponge->user('version', $VERSION);
     $sponge->user('net_lo', $network->first->numeric);
     $sponge->user('net_hi', $network->last->numeric);
     $sponge->user('start_time', time);
@@ -270,7 +271,7 @@ sub Main {
         $sponge->user('sweep_age', $sweep_threshold);
     }
 
-    $sponge->set_state($network, STATIC) if $sponge_net;
+    $sponge->set_state(ip2hex($network->addr), STATIC) if $sponge_net;
     init_state($sponge, $init);
 
     $sponge->print_log("Initializing $0 on [%s, %s, %s]",
@@ -414,14 +415,12 @@ sub packet_capture_loop {
                     );
                 }
             }
-            else {
-                if (!handle_client_command($sponge, $ready_fh)) {
-                    $select->remove($ready_fh);
-                    $sponge->remove_notify($ready_fh);
-                    $sponge->print_log("[client %d] disconnected",
-                                        $ready_fh->fileno);
-                    $ready_fh->close;
-                }
+            elsif (!$ready_fh->handle_command($sponge)) {
+                $select->remove($ready_fh);
+                $sponge->remove_notify($ready_fh);
+                $sponge->print_log("[client %d] disconnected",
+                                    $ready_fh->fileno);
+                $ready_fh->close;
             }
         }
     }
@@ -450,13 +449,17 @@ sub cmd_sponge {
     if (@args != 1) {
         return $fh->send_response("[ERR] sponge IP");
     }
-    my $ip = shift @args;
+    my $ip_s = shift @args;
+    my $ip = ip2hex($ip_s);
+    if ( ! $ip ) {
+        return $fh->send_response("[ERR] \"$ip_s\" is not a valid IP");
+    }
     if ( ! $sponge->is_my_network($ip) ) {
-        return $fh->send_response("[ERR] \"$ip\" not in network");
+        return $fh->send_response("[ERR] \"$ip_s\" not in network");
     }
     $sponge->set_dead($ip);
     my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
-    return $fh->send_response("[OK] $ip state=DEAD rate=$rate");
+    return $fh->send_response("[OK] $ip_s state=DEAD rate=$rate");
 }
 
 sub cmd_clear {
@@ -465,9 +468,13 @@ sub cmd_clear {
     if (@args == 0 || @args > 2) {
         return $fh->send_response("[ERR] clear IP [MAC]");
     }
-    my ($ip, $mac) = @args;
+    my ($ip_s, $mac) = @args;
+    my $ip = ip2hex($ip_s);
+    if ( ! $ip ) {
+        return $fh->send_response("[ERR] \"$ip_s\" is not a valid IP");
+    }
     if ( ! $sponge->is_my_network($ip) ) {
-        return $fh->send_response("[ERR] \"$ip\" not in network");
+        return $fh->send_response("[ERR] \"$ip_s\" not in network");
     }
     $mac //= '00:00:00:00:00:00';
     ($mac, my $time) = $sponge->set_alive($ip, $mac);
@@ -480,10 +487,14 @@ sub cmd_set_pending {
     if (@args == 0 || @args > 2) {
         return $fh->send_response("[ERR] set-pending IP [STATE]");
     }
-    my ($ip, $state) = @args;
+    my ($ip_s, $state) = @args;
     $state //= 0;
+    my $ip = ip2hex($ip_s);
+    if ( ! $ip ) {
+        return $fh->send_response("[ERR] \"$ip_s\" is not a valid IP");
+    }
     if ( ! $sponge->is_my_network($ip) ) {
-        return $fh->send_response("[ERR] \"$ip\" not in network");
+        return $fh->send_response("[ERR] \"$ip_s\" not in network");
     }
     $state = $sponge->set_pending($ip, PENDING($state));
     $fh->send_response("[OK] ip=$ip state=$state");
@@ -495,10 +506,16 @@ sub cmd_show_ip {
     if (@args != 1) {
         return $fh->send_response("[ERR] show-ip IP");
     }
-    my $ip = shift @args;
-    if ( ! $sponge->is_my_network($ip) ) {
-        return $fh->send_response("[ERR] \"$ip\" not in network");
+
+    my $ip_s = shift @args;
+    my $ip = ip2hex($ip_s);
+    if ( ! $ip ) {
+        return $fh->send_response("[ERR] \"$ip_s\" is not a valid IP");
     }
+    if ( ! $sponge->is_my_network($ip) ) {
+        return $fh->send_response("[ERR] \"$ip_s\" not in network");
+    }
+
     my $state       = $sponge->state_name($sponge->get_state($ip));
     my $depth       = $sponge->queue->depth($ip) // 0;
     my $rate        = $sponge->queue->rate($ip)  // 0.0;
@@ -532,7 +549,7 @@ sub get_status_info_s {
     my @response = (
         sprintf("%-17s %s\n", 'id:', $sponge->syslog_ident),
         sprintf("%-17s %d\n", 'pid:', $$),
-        sprintf("%-17s %s\n", 'version:', $VERSION),
+        sprintf("%-17s %s\n", 'version:', $sponge->user('version')),
         sprintf("%-17s %s [%d]\n", 'date:', format_time($now), $now),
         sprintf("%-17s %s [%d]\n", 'started:',
                 format_time($start_time), $start_time),
@@ -856,8 +873,8 @@ sub do_sweep($) {
     my $threshold = $sponge->user('sweep_age');
     my $sleep     = $sponge->user('probesleep');
 
-    my ($net, $mask) = ($sponge->network, $sponge->netmask);
-    $sponge->print_log("sweeping for quiet entries on $net/$mask");
+    my ($net, $prefixlen) = ($sponge->network, $sponge->prefixlen);
+    $sponge->print_log("sweeping for quiet entries on $net/$prefixlen");
     
     my $lo = $sponge->user('net_lo');
     my $hi = $sponge->user('net_hi');
