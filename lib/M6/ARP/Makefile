@@ -19,4 +19,12 @@ INSTALLFILES		=	\
 
 include $(TOPDIR)/rules.mk
 
+all			:	Control-all
+
+install		:	Control-install
+
+clean		:	Control-clean
+
+veryclean	:	Control-veryclean
+
 # E.O.F. Makefile
