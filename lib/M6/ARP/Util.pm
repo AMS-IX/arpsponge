@@ -24,7 +24,7 @@ BEGIN {
 
 	our @EXPORT_OK = qw( 
             int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
-            format_time decode_ip hex_addr_in_net
+            format_time relative_time decode_ip hex_addr_in_net
         );
 	our @EXPORT    = ();
 
@@ -51,7 +51,8 @@ M6::ARP::Util - IP/MAC utility routines
  $hex = mac2hex( $mac );
  $mac = mac2mac( $mac );
 
- $str = format_time(time);
+ $str = format_time($some_earlier_time);
+ $str = relative_time($some_earlier_time);
 
 =head1 DESCRIPTION
 
@@ -206,6 +207,50 @@ sub format_time {
     return 'never';
 }
 
+=item X<relative_time>B<relative_time> ( I<TIME> )
+
+Compare I<TIME> (seconds since epoch) against the current time
+and return a string that indicates the absolute difference.
+If I<TIME> is undefined or 0, it returns C<never>.
+
+Example: format_time(time-3745)
+returns "2011-03-23@15:41:18"
+
+=cut
+
+sub relative_time {
+	my $time = shift;
+    my $now  = time;
+
+    return 'never' if !$time;
+
+    my $direction = $time > $now ? 'from now' : 'ago';
+    my $diff = abs(time - $time);
+    my $sec = $diff % 60;
+    $diff   = int($diff/60);
+    my $min = $diff % 60;
+    $diff   = int($diff/60);
+    my $hrs = $diff % 24;
+    my $day = int($diff/24);
+
+    my $str = '';
+    $str = "$day day".($day==1?'':'s') if $day;
+    my $t;
+    $t = "${hrs}h"  if $hrs;
+    $t .= "${min}m" if $min;
+    $t .= "${sec}s" if $sec || !length($str.$t);
+    
+    if (length $str) {
+        if (length($t)) {
+            $str .= " $t";
+        }
+    }
+    else {
+        $str = $t;
+    }
+    return "$str $direction";
+}
+
 ###############################################################################
 
 =item X<hex_addr_in_net>B<hex_addr_in_net> ( I<ADDR>, I<NET>, I<PREFIXLEN> )
@@ -223,6 +268,8 @@ sub hex_addr_in_net {
 
     my $nibbles = $len >> 2;
 
+    #print STDERR "$nibbles nibbles\n";
+
     if ($nibbles) {
         if (substr($addr, 0, $nibbles) ne substr($net, 0, $nibbles)) {
             return;
@@ -231,12 +278,14 @@ sub hex_addr_in_net {
 
     $len = $len % 4;
 
+    #print STDERR "$len bits leftover\n";
     return 1 if !$len;
 
     #my $mask = 0xf & ~( 1<<(4-$len) - 1 );
-    my $mask = (0,1,3,7)[$len];
+    my $mask = (0,8,12,14,15)[$len];
     my $addr_nibble = hex(substr($addr, $nibbles, 1));
     my $net_nibble  = hex(substr($net,  $nibbles, 1));
+    #print STDERR "addr:$addr_nibble net:$net_nibble mask:$mask\n";
     return ($addr_nibble & $mask) == $net_nibble;
 }
 
