@@ -19,8 +19,6 @@ use IO::Socket;
 
 use M6::ARP::Control;
 
-#use IO::Socket;
-
 # $ref = $handle->_log_buffer;
 # $handle->_log_buffer($ref);
 #
