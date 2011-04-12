@@ -15,9 +15,11 @@ package M6::ARP::Control::Server;
 
 use strict;
 use base qw( M6::ARP::Control::Base );
+use M6::ARP::Sponge qw( :states );
 
 use IO::Socket;
 use M6::ARP::Util qw( :all );
+use Time::HiRes   qw( time );
 
 use POSIX qw( strftime );
 
@@ -26,8 +28,12 @@ BEGIN {
 }
 
 my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
-    quit ping get_status get_arp clear_arp get_ip
-    clear_ip set_dead set_alive set_pending set_queue set_rate
+    clear_arp clear_ip clear_ip_all
+    get_arp get_ip get_status get_log ping quit
+    set_queuedepth set_max_rate set_max_pending set_learning
+    set_proberate set_flood_protection set_dummy
+    set_sweep_age set_sweep_sec
+    set_alive set_dead set_pending 
 );
 
 # my $server = M6::ARP::Control::Server->create_server(
@@ -151,7 +157,7 @@ sub handle_command {
         $sponge->print_log("FIXME: $cmd -> $sub_name not implemented!");
         return $self->send_error("FIXME: $cmd not implemented!");
     }
-    my $retval = eval '$self->'.$sub_name.'($sponge, @args)';
+    my $retval = eval '$self->'.$sub_name.'($sponge, $cmd, @args)';
     if ($@) {
         $self->send_log("INTERNAL ERROR: $@");
         $self->send_error("INTERNAL ERROR: $@");
@@ -199,9 +205,9 @@ sub _get_ip_info_s {
     my $queue  = $sponge->queue;
 
     my @ip_list = defined $ip_arg ? ($ip_arg) : keys %$states;
-    print STDERR "ip_arg: <$ip_arg>\n";
-    print STDERR "ip_list: ", int(@ip_list), " elements\n";
-    print STDERR "ip_list: @ip_list\n";
+    #print STDERR "ip_arg: <$ip_arg>\n";
+    #print STDERR "ip_list: ", int(@ip_list), " elements\n";
+    #print STDERR "ip_list: @ip_list\n";
     my @output = ();
     for my $ip (sort { $a cmp $b } @ip_list) {
         my $state = $states->{$ip};
@@ -242,94 +248,304 @@ sub _get_arp_info_s {
 ###############################################################################
 # $success = $conn->cmd_quit($sponge, @args);
 sub _cmd_quit {
-    my ($self, $sponge, @args) = @_;
+    my ($self, $sponge, $command, @args) = @_;
     $self->send_ok("bye");
     return;
 }
 
 sub _cmd_ping {
-    my ($self, $sponge, @args) = @_;
+    my ($self, $sponge, $command, @args) = @_;
     return $self->send_ok("ping $$");
 }
 
 sub _cmd_get_status {
-    my ($self, $sponge, @args) = @_;
+    my ($self, $sponge, $cmd, @args) = @_;
     
     my $status = $self->_get_status_info_s($sponge);
     return $self->send_ok($status);
 }
 
+sub _cmd_get_log {
+    my ($self, $sponge, $cmd, @args) = @_;
+    
+    my $count = 0;
+    if (@args) {
+        $count = is_valid_int($args[0], -min=>1);
+        defined $count or return $self->send_error("$cmd [<COUNT>]");
+    }
+    my @output;
+    my $buffer = $sponge->log_buffer;
+    my $nlines = int @{$sponge->log_buffer};
+    my $start  = ($count == 0 || $count > $nlines) ? 0 : $nlines-$count;
+    for (my $i = $start; $i < $nlines; $i++) {
+        my $log = $buffer->[$i];
+        push @output, $log->[0]."\t$$\t".$log->[1];
+    }
+    return $self->send_ok(join("\n", @output));
+}
+
 sub _cmd_get_ip {
-    my ($self, $sponge, @args) = @_;
+    my ($self, $sponge, $cmd, @args) = @_;
 
     my $ip;
     if (@args >1 ) {
-        return $self->send_error("too many arguments");
+        return $self->send_error("$cmd [<IP>]");
     }
     elsif (@args) {
         $ip = shift @args;
         if (!$sponge->is_my_network($ip)) {
-            return $self->send_error("$ip: address out of range");
+            return $self->send_error(hex2ip($ip), ": address out of range");
         }
     }
     return $self->send_ok($self->_get_ip_info_s($sponge, $ip));
 }
 
 sub _cmd_get_arp {
-    my ($self, $sponge, @args) = @_;
+    my ($self, $sponge, $cmd, @args) = @_;
 
     my $ip;
     if (@args >1 ) {
-        return $self->send_error("too many arguments");
+        return $self->send_error("$cmd [<IP>]");
     }
     elsif (@args) {
         $ip = shift @args;
         if (!$sponge->is_my_network($ip)) {
-            return $self->send_error("address out of range");
+            return $self->send_error(hex2ip($ip), ": address out of range");
         }
     }
     return $self->send_ok($self->_get_arp_info_s($sponge, $ip));
 }
 
 sub _cmd_clear_arp {
-    my ($self, $sponge, @args) = @_;
-    my $ip;
-    if (@args >1 ) {
-        return $self->send_error("too many arguments");
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    if (@args != 1 ) {
+        return $self->send_error("$cmd <IP>");
     }
-    elsif (@args) {
-        $ip = shift @args;
-        if (!$sponge->is_my_network($ip)) {
-            return $self->send_error("address out of range");
-        }
+
+    my $ip = shift @args;
+    if (!$sponge->is_my_network($ip)) {
+        return $self->send_error(hex2ip($ip), ": address out of range");
     }
     $sponge->arp_table($ip, undef);
     return $self->send_ok();
 }
 
+sub _cmd_clear_ip_all {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    if (@args) {
+        return $self->send_error("$cmd");
+    }
+
+    $sponge->print_log("[client %d] %s", $self->fileno, $cmd);
+    $sponge->init_all_state();
+    return $self->send_ok();
+}
+
 sub _cmd_clear_ip {
-    my ($self, $sponge, @args) = @_;
-    return $self->send_error("Not implemented yet");
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    if (@args != 1 ) {
+        return $self->send_error("$cmd <IP>");
+    }
+
+    my $ip = shift @args;
+    if (!$sponge->is_my_network($ip)) {
+        return $self->send_error(hex2ip($ip), ": address out of range");
+    }
+    $sponge->set_state($ip, undef);
+    $sponge->arp_table($ip, undef);
+    $sponge->print_log("[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
+    return $self->send_ok();
 }
-sub _cmd_set_dead {
-    my ($self, $sponge, @args) = @_;
-    return $self->send_error("Not implemented yet");
-}
-sub _cmd_set_alive {
-    my ($self, $sponge, @args) = @_;
-    return $self->send_error("Not implemented yet");
-}
+
 sub _cmd_set_pending {
-    my ($self, $sponge, @args) = @_;
-    return $self->send_error("Not implemented yet");
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    if (@args == 0 || @args > 2) {
+        return $self->send_error("$cmd <IP> [<STATE>]");
+    }
+    my $ip = shift @args;
+    my $state = @args ? shift @args : 0;
+    if ( ! $sponge->is_my_network($ip) ) {
+        return $self->send_error(hex2ip($ip), ": address out of range");
+    }
+    $sponge->print_log("[client %d] %s %s %d", $self->fileno,
+                        $cmd, hex2ip($ip), $state);
+    $state = $sponge->set_pending($ip, PENDING($state));
+    my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
+    return $self->send_ok("state=PENDING:$state\nrate=$rate");
 }
-sub _cmd_set_queue {
-    my ($self, $sponge, @args) = @_;
-    return $self->send_error("Not implemented yet");
+
+sub _cmd_set_dead {
+    my ($self, $sponge, $cmd, @args) = @_;
+    if (@args != 1) {
+        return $self->send_error("$cmd <IP>");
+    }
+    my $ip = shift @args;
+    if ( ! $sponge->is_my_network($ip) ) {
+        return $self->send_error(hex2ip($ip), ": address out of range");
+    }
+    $sponge->set_dead($ip);
+    $sponge->print_log("[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
+    my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
+    return $self->send_ok("ip=$ip\nstate=DEAD\nrate=$rate");
 }
-sub _cmd_set_rate {
-    my ($self, $sponge, @args) = @_;
-    return $self->send_error("Not implemented yet");
+
+sub _cmd_set_alive {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    if (@args < 1 || @args > 2) {
+        return $self->send_error("$cmd <IP> [<MAC>]");
+    }
+    my $ip = shift @args;
+    if ( ! $sponge->is_my_network($ip) ) {
+        return $self->send_error(hex2ip($ip), ": address out of range");
+    }
+    my $mac;
+    if (@args) {
+        ($mac) = $sponge->set_alive($ip, shift @args);
+    }
+    else {
+        ($mac) = $sponge->set_alive($ip);
+    }
+    $sponge->print_log("[client %d] %s %s %s", $self->fileno, $cmd,
+                        hex2ip($ip), hex2mac($mac));
+    return $self->send_ok("ip=$ip\nstate=ALIVE\nmac=$mac");
+}
+
+
+sub _cmd_set_queuedepth {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $max = is_valid_int($args[0], -min=>1);
+    if (!defined $max) {
+        return $self->send_error("$cmd <POSITIVE-INT>");
+    }
+    $sponge->print_log("[client %d] %s %d", $self->fileno, $cmd, $max);
+    my $old = $sponge->queuedepth();
+    $sponge->queuedepth($max);
+    $max    = $sponge->queuedepth();
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $max));
+}
+
+sub _cmd_set_learning {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $int = is_valid_int($args[0], -min=>0);
+    if (!defined $int) {
+        return $self->send_error("$cmd <NON-NEGATIVE-INT>");
+    }
+    $sponge->print_log("[client %d] %s %d", $self->fileno, $cmd, $int);
+    my $old = $sponge->user('learning');
+    $sponge->user('learning', $int);
+    $int    = $sponge->user('learning');
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
+}
+
+sub _cmd_set_max_pending {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $max = is_valid_int($args[0], -min=>1);
+    if (!defined $max) {
+        return $self->send_error("$cmd <POSITIVE-INT>");
+    }
+    $sponge->print_log("[client %d] %s %d", $self->fileno, $cmd, $max);
+    my $old = $sponge->max_pending();
+    $sponge->max_pending($max);
+    $max    = $sponge->max_pending();
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $max));
+}
+
+sub _cmd_set_sweep_sec {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $sec = is_valid_int($args[0], -min=>1);
+    if (!defined $sec) {
+        return $self->send_error("$cmd <POSITIVE-INT>");
+    }
+    $sponge->print_log("[client %d] %s %d", $self->fileno, $cmd, $sec);
+    my $old = $sponge->user('sweep_sec');
+    $sponge->user('sweep_sec', $sec);
+    my $new = $sponge->user('sweep_sec');
+
+    # See if we need to sweep right now.
+    my $next = $sponge->user('next_sweep') - $old + $new;
+    $sponge->user('next_sweep', $next);
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $new));
+}
+
+sub _cmd_set_sweep_age {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $sec = is_valid_int($args[0], -min=>1);
+    if (!defined $sec) {
+        return $self->send_error("$cmd <POSITIVE-INT>");
+    }
+    $sponge->print_log("[client %d] %s %d", $self->fileno, $cmd, $sec);
+    my $old = $sponge->user('sweep_age');
+    $sponge->user('sweep_age', $sec);
+    my $new = $sponge->user('sweep_age');
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $new));
+}
+
+sub _cmd_set_dummy {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $int = is_valid_int($args[0], -min=>0, -max=>1);
+    if (!defined $int) {
+        return $self->send_error("$cmd {0|1}");
+    }
+    $sponge->print_log("[client %d] %s %d", $self->fileno, $cmd, $int);
+    my $old = $sponge->is_dummy;
+    $sponge->is_dummy($int);
+    $int    = $sponge->is_dummy;
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
+}
+
+sub _cmd_set_max_rate {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $max = is_valid_float($args[0], -min=>0, -inclusive=>0);
+    if (!defined $max) {
+        return $self->send_error("$cmd <POSITIVE-FLOAT>");
+    }
+    $sponge->print_log("[client %d] %s %d", $self->fileno, $cmd, $max);
+    my $old = $sponge->max_rate();
+    $sponge->max_rate($max);
+    $max    = $sponge->max_rate();
+    return $self->send_ok(sprintf("old=%0.2f\nnew=%0.2f", $old, $max));
+}
+
+sub _cmd_set_flood_protection {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $rate = is_valid_float($args[0], -min=>0, -inclusive=>0);
+    if (!defined $rate) {
+        return $self->send_error("$cmd <POSITIVE-FLOAT>");
+    }
+    $sponge->print_log("[client %d] %s %0.2f", $self->fileno, $cmd, $rate);
+    my $old = $sponge->flood_protection();
+    $sponge->flood_protection($rate);
+    $rate   = $sponge->flood_protection();
+    return $self->send_ok(sprintf("old=%0.2f\nnew=%0.2f", $old, $rate));
+}
+
+sub _cmd_set_proberate {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $rate = is_valid_float($args[0], -min=>0, -inclusive=>0);
+    if (!defined $rate) {
+        return $self->send_error("$cmd <POSITIVE-FLOAT>");
+    }
+    my $newsleep = 1.0 / $rate;
+    $sponge->print_log("[client %d] %s %0.2f (probesleep=%0.2fms)",
+                        $self->fileno, $cmd, $rate, $newsleep*1000);
+    my $old = 1.0 / $sponge->user('probesleep');
+    $sponge->user('probesleep', $newsleep);
+    $rate   = 1.0 / $sponge->user('probesleep');
+    return $self->send_ok(sprintf("old=%0.2f\nnew=%0.2f", $old, $rate));
 }
 
 1;
