@@ -51,7 +51,7 @@ my $rundir        = $SPONGE_VAR;
 my $MAX_HISTORY   = 1000;
 my $HISTFILE      = "$::ENV{HOME}/.$0_history";
 
-($::VERSION) = '$Revision: 1.0$' =~ /Revision: (\S+)\$/;
+($::VERSION) = '$Revision$' =~ /Revision: (\S+) \$/;
 my $app_header = "\nThis is $0, v$::VERSION\n\n"
                . "See \"perldoc $0\" for more information.\n"
                ;

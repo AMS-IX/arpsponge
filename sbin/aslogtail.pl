@@ -41,7 +41,7 @@ my $opt_verbose   = undef;
 my $rundir        = $SPONGE_VAR;
 my $HISTFILE      = "$::ENV{HOME}/.$0_history";
 
-($::VERSION) = '$Revision$' =~ /Revision: (\S+)\$/;
+($::VERSION) = '$Revision$' =~ /Revision: (\S+) \$/;
 my $app_header = "\nThis is $0, v$::VERSION\n\n"
                . "See \"perldoc $0\" for more information.\n"
                ;
