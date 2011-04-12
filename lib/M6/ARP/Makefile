@@ -15,6 +15,7 @@ INSTALLFILES		=	\
 				$(INSTALLDIR)/Sponge.pm		\
 				$(INSTALLDIR)/Table.pm		\
 				$(INSTALLDIR)/Control.pm	\
+				$(INSTALLDIR)/NetPacket.pm	\
 				$(INSTALLDIR)/Util.pm
 
 include $(TOPDIR)/rules.mk
