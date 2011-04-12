@@ -37,6 +37,8 @@ M6::ARP::Queue - ARP query queue.
  $q->clear($dst_ip);
  $q->add($dst_ip, $src_ip, $timestamp);
 
+ $q->clear_all();
+
  while ( ! $q->is_full($dst_ip) ) {
 	...
  }
@@ -106,6 +108,14 @@ sub new {
 =head1 METHODS
 
 =over
+
+=item X<clear_all>B<clear_all>
+
+Clear all queues.
+
+=cut
+
+sub clear_all { %{$_[0]} = () }
 
 =item X<clear>B<clear> ( I<IP> )
 
