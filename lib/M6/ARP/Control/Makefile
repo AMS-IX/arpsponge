@@ -1,4 +1,4 @@
-# $Id: Makefile 100 2011-03-21 16:07:34Z steven $
+# $Id$
 #
 # Copyright (c) 2002 Steven Bakker.
 #
