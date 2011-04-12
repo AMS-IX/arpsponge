@@ -14,17 +14,18 @@
 package M6::ARP::Util;
 
 use strict;
-use POSIX qw( strftime );
+use POSIX qw( strftime strtod strtol );
 
 BEGIN {
 	use Exporter;
 
-	our $VERSION = 1.03;
+	our $VERSION = 1.04;
 	our @ISA = qw( Exporter );
 
 	our @EXPORT_OK = qw( 
             int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
             format_time relative_time decode_ip hex_addr_in_net
+            is_valid_int is_valid_float
         );
 	our @EXPORT    = ();
 
@@ -37,7 +38,7 @@ BEGIN {
 
 =head1 NAME
 
-M6::ARP::Util - IP/MAC utility routines
+M6::ARP::Util - IP, MAC, misc. utility routines
 
 =head1 SYNOPSIS
 
@@ -54,10 +55,14 @@ M6::ARP::Util - IP/MAC utility routines
  $str = format_time($some_earlier_time);
  $str = relative_time($some_earlier_time);
 
+ $month = is_valid_int($some_string, 1, 12);
+ $count = is_valid_int($some_string, 0);
+
 =head1 DESCRIPTION
 
 This module defines a number of routines to convert IP and MAC
-representations to and from various formats.
+representations to and from various formats and some miscellaneous
+utility functions.
 
 =head1 FUNCTIONS
 
@@ -184,75 +189,6 @@ sub mac2mac {
 
 ###############################################################################
 
-=item X<format_time>B<format_time> ( I<TIME> [, I<SEPARATOR>] )
-
-Convert I<TIME> (seconds since epoch) to a "YYYY-mm-dd@HH:MM:SS"
-string in the local timezone.
-If I<TIME> is undefined or 0, it returns C<never>.
-
-If I<SEPARATOR> is specified, it is used as the string that
-separates the date part from the time part (by default an at-sign: "@").
-
-Example: format_time(1300891278)
-returns "2011-03-23@15:41:18"
-
-=cut
-
-sub format_time {
-	my $time = shift;
-    my $separator = @_ ? shift : '@';
-    if (defined $time && $time > 0) {
-        return strftime("%Y-%m-%d${separator}%H:%M:%S", localtime($time));
-    }
-    return 'never';
-}
-
-=item X<relative_time>B<relative_time> ( I<TIME> )
-
-Compare I<TIME> (seconds since epoch) against the current time
-and return a string that indicates the absolute difference.
-If I<TIME> is undefined or 0, it returns C<never>.
-
-Example: format_time(time-3745)
-returns "2011-03-23@15:41:18"
-
-=cut
-
-sub relative_time {
-	my $time = shift;
-    my $now  = time;
-
-    return 'never' if !$time;
-
-    my $direction = $time > $now ? 'from now' : 'ago';
-    my $diff = abs(time - $time);
-    my $sec = $diff % 60;
-    $diff   = int($diff/60);
-    my $min = $diff % 60;
-    $diff   = int($diff/60);
-    my $hrs = $diff % 24;
-    my $day = int($diff/24);
-
-    my $str = '';
-    $str = "$day day".($day==1?'':'s') if $day;
-    my $t;
-    $t = "${hrs}h"  if $hrs;
-    $t .= "${min}m" if $min;
-    $t .= "${sec}s" if $sec || !length($str.$t);
-    
-    if (length $str) {
-        if (length($t)) {
-            $str .= " $t";
-        }
-    }
-    else {
-        $str = $t;
-    }
-    return "$str $direction";
-}
-
-###############################################################################
-
 =item X<hex_addr_in_net>B<hex_addr_in_net> ( I<ADDR>, I<NET>, I<PREFIXLEN> )
 
 Check whether I<ADDR> is a part of I<NET>/I<PREFIXLEN>. The
@@ -289,7 +225,190 @@ sub hex_addr_in_net {
     return ($addr_nibble & $mask) == $net_nibble;
 }
 
+###############################################################################
 
+=item X<is_valid_int>B<is_valid_int> ( I<ARG>
+[, B<-min> =E<gt> I<MIN>, B<-max> =E<gt> I<MAX>,
+ B<-inclusive> =E<gt> I<BOOL> ])
+
+Check whether I<ARG> is defined and represents a valid integer. If I<MIN>
+and/or I<MAX> are given and not C<undef>, it also checks the boundaries
+(by default inclusive). Returns the integer value if the checks are successful,
+C<undef> otherwise.
+
+Example:
+
+=over
+
+=item Check for a positive integer:
+
+ # check for >= 1
+ if ($val = is_valid_int($arg, -min => 1)) {
+    ...
+ }
+
+ # check for > 0
+ if ($val = is_valid_int($arg, -min => 0, -inclusive => 0)) {
+    ...
+ }
+
+
+=item Check for a negative integer:
+
+ if ($val = is_valid_int($arg, -max => -1)) {
+    ...
+ }
+
+=item Check for a valid month number:
+
+ if ($val = is_valid_int($arg, -min => 1, -max => 12)) {
+    ...
+ }
+
+=back
+
+=cut
+
+sub is_valid_int {
+    my $arg = shift;
+    my %opts = (-min => undef, -max => undef, -inclusive => 1, @_);
+    
+    return if !defined $arg || length($arg) == 0;
+    my ($num, $unparsed) = strtol($arg);
+    return if $unparsed;
+    if ($opts{-inclusive}) {
+        return if defined $opts{-min} && $num < $opts{-min};
+        return if defined $opts{-max} && $num > $opts{-max};
+    }
+    else {
+        return if defined $opts{-min} && $num <= $opts{-min};
+        return if defined $opts{-max} && $num >= $opts{-max};
+    }
+    return $num;
+}
+
+###############################################################################
+
+=item X<is_valid_float>B<is_valid_float> ( I<ARG>
+[, B<-min> =E<gt> I<MIN>, B<-max> =E<gt> I<MAX>,
+ B<-inclusive> =E<gt> I<BOOL> ])
+
+Check whether I<ARG> is defined and represents a valid floating point
+number.  If I<MIN> and/or I<MAX> are given and not C<undef>, it also
+checks the boundaries (by default inclusive). Returns the value of I<ARG>
+if the checks are successful, C<undef> otherwise.
+
+Example:
+
+=over
+
+=item Check for a positive float:
+
+ # check for > 0
+ if ($val = is_valid_float($arg, -min => 0, -inclusive => 0)) {
+    ...
+ }
+
+
+=item Check for a negative float:
+
+ if ($val = is_valid_float($arg, -max => 0, -inclusive => 0)) {
+    ...
+ }
+
+=item Check for a valid stochastic value:
+
+ if ($val = is_valid_float($arg, -min => 0, -max => 1)) {
+    ...
+ }
+
+=back
+
+=cut
+
+sub is_valid_float {
+    my $arg = shift;
+    my %opts = (-min => undef, -max => undef, -inclusive => 1, @_);
+    
+    return if !defined $arg || length($arg) == 0;
+    my ($num, $unparsed) = strtod($arg);
+    return if $unparsed;
+    if ($opts{-inclusive}) {
+        return if defined $opts{-min} && $num < $opts{-min};
+        return if defined $opts{-max} && $num > $opts{-max};
+    }
+    else {
+        return if defined $opts{-min} && $num <= $opts{-min};
+        return if defined $opts{-max} && $num >= $opts{-max};
+    }
+    return $num;
+}
+
+###############################################################################
+
+=item X<format_time>B<format_time> ( I<TIME> [, I<SEPARATOR>] )
+
+Convert I<TIME> (seconds since epoch) to a "YYYY-mm-dd@HH:MM:SS"
+string in the local timezone.
+If I<TIME> is undefined or 0, it returns C<never>.
+
+If I<SEPARATOR> is specified, it is used as the string that
+separates the date part from the time part (by default an at-sign: "@").
+
+Example: format_time(1300891278)
+returns "2011-03-23@15:41:18"
+
+=cut
+
+sub format_time {
+	my $time = shift;
+    my $separator = @_ ? shift : '@';
+    if (defined $time && $time > 0) {
+        return strftime("%Y-%m-%d${separator}%H:%M:%S", localtime($time));
+    }
+    return 'never';
+}
+
+=item X<relative_time>B<relative_time> ( I<TIME> [, I<WITH_DIRECTION>] )
+
+Compare I<TIME> (seconds since epoch) against the current time
+and return a string that indicates the absolute difference.
+If I<TIME> is undefined or 0, it returns C<never>.
+
+If I<WITH_DIRECTION> is true, it will append "ago" or "from now" to the
+string. If not given, it defaults to C<true>.
+
+Example: relative_time(time-103745)
+returns "1 day 4h49m5s ago"
+
+=cut
+
+sub relative_time {
+	my $time = shift;
+    my $with_direction = @_ ? shift : 1;
+    my $now  = time;
+
+    return 'never' if !$time;
+
+    my $direction = $time > $now ? 'from now' : 'ago';
+    my $diff = abs(time - $time);
+
+    my $day = int($diff / (24*3600));
+    $diff %= 24*3600;
+
+    my $str;
+    if ($day) {
+        $str = "$day day".($day==1?'':'s');
+        $str .= ", ";
+    }
+
+    $str .= strftime("%H:%M:%S", gmtime($diff));
+    
+    if ($with_direction) {
+        $str .= " $direction";
+    }
+    return $str;
+}
 
 1;
 
