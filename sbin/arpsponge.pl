@@ -247,6 +247,7 @@ sub Main {
             max_pending      => $pending,
             max_rate         => $rate,
             arp_age          => $age,
+            sponge_net       => $sponge_net,
             gratuitous       => $gratuitous,
             flood_protection => $flood_protection,
             syslog_ident     => SYSLOG_IDENT,
@@ -271,7 +272,6 @@ sub Main {
         $sponge->user('sweep_age', $sweep_threshold);
     }
 
-    $sponge->set_state(ip2hex($network->addr), STATIC) if $sponge_net;
     init_state($sponge, $init);
 
     $sponge->print_log("Initializing $0 on [%s, %s, %s]",
@@ -433,111 +433,6 @@ sub packet_capture_loop {
 ###############################################################################
 #####   HANDLING CONTROL INPUT   ##############################################
 
-sub cmd_quit {
-    my ($sponge, $fh, @args) = @_;
-    $fh->send_response("[OK] bye");
-    return;
-}
-
-sub cmd_ping {
-    my ($sponge, $fh, @args) = @_;
-    return $fh->send_response("[OK] ping @args");
-}
-
-sub cmd_sponge {
-    my ($sponge, $fh, @args) = @_;
-    if (@args != 1) {
-        return $fh->send_response("[ERR] sponge IP");
-    }
-    my $ip_s = shift @args;
-    my $ip = ip2hex($ip_s);
-    if ( ! $ip ) {
-        return $fh->send_response("[ERR] \"$ip_s\" is not a valid IP");
-    }
-    if ( ! $sponge->is_my_network($ip) ) {
-        return $fh->send_response("[ERR] \"$ip_s\" not in network");
-    }
-    $sponge->set_dead($ip);
-    my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
-    return $fh->send_response("[OK] $ip_s state=DEAD rate=$rate");
-}
-
-sub cmd_clear {
-    my ($sponge, $fh, @args) = @_;
-
-    if (@args == 0 || @args > 2) {
-        return $fh->send_response("[ERR] clear IP [MAC]");
-    }
-    my ($ip_s, $mac) = @args;
-    my $ip = ip2hex($ip_s);
-    if ( ! $ip ) {
-        return $fh->send_response("[ERR] \"$ip_s\" is not a valid IP");
-    }
-    if ( ! $sponge->is_my_network($ip) ) {
-        return $fh->send_response("[ERR] \"$ip_s\" not in network");
-    }
-    $mac //= '00:00:00:00:00:00';
-    ($mac, my $time) = $sponge->set_alive($ip, $mac);
-    $fh->send_response("[OK] $ip mac=$mac");
-}
-
-sub cmd_set_pending {
-    my ($sponge, $fh, @args) = @_;
-
-    if (@args == 0 || @args > 2) {
-        return $fh->send_response("[ERR] set-pending IP [STATE]");
-    }
-    my ($ip_s, $state) = @args;
-    $state //= 0;
-    my $ip = ip2hex($ip_s);
-    if ( ! $ip ) {
-        return $fh->send_response("[ERR] \"$ip_s\" is not a valid IP");
-    }
-    if ( ! $sponge->is_my_network($ip) ) {
-        return $fh->send_response("[ERR] \"$ip_s\" not in network");
-    }
-    $state = $sponge->set_pending($ip, PENDING($state));
-    $fh->send_response("[OK] ip=$ip state=$state");
-}
-
-sub cmd_show_ip {
-    my ($sponge, $fh, @args) = @_;
-
-    if (@args != 1) {
-        return $fh->send_response("[ERR] show-ip IP");
-    }
-
-    my $ip_s = shift @args;
-    my $ip = ip2hex($ip_s);
-    if ( ! $ip ) {
-        return $fh->send_response("[ERR] \"$ip_s\" is not a valid IP");
-    }
-    if ( ! $sponge->is_my_network($ip) ) {
-        return $fh->send_response("[ERR] \"$ip_s\" not in network");
-    }
-
-    my $state       = $sponge->state_name($sponge->get_state($ip));
-    my $depth       = $sponge->queue->depth($ip) // 0;
-    my $rate        = $sponge->queue->rate($ip)  // 0.0;
-    my $state_mtime = format_time($sponge->state_mtime($ip));
-    my $state_atime = format_time($sponge->state_atime($ip));
-    my ($mac, $mtime) = $sponge->arp_table($ip);
-    $mac //= 'unknown';
-    $mtime = format_time($mtime);
-    my $response
-            = sprintf("ip:            %s\n", $ip)
-            . sprintf("state:         %s\n", $state)
-            . sprintf("queue:         %d\n", $depth)
-            . sprintf("rate:          %0.1f\n", $rate)
-            . sprintf("mac:           %s\n", $mac)
-            . sprintf("mac changed:   %s\n", $mtime)
-            . sprintf("state changed: %s\n", $state_mtime)
-            . sprintf("last queried:  %s\n", $state_atime)
-            ;
-
-    return $fh->send_response("$response\n[OK] $state");
-}
-
 sub get_status_info_s {
     my $sponge = shift;
 
@@ -647,92 +542,6 @@ sub get_arp_table_s {
     $fh->print("</ARP-TABLE>\n");
 
     return ($nmac, ${$fh->string_ref});
-}
-
-
-sub cmd_status {
-    my ($sponge, $fh, @args) = @_;
-
-    if (@args >= 1) {
-        return $fh->send_response("[ERR] status");
-    }
-
-    return $fh->send_response( get_status_info_s($sponge)."\n[OK]" );
-}
-
-sub cmd_show_state {
-    my ($sponge, $socket, @args) = @_;
-
-    if (@args >= 1) {
-        return $socket->send_response("[ERR] show-state");
-    }
-
-    return $socket->send_response(
-        sprintf("%s\n[OK] alive=%d dead=%d pending=%d\n",
-                get_ip_state_table_s($sponge))
-    );
-}
-
-sub cmd_show_arp {
-    my ($sponge, $socket, @args) = @_;
-
-    if (@args >= 1) {
-        return $socket->send_response("[ERR] status");
-    }
-
-    my ($nmac, $arp_table_s) = get_arp_table_s($sponge);
-    return $socket->send_response(
-                $arp_table_s.sprintf("\n[OK] ARP_entries=%d\n", $nmac)
-            );
-}
-
-###############################################################################
-# $success = handle_client_command($sponge, $fh)
-#
-#    Read a command from client $fh and handle it. Return true if
-#    the communication succeeded, false if it failed (ie. remote end
-#    disconnected).
-#
-sub handle_client_command {
-    my ($sponge, $fh) = @_;
-    my $buf = $fh->get_command or return;
-    
-    my ($cmd, @args) = split(' ', $buf);
-    given (lc $cmd) {
-        when ('quit') {
-            return cmd_quit($sponge, $fh, @args);
-        }
-        when ('ping') {
-            return cmd_ping($sponge, $fh, @args);
-        }
-        when ('sponge') {
-            return cmd_sponge($sponge, $fh, @args);
-        }
-        when ('clear') {
-            return cmd_clear($sponge, $fh, @args);
-        }
-        when ('set-pending') {
-            return cmd_set_pending($sponge, $fh, @args);
-        }
-        when ('show-ip') {
-            return cmd_show_ip($sponge, $fh, @args);
-        }
-        when ('show-state') {
-            return cmd_show_state($sponge, $fh, @args);
-        }
-        when ('show-arp') {
-            return cmd_show_arp($sponge, $fh, @args);
-        }
-        when ('status') {
-            return cmd_status($sponge, $fh, @args);
-        }
-
-        $sponge->print_log("[client %d] unknown command <%s>",
-                            $fh->fileno, $cmd);
-        $fh->send_response("[ERR] unknown command \"$cmd\"");
-        return; # Make the connection go away.
-    }
-    return 1;
 }
 
 ###############################################################################
@@ -873,8 +682,8 @@ sub do_sweep($) {
     my $threshold = $sponge->user('sweep_age');
     my $sleep     = $sponge->user('probesleep');
 
-    my ($net, $prefixlen) = ($sponge->network, $sponge->prefixlen);
-    $sponge->print_log("sweeping for quiet entries on $net/$prefixlen");
+    $sponge->print_log("sweeping for quiet entries on %s/%d",
+                        hex2ip($sponge->network), $sponge->prefixlen);
     
     my $lo = $sponge->user('net_lo');
     my $hi = $sponge->user('net_hi');
@@ -905,6 +714,29 @@ sub do_sweep($) {
 }
 
 ###############################################################################
+# update_state($sponge, $src_ip, $src_mac);
+#
+#   Something sent something from [$src_ip, $src_mac]. Update
+#   our internal tables if necessary.
+#
+#   An exception should be made for STATIC entries, since these should
+#   be statically sponged.
+#
+sub update_state {
+    my ($sponge, $src_ip, $src_mac) = @_;
+
+    if ($sponge->get_state($src_ip) != STATIC) {
+        $sponge->set_alive($src_ip, $src_mac);
+    }
+    else {
+        $sponge->print_log(
+            "traffic from STATIC sponged IP: src.mac=%s src.ip=%s",
+            hex2mac($src_mac), hex2ip($src_ip),
+        );
+    }
+}
+
+###############################################################################
 # process_pkt($sponge, $hdr, $pkt);
 #
 #    Called by pcap_dispatch() as:
@@ -928,7 +760,22 @@ sub process_pkt {
     if ($eth_obj->{type} == ETH_TYPE_IP) {
         my $ip_obj  = NetPacket::IP->decode($eth_obj->{data});
         my $src_ip  = ip2hex($ip_obj->{src_ip});
-        $sponge->set_alive($src_ip, $src_mac);
+        # Update state for the source IP address.
+        update_state($sponge, $src_ip, $src_mac);
+
+        # Now, there are cases where a BGP peer A does not update
+        # its neighbor cache after we unsponge peer B. This may
+        # result in peer A sending traffic for B over us. For normal
+        # BGP peerings this never happens (since A and B must communicate
+        # directly over BGP), but in the case of a route server this
+        # may actually happen, since all the BGP traffic happens
+        # indirectly.
+        #
+        # So, what we are looking for here is a packet with a destination
+        # mac set to us, but an IP address that has nothing to do with us.
+        # If we see it, we send a unicast ARP reply with the correct info
+        # to the packet's source.
+        my $dst_ip = ip2hex($ip_obj->{dst_ip});
         return;
     }
     else {
@@ -941,8 +788,8 @@ sub process_pkt {
     my $dst_ip  = $arp_obj->{tpa};
     my $src_ip  = $arp_obj->{spa};
 
-    # Always "unsponge" the source IP address!
-    $sponge->set_alive($src_ip, $src_mac);
+    # Update state for the source IP address.
+    update_state($sponge, $src_ip, $src_mac);
 
     # Ignore anything that is not an ARP "WHO-HAS" request.
     return if $arp_obj->{opcode} != ARP_OPCODE_REQUEST;
