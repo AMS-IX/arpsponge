@@ -51,8 +51,9 @@ my $rundir        = $SPONGE_VAR;
 my $MAX_HISTORY   = 1000;
 my $HISTFILE      = "$::ENV{HOME}/.$0_history";
 
-($::VERSION) = '$Revision$' =~ /Revision: (\S+) \$/;
-my $app_header = "\nThis is $0, v$::VERSION\n\n"
+my ($REVISION) = '$Revision$' =~ /Revision: (\S+) \$/;
+my $VERSION    = '@RELEASE@'."($REVISION)";
+my $app_header = "\nThis is $0, v$VERSION\n\n"
                . "See \"perldoc $0\" for more information.\n"
                ;
 
@@ -734,19 +735,6 @@ sub do_clear_arp {
     return;
 }
 
-
-# cmd: clear log
-sub do_clear_log {
-    my ($conn, $parsed, $args) = @_;
-    my $format = 1;
-
-    check_arg_count(0,0,"@$parsed", $args) or return;
-
-    my $log = $conn->get_log_buffer(-order => -1);
-    $conn->clear_log_buffer;
-    print_output(length($log)." bytes cleared");
-}
-
 ###############################################################################
 # SET commands
 ###############################################################################
@@ -1193,7 +1181,7 @@ sub list_ip_completion {
 
 my %Completions = (
     ''          => [qw( quit ping sponge unsponge clear set show status )],
-    'clear'     => [qw( ip arp log )],
+    'clear'     => [qw( ip arp )],
     'set'       => [qw( ip max-pending queuedepth max-rate
                      flood-protection learning proberate
                      dummy sweep )],
@@ -1341,35 +1329,117 @@ __END__
 
 =head1 NAME
 
-xxx - do xxx
+asctl - Arp Sponge ConTroL utility
 
 =head1 SYNOPSIS
 
- xxx [--verbose|--quiet] infile
+B<asctl>
+[B<--verbose>]
+[B<--rundir>=I<dir>]
+[B<--interface>=I<ifname>]
+[B<--socket>=I<sock>]
+[I<command> ...]
 
 =head1 DESCRIPTION
+
+The C<asctl> program connects to a running L<arpsponge(8)|arpsponge>'s control
+socket, and executes commands that either come from standard input, or from
+the command line.
+
+By default, the program connects to the first control socket it finds in
+F<@SPONGE_VAR@> (see L<FILES|/FILES>), but see L<OPTIONS|/OPTIONS> below
+for ways to override this.
 
 =head1 OPTIONS
 
 =over
 
-=item X<--verbose>X<--quiet>B<--verbose> | B<--quiet>
+=item X<--verbose>B<--verbose>
 
-By default, only a short summary of the progress is printed to STDOUT.
-The C<--verbose> flag causes the program to be a little more talkative,
-the C<--quiet> flag suppresses all non-error output to STDOUT.
+The C<--verbose> flag causes the program to be a little more talkative.
+
+=item B<--rundir>=I<dir>
+
+Override the default top directory for the L<arpsponge> control files.
+See also L<FILES|/FILES> below.
+
+=item B<--interface>=I<ifname>
+
+Connect to the L<arpsponge> instance for interface I<ifname>.
+
+=item B<--socket>=I<sock>
+
+Explicitly specify the path of the control socket to connect to. Mutually
+exclusive with L<--interface|/--interface>.
 
 =back
 
-=head1 EXAMPLES
+=head1 COMMANDS
+
+    quit
+    ping [<count> [<delay>]]
+    sponge <ip>
+    unsponge <ip>
+    status
+
+    clear ip { all | <ip> ... }
+    clear arp <ip> ...
+
+    set max-pending <num>
+    set queuedepth <num>
+    set max-rate <rate>
+    set flood-protection <rate>
+    set learning <secs>
+    set proberate <rate>
+    set dummy <bool>
+    set sweep age <secs>
+    set sweep period <secs>
+
+    set ip ...
+
+    show status
+    show version
+    show uptime
+    show log [ <count> ]
+    show arp [ { all | <ip> ... } ]
+    show ip [ { all | alive | dead | pending | <ip> ... } ]
+
+=head1 COMMAND OPTIONS
+
+Most C<show> commands accept the following options:
+
+=over
+
+=item X<--raw>X<--noraw>B<--raw>, B<--noraw>
+
+Don't translate timestamps, IP addresses or MAC addresses. Implies
+C<--noformat>.
+
+=item X<--format>B<--format>
+
+=item X<--nf>X<--noformat>B<--nf>, B<--noformat>
+
+=back
+
+=head1 FILES
+
+=over
+
+=item F<@SPONGE_VAR@>
+
+Default top-level directory location for per-interface control sockets:
+the L<arpsponge> on interface I<ifname> will have its control socket at
+F<@SPONGE_VAR@/>I<ifname>F</control>.
+
+=back
 
 =head1 SEE ALSO
 
+L<arpsponge(8)|arpsponge>,
+L<asctl(8)|asctl>,
+L<tail(1)|tail>,
 L<perl(1)|perl>.
 
 =head1 AUTHOR
 
 Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011.
-
-=cut
-

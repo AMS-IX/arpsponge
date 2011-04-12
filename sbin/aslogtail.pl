@@ -41,8 +41,9 @@ my $opt_verbose   = undef;
 my $rundir        = $SPONGE_VAR;
 my $HISTFILE      = "$::ENV{HOME}/.$0_history";
 
-($::VERSION) = '$Revision$' =~ /Revision: (\S+) \$/;
-my $app_header = "\nThis is $0, v$::VERSION\n\n"
+my ($REVISION) = '$Revision$' =~ /Revision: (\S+) \$/;
+my $VERSION    = '@RELEASE@'."($REVISION)";
+my $app_header = "\nThis is $0, v$VERSION\n\n"
                . "See \"perldoc $0\" for more information.\n"
                ;
 
@@ -151,11 +152,9 @@ E.g.:
 
 =over
 
-=item X<--verbose>X<--quiet>B<--verbose> | B<--quiet>
+=item X<--verbose>B<--verbose>
 
-By default, only a short summary of the progress is printed to STDOUT.
-The C<--verbose> flag causes the program to be a little more talkative,
-the C<--quiet> flag suppresses all non-error output to STDOUT.
+The C<--verbose> flag causes the program to be a little more talkative.
 
 =item B<--rundir>=I<dir>
 
@@ -197,6 +196,7 @@ F<@SPONGE_VAR@/>I<ifname>F</control>.
 =head1 SEE ALSO
 
 L<arpsponge(8)|arpsponge>,
+L<asctl(8)|asctl>,
 L<tail(1)|tail>,
 L<perl(1)|perl>.
 
