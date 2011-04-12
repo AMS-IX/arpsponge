@@ -50,7 +50,10 @@ BEGIN {
             'states' => \@states,
             'all'    => [ @states ]
         );
-    0 if 0 && $::opt_verbose;
+}
+
+END {
+    closelog;
 }
 
 # State constants/macros
@@ -68,11 +71,12 @@ my %state_name_map = (
 
 # Accessors; use the factory :-)
 __PACKAGE__->mk_accessors(qw( 
-                syslog_ident    is_verbose  is_dummy
-                queuedepth      my_ip       my_mac
-                network         prefixlen   loglevel
-                arp_age         gratuitous  flood_protection
-                max_rate        max_pending
+                syslog_ident    is_verbose          is_dummy
+                queuedepth      my_ip               my_mac
+                network         prefixlen           loglevel
+                arp_age         gratuitous          flood_protection
+                max_rate        max_pending         sponge_net
+                log_buffer      log_buffer_size
         ));
 
 ###############################################################################
@@ -142,13 +146,22 @@ sub get_state        { $_[0]->{state}->{$_[1]} }
 sub set_state    {
     my ($self, $ip, $state) = @_;
 
-    $self->{state_mtime}->{$ip} = $self->{state_atime}->{$ip} = time;
-    $self->{state}->{$ip} = $state;
-    if ($state >= PENDING(0)) {
-        $self->{'pending'}->{$ip} = $state;
+    if (defined $state) {
+        $self->{state_mtime}->{$ip} = $self->{state_atime}->{$ip} = time;
+        $self->{state}->{$ip} = $state;
+        if ($state >= PENDING(0)) {
+            $self->{'pending'}->{$ip} = $state;
+        }
+        else {
+            delete $self->{'pending'}->{$ip};
+        }
     }
     else {
+        delete $self->{state_mtime}->{$ip};
+        delete $self->{state_atime}->{$ip};
+        delete $self->{state}->{$ip};
         delete $self->{'pending'}->{$ip};
+        $self->queue->clear($ip);
     }
     return $state;
 }
@@ -162,7 +175,14 @@ sub set_state    {
 sub new {
     my $type = shift;
 
-    my $self = {};
+    my ($prog) = $0 =~ m|([^/]+)$|;
+    my $self = {
+            'log_buffer_size' => 256,
+            'syslog_ident'    => $prog,
+            'loglevel'        => 'info',
+            'queuedepth'      => $M6::ARP::Queue::DFL_DEPTH,
+        };
+
     while (@_ >= 2) {
         my $k = shift @_;
         my $v = shift @_;
@@ -172,37 +192,54 @@ sub new {
     }
     bless $self, $type;
 
-    $self->{queuedepth}   = $M6::ARP::Queue::DFL_DEPTH if !$self->queuedepth;
-    if (length $self->syslog_ident == 0) {
-        my ($prog) = $0 =~ m|([^/]+)$|;
-        $self->syslog_ident($prog);
-    }
-    $self->{user}        = {};
-    $self->{notify}      = IO::Select->new();
-    $self->{pending}     = {};
-    $self->{state}       = {};
-    $self->{state_mtime} = {};
-    $self->{state_atime} = {};
-    $self->{queue}       = new M6::ARP::Queue($self->queuedepth);
-
+    ($self->{'phys_device'}) = split(/:/, $self->{'device'});
+    
+    $self->{'ip_all'} = { map { $_ => 1 } $self->get_ip_all };
     $self->my_ip( $self->get_ip );
     $self->my_mac( $self->get_mac );
 
-    $self->{'ip_all'} = { map { $_ => 1 } $self->get_ip_all };
+    $self->{log_buffer}  = [];
+    $self->{user}        = {};
+    $self->{notify}      = IO::Select->new();
+    $self->{queue}       = new M6::ARP::Queue($self->queuedepth);
 
-    $self->loglevel('info') if length $self->loglevel == 0;
-
-    $self->{'arp_table'} = {
-        $self->my_ip => [ $self->my_mac, time ]
-    };
-
-    ($self->{'phys_device'}) = split(/:/, $self->{'device'});
+    $self->init_all_state();
 
     if ($self->is_verbose) {
         $self->sverbose(1, "Device: %s\n", $self->device);
         $self->sverbose(1, "Device: %s\n", $self->phys_device);
-        $self->sverbose(1, "MAC:    %s\n", hex2mac($self->my_mac));
-        $self->sverbose(1, "IP:     %s\n", hex2ip($self->my_ip));
+        $self->sverbose(1, "MAC:    %s\n", $self->my_mac_s);
+        $self->sverbose(1, "IP:     %s\n", $self->my_ip_s);
+    }
+    openlog($self->syslog_ident, 'cons,pid', 'user');
+    return $self;
+}
+
+###############################################################################
+# $sponge->init_all_state();
+#
+#   Wipe all state info from the sponge. This includes all IP state info,
+#   all queue info, all timings, all ARP info.
+#
+#   The only info left in the tables is the sponge's own address.
+#
+###############################################################################
+sub init_all_state {
+    my $self = shift;
+
+    $self->{pending}     = {};
+    $self->{state}       = {};
+    $self->{state_mtime} = {};
+    $self->{state_atime} = {};
+    $self->{queue}->clear_all();
+    $self->{'arp_table'} = {};
+
+    # Build up a bit of state again...
+
+    $self->set_state($self->network, STATIC) if $self->sponge_net;
+
+    for my $ip ($self->my_ip, keys %{$self->{'ip_all'}}) {
+        $self->set_alive($ip, $self->my_mac);
     }
     return $self;
 }
@@ -390,8 +427,8 @@ sub send_probe {
     #return if $self->is_dummy;
 
     Net::ARP::send_packet($self->phys_device,
-            $self->my_ip,  $target_ip,
-            $self->my_mac, 'ff:ff:ff:ff:ff:ff',
+            $self->my_ip_s,  hex2ip($target_ip),
+            $self->my_mac_s, 'ff:ff:ff:ff:ff:ff',
             'request'
         );
 }
@@ -414,9 +451,10 @@ sub gratuitous_arp {
 
     return if $self->is_dummy;
 
+    my $ip_s = hex2ip($ip);
     Net::ARP::send_packet($self->phys_device,
-            $ip, $ip,
-            $self->my_mac, 'ff:ff:ff:ff:ff:ff',
+            $ip_s, $ip_s,
+            $self->my_mac_s, 'ff:ff:ff:ff:ff:ff',
             'request'
         );
 }
@@ -442,7 +480,7 @@ sub send_reply {
     }
     return if $self->is_dummy;
     Net::ARP::send_packet($self->phys_device, $src_ip_s, $dst_ip_s,
-                hex2mac($self->my_mac), $dst_mac_s, 'reply'
+                $self->my_mac_s, $dst_mac_s, 'reply'
             );
 }
 
@@ -542,17 +580,24 @@ sub sverbose {
 ###############################################################################
 sub print_log_level {
     my ($self, $level, $format, @args) = @_;
-    my $syslog = $self->syslog_ident;
+
+    # Add message to circular log buffer.
+    my $log_buffer = $self->log_buffer;
+    foreach (split(/\n/, sprintf($format, @args))) {
+        push @$log_buffer, [ time, $_ ];
+        if (int(@$log_buffer) > $self->log_buffer_size) {
+            shift @$log_buffer;
+        }
+    }
 
     if ($self->is_dummy || $self->is_verbose > 0) {
+        my $syslog = $self->syslog_ident;
         my $head = strftime("%Y-%m-%d %H:%M:%S ", localtime(time))
                  . $syslog . "[$$]:";
         print STDOUT map { "$head $_\n" } split(/\n/, sprintf($format, @args));
     }
     else {
-        openlog($syslog, 'cons,pid', 'user');
         syslog($level, $format, @args);
-        closelog;
     }
     $self->print_notify($format, @args);
 }
