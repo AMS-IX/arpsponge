@@ -182,8 +182,6 @@ and I<message> is the log message.
 
 =back
 
-=head1 EXAMPLES
-
 =head1 FILES
 
 =over
