@@ -78,7 +78,7 @@ sub initialise {
         'interface=s' => \(my $interface),
         'rundir=s'    => \$rundir,
         'socket=s'    => \(my $sockname),
-        'raw'         => \(my $raw = 0),
+        'raw!'        => \(my $raw = 0),
         'manual'      => sub { pod2usage(-exitval=>0, -verbose=>2) },
     ) or pod2usage(-exitval=>2);
 
@@ -118,13 +118,34 @@ __END__
 
 =head1 NAME
 
-xxx - do xxx
+aslogtail - Arp Sponge log tail
 
 =head1 SYNOPSIS
 
- xxx [--verbose|--quiet] infile
+B<aslogtail>
+[B<--verbose>]
+[B<--rundir>=I<dir>]
+[B<--interface>=I<ifname>]
+[B<--socket>=I<sock>]
+[B<-->[B<no>]B<raw>]
 
 =head1 DESCRIPTION
+
+The C<aslogtail> program functions like C<tail -f>, but instead of operating
+on a file, it connects to a running L<arpsponge(8)|arpsponge>'s control
+socket, reads log events from the daemon and prints them to F<stdout>.
+
+By default, the program connects to the first control socket it finds in
+F<@SPONGE_VAR@> (see L<FILES|/FILES>), but see L<OPTIONS|/OPTIONS> below
+for ways to override this.
+
+Output is in the form of:
+
+  YYYY-MM-DD hh:mm:ss [pid] message
+
+E.g.:
+
+  2011-04-12 16:52:46 [17325] alive=25 dead=37 pending=0 ARP_entries=25
 
 =head1 OPTIONS
 
@@ -136,12 +157,49 @@ By default, only a short summary of the progress is printed to STDOUT.
 The C<--verbose> flag causes the program to be a little more talkative,
 the C<--quiet> flag suppresses all non-error output to STDOUT.
 
+=item B<--rundir>=I<dir>
+
+Override the default top directory for the L<arpsponge> control files.
+See also L<FILES|/FILES> below.
+
+=item B<--interface>=I<ifname>
+
+Connect to the L<arpsponge> instance for interface I<ifname>.
+
+=item B<--socket>=I<sock>
+
+Explicitly specify the path of the control socket to connect to. Mutually
+exclusive with L<--interface|/--interface>.
+
+=item X<--raw>X<--noraw>B<--raw>, B<--noraw>
+
+If C<--raw> is specified, output will be in the form of:
+
+  <tstamp> <TAB> <pid> <TAB> <message>
+
+Where I<tstamp> is the seconds since epoch, I<pid> is the daemon's process ID
+and I<message> is the log message.
+
 =back
 
 =head1 EXAMPLES
 
+=head1 FILES
+
+=over
+
+=item F<@SPONGE_VAR@>
+
+Default top-level directory location for per-interface control sockets:
+the L<arpsponge> on interface I<ifname> will have its control socket at
+F<@SPONGE_VAR@/>I<ifname>F</control>.
+
+=back
+
 =head1 SEE ALSO
 
+L<arpsponge(8)|arpsponge>,
+L<tail(1)|tail>,
 L<perl(1)|perl>.
 
 =head1 AUTHOR
@@ -149,4 +207,3 @@ L<perl(1)|perl>.
 Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011.
 
 =cut
-
