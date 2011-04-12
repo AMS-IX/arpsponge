@@ -14,16 +14,14 @@ INSTALLDIRS	=	$(BINDIR)
 
 TARGETS		=	\
 			arpsponge \
+			aslogtail \
 			asctl
 
 INSTALLFILES	=	\
 			$(BINDIR)/arpsponge \
+			$(BINDIR)/aslogtail \
 			$(BINDIR)/asctl
 
 include ../rules.mk
-
-bla: arpsponge.pl Makefile
-	@ echo expanding
-	@ $(perlit) arpsponge.pl > bla
 
 # E.O.F. Makefile
