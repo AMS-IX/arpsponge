@@ -8,7 +8,8 @@ Build-Depends: debhelper (>= 4.0.0),
  libnetwork-ipv4addr-perl (>= 0.10),
  libsys-syslog-perl (>= 0.26),
  libnet-pcap-perl (>= 0.16),
- libnet-arp-perl (>= 1.0.2)
+ libnet-arp-perl (>= 1.0.2),
+ libreadonly-perl (>= 1.02)
 Standards-Version: 3.6.1
 
 Package: arpsponge
@@ -19,7 +20,10 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  libnetwork-ipv4addr-perl (>= 0.10),
  libsys-syslog-perl (>= 0.26),
  libnet-pcap-perl (>= 0.16),
- libnet-arp-perl (>= 1.0.2)
+ libnet-arp-perl (>= 1.0.2),
+ libreadonly-perl (>= 1.02),
+ libreadonly-xs-perl (>= 1.04)
 Description: Nifty ARP sponge.
  Nifty ARP sponge featuring gratuitous ARP, sweeping, reporting, etc.
- Also keeps an internal ARP table which can be dumped to a file.
+ Also keeps an internal ARP table which can be dumped to a file. The
+ daemon's state can be inspected and manipulated over a control socket.
