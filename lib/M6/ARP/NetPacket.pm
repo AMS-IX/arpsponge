@@ -25,6 +25,7 @@ BEGIN {
 
     my @functions = qw(
             decode_ethernet decode_ipv4 decode_arp
+            encode_ethernet encode_arp
         );
 
     my @variables = qw(
@@ -32,11 +33,10 @@ BEGIN {
             $ETH_TYPE_IPv4
             $ETH_TYPE_ARP
             $ETH_TYPE_IPv6
-            $ARP_OPCODE_REQUEST
-            $ARP_OPCODE_REPLY
-            $ARP_HTYPE_ETHERNET
+            $ARP_OPCODE_REQUEST $ARP_OPCODE_REPLY
+            $ARP_HTYPE_ETHERNET $ARP_HLEN_ETHERNET
+            $ARP_PROTO_IPv4     $ARP_PLEN_IPv4
             $ARP_PROTO_IP
-            $ARP_PROTO_IPv4
         );
 
 	our @EXPORT_OK = ( @functions, @variables );
@@ -60,6 +60,8 @@ Readonly our $ARP_OPCODE_REPLY    => 2;
 Readonly our $ARP_HTYPE_ETHERNET  => 1;
 Readonly our $ARP_PROTO_IP        => $ETH_TYPE_IPv4;
 Readonly our $ARP_PROTO_IPv4      => $ETH_TYPE_IPv4;
+Readonly our $ARP_HLEN_ETHERNET   => 6;
+Readonly our $ARP_PLEN_IPv4       => 4;
 
 =pod
 
@@ -161,6 +163,14 @@ ARP C<htype> for Ethernet hardware addresses.
 
 ARP C<proto> for IPv4 requests/replies.
 
+=item X<$ARP_HLEN_ETHERNET>I<$ARP_HLEN_ETHERNET>
+
+Ethernet protocol address length in bytes (6).
+
+=item X<$ARP_PLEN_IPv4>I<$ARP_PLEN_IPv4>
+
+IP protocol address length in bytes (4).
+
 =back
 
 =head1 FUNCTIONS
@@ -177,8 +187,7 @@ set. They do not set C<_parent> or C<_frame>.
 
 =item X<decode_ethernet>B<decode_ethernet> ( I<DATA> )
 
-(TCP/IP Illustrated, Volume 1, Section 4.4, p56-57. The section is about ARP,
-but shows the Ethernet header as well.)
+(TCP/IP Illustrated, Volume 1, Section 2.2, p21-23.)
 
 Decode I<DATA> as a raw Ethernet frame. Returns a hash with the following
 fields:
@@ -215,6 +224,46 @@ sub decode_ethernet {
             = unpack('H12H12na*', $pkt);
     }
     return $self;
+}
+
+###############################################################################
+
+=item X<encode_ethernet>B<encode_ethernet> ( I<HASHREF> )
+
+(TCP/IP Illustrated, Volume 1, Section 2.2, p21-23.)
+
+Encode I<HASHREF> as a raw Ethernet frame. Returns a scalar with
+the raw data. I<HASHREF> should point to a hash with the following fields:
+
+=over 12
+
+=item C<src_mac>
+
+Source MAC address as a 12 digit, lowercase hex string.
+
+=item C<dest_mac>
+
+Destination MAC address as a 12 digit, lowercase hex string.
+
+=item C<type>
+
+Integer denoting the Ethernet type field.
+
+=item C<data>
+
+Payload data of the Ethernet frame.
+
+=back
+
+=cut
+
+sub encode_ethernet {
+    my $self = shift;
+
+    return pack('H12H12na*', 
+            $self->{dest_mac}, $self->{src_mac},
+            $self->{type}, $self->{data}
+        );
 }
 
 ###############################################################################
@@ -343,12 +392,13 @@ I<$ARP_HTYPE_ETHERNET>.
 =item C<proto>
 
 Type of protocol address. This routine is only designed for
-I<$ARP_PROTO_ETHERNET>.
+I<$ARP_PROTO_IPv4>.
 
 =item C<hlen>, C<plen>
 
 Hardware address length and protocol address length (in octets). For IPv4
-on Ethernet these should be 6 and 4, respectively.
+on Ethernet these should be I<$ARP_HLEN_ETHERNET> and I<$ARP_PLEN_IPv4>,
+respectively.
 
 =item C<opcode>
 
@@ -373,10 +423,6 @@ as a 12 digit, lowercase hex string.
 
 Target protocol (IP) address
 as an 8 digit, lowercase hex string.
-
-=item C<type>
-
-Integer denoting the Ethernet type field.
 
 =item C<data>
 
@@ -410,7 +456,7 @@ sub decode_arp {
             = unpack('nnCCna*' , $pkt);
         
     # Take the long way home.
-    my $spec = 'H'.$self->{hlen}.'H'.$self->{plen};
+    my $spec = 'H'.($self->{hlen}*2).'H'.($self->{plen}*2);
     ($self->{sha}, $self->{spa}, $self->{tha}, $self->{tpa})
             = unpack($spec.$spec, $payload);
 
@@ -419,6 +465,86 @@ sub decode_arp {
 }
 
 ###############################################################################
+
+=item X<encode_arp>B<encode_arp> ( I<HASHREF> )
+
+(TCP/IP Illustrated, Volume 1, Section 4.4, p56-57.)
+
+Encode I<HASHREF> as a raw ARP packet. Returns a scalar with
+the raw data. I<HASHREF> should point to a hash with the following fields:
+
+=over 12
+
+=item C<htype>
+
+(optional, default value I<$ARP_HTYPE_ETHERNET>)
+
+Hardware type field. Only I<$ARP_HTYPE_ETHERNET> is currently supported.
+
+=item C<proto>
+
+(optional, default value I<$ARP_PROTO_IPv4>)
+
+Type of protocol address. Only I<$ARP_PROTO_IPv4> is currently supported.
+
+=item C<hlen>, C<plen>
+
+(optional, default values I<$ARP_HLEN_ETHERNET> and I<$ARP_PLEN_IPv4>)
+
+Hardware address length and protocol address length (in octets). For IPv4
+on Ethernet these should be I<$ARP_HLEN_ETHERNET> and I<$ARP_PLEN_IPv4>,
+respectively.
+
+=item C<opcode>
+
+Operation type: one of I<$ARP_OPCODE_REQUEST> or I<$ARP_OPCODE_REPLY>.
+
+=item C<sha>
+
+Source hardware (MAC) address
+as a 12 digit, lowercase hex string.
+
+=item C<spa>
+
+Source protocol (IP) address
+as an 8 digit, lowercase hex string.
+
+=item C<tha>
+
+Target hardware (MAC) address
+as a 12 digit, lowercase hex string.
+
+=item C<tpa>
+
+Target protocol (IP) address
+as an 8 digit, lowercase hex string.
+
+=back
+
+In theory the ARP packet could be for an AppleTalk address over Token Ring, but
+in practice (and our use case), we only see IP over Ethernet.
+
+=cut
+
+sub encode_arp {
+    my $self = shift;
+
+    $self->{htype} //= $ARP_HTYPE_ETHERNET;
+    $self->{proto} //= $ARP_PROTO_IPv4;
+
+    $self->{hlen}  //= $ARP_HLEN_ETHERNET;
+    $self->{plen}  //= $ARP_PLEN_IPv4;
+
+    my $spec = 'H'.($self->{hlen}*2).'H'.($self->{plen}*2);
+    return pack("nnCCn$spec$spec",
+            $self->{htype}, $self->{proto}, $self->{hlen}, $self->{plen},
+            $self->{opcode}, 
+            $self->{sha}, $self->{spa}, $self->{tha}, $self->{tpa}
+        );
+}
+
+###############################################################################
+
 1;
 
 __END__
