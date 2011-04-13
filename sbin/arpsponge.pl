@@ -24,9 +24,7 @@ use Pod::Usage;
 use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
                   pcap_get_selectable_fd pcap_setnonblock );
 
-use NetPacket::Ethernet qw( :types );
-use NetPacket::ARP      qw( ARP_OPCODE_REQUEST );
-use NetPacket::IP;
+use M6::ARP::NetPacket  qw( :all );
 use NetAddr::IP         qw( :lower );
 
 use Time::HiRes         qw( time sleep );
@@ -232,6 +230,19 @@ sub Main {
     my $control_fh = M6::ARP::Control::Server->create_server($control_socket)
                         or die M6::ARP::Control->error;
 
+    my $pcap_h
+        = pcap_open_live(
+                $sponge->device, # capture device
+                512,             # snaplen
+                1,               # promiscuous
+                0,               # timeout (we're handling that ourselves)
+                \$err,           # error diagnostic
+        );
+
+    if (!$pcap_h) {
+        $sponge->log_fatal("cannot capture on %s: %s", $sponge->device, $err);
+    }
+
     ####################################################################
 
     $| = ($verbose > 0 ? 1 : 0);
@@ -250,6 +261,7 @@ sub Main {
             sponge_net       => $sponge_net,
             gratuitous       => $gratuitous,
             flood_protection => $flood_protection,
+            pcap_handle      => $pcap_h,
             syslog_ident     => SYSLOG_IDENT,
         );
 
@@ -304,18 +316,8 @@ sub packet_capture_loop {
     my $sponge = shift;
 
     my $err = '';
-    my $pcap_h
-        = pcap_open_live(
-                $sponge->device, # capture device
-                512,             # snaplen
-                1,               # promiscuous
-                0,               # timeout (we're handling that ourselves)
-                \$err,           # error diagnostic
-        );
+    my $pcap_h = $sponge->pcap_handle;
 
-    if (!$pcap_h) {
-        $sponge->log_fatal("cannot capture on %s: %s", $sponge->device, $err);
-    }
     if (pcap_setnonblock($pcap_h, 0, \$err) < 0) {
         $sponge->log_fatal("cannot capture in non-blocking mode: %s", $err);
     }
@@ -750,16 +752,16 @@ sub update_state {
 ###############################################################################
 sub process_pkt {
     my ($sponge, $hdr, $pkt) = @_;
-    my $eth_obj = NetPacket::Ethernet->decode($pkt);
+    my $eth_obj = decode_ethernet($pkt);
     my $src_mac = $eth_obj->{src_mac};
 
     # Self-generated packets are not relevant.
     return if $src_mac eq $sponge->my_mac;
 
     # Always "unsponge" the source IP address!
-    if ($eth_obj->{type} == ETH_TYPE_IP) {
-        my $ip_obj  = NetPacket::IP->decode($eth_obj->{data});
-        my $src_ip  = ip2hex($ip_obj->{src_ip});
+    if ($eth_obj->{type} == $ETH_TYPE_IP) {
+        my $ip_obj  = decode_ip($eth_obj->{data});
+        my $src_ip  = $ip_obj->{src_ip};
         # Update state for the source IP address.
         update_state($sponge, $src_ip, $src_mac);
 
@@ -775,16 +777,16 @@ sub process_pkt {
         # mac set to us, but an IP address that has nothing to do with us.
         # If we see it, we send a unicast ARP reply with the correct info
         # to the packet's source.
-        my $dst_ip = ip2hex($ip_obj->{dst_ip});
+        my $dst_ip = $ip_obj->{dest_ip};
         return;
     }
     else {
-        return if $eth_obj->{type} != ETH_TYPE_ARP;
+        return if $eth_obj->{type} != $ETH_TYPE_ARP;
     }
 
     # From this point on, we have an ARP packet.
 
-    my $arp_obj = NetPacket::ARP->decode($eth_obj->{data}, $eth_obj);
+    my $arp_obj = decode_arp($eth_obj->{data});
     my $dst_ip  = $arp_obj->{tpa};
     my $src_ip  = $arp_obj->{spa};
 
@@ -792,7 +794,7 @@ sub process_pkt {
     update_state($sponge, $src_ip, $src_mac);
 
     # Ignore anything that is not an ARP "WHO-HAS" request.
-    return if $arp_obj->{opcode} != ARP_OPCODE_REQUEST;
+    return if $arp_obj->{opcode} != $ARP_OPCODE_REQUEST;
 
     # From this point on, we have an ARP "WHO-HAS" request.
 
