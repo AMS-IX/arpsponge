@@ -26,16 +26,11 @@ use base qw( M6::ARP::Base Exporter );
 
 use M6::ARP::Queue;
 use M6::ARP::Util       qw( :all );
+use M6::ARP::NetPacket  qw( :all );
 
 use POSIX               qw( strftime );
-use NetPacket::Ethernet qw( :types );
-use NetPacket::ARP      qw( ARP_OPCODE_REQUEST );
-use NetPacket::IP;
 use Net::ARP;
 use Sys::Syslog;
-use NetAddr::IP;
-use Net::IPv4Addr       qw( :all );
-use IO::File;
 use IO::Select;
 
 BEGIN {
@@ -76,7 +71,7 @@ __PACKAGE__->mk_accessors(qw(
                 network         prefixlen           loglevel
                 arp_age         gratuitous          flood_protection
                 max_rate        max_pending         sponge_net
-                log_buffer      log_buffer_size
+                log_buffer      log_buffer_size     pcap_handle
         ));
 
 ###############################################################################
@@ -128,7 +123,7 @@ sub phys_device      { shift->{'phys_device'} }
 sub pending          { shift->{'pending'} }
 
 sub is_my_ip         { $_[0]->{'ip_all'}->{$_[1]} }
-sub is_my_ip_s       { $_[0]->{'ip_all'}->{hex2ip($_[1])} }
+sub is_my_ip_s       { $_[0]->{'ip_all'}->{ip2hex($_[1])} }
 
 sub my_ip_s          { return hex2ip(shift->my_ip)   }
 sub network_s        { return hex2ip(shift->network) }
@@ -424,13 +419,10 @@ sub send_probe {
 
     $self->set_state_atime($target_ip, time);
 
-    #return if $self->is_dummy;
-
-    Net::ARP::send_packet($self->phys_device,
-            $self->my_ip_s,  hex2ip($target_ip),
-            $self->my_mac_s, 'ff:ff:ff:ff:ff:ff',
-            'request'
-        );
+    $self->send_arp( tha => $ETH_ADDR_BROADCAST,
+                     tpa => $target_ip,
+                     opcode => $ARP_OPCODE_REQUEST );
+    return;
 }
 
 ###############################################################################
@@ -443,8 +435,9 @@ sub gratuitous_arp {
     my ($self, $ip) = @_;
 
     if ($self->is_verbose) {
-        $self->sverbose(1, "Gratuitous ARP [dev=%s]: %s\n",
-                           $self->phys_device, hex2ip($ip));
+        $self->sverbose(1, "%sgratuitous ARP [dev=%s]: %s\n",
+                ($self->is_dummy ? '[DUMMY] ' : ''),
+                $self->phys_device, hex2ip($ip));
     }
 
     $self->set_state_atime($ip, time);
@@ -452,11 +445,78 @@ sub gratuitous_arp {
     return if $self->is_dummy;
 
     my $ip_s = hex2ip($ip);
-    Net::ARP::send_packet($self->phys_device,
-            $ip_s, $ip_s,
-            $self->my_mac_s, 'ff:ff:ff:ff:ff:ff',
-            'request'
-        );
+    $self->send_arp( spa => $ip,
+                     tha => $ETH_ADDR_BROADCAST,
+                     tpa => $ip,
+                     opcode => $ARP_OPCODE_REQUEST );
+}
+
+###############################################################################
+# $sponge->send_arp($opcode, $sha, $spa, $tha, $tpa);
+#
+#   Send an ARP packet.
+#
+###############################################################################
+sub send_arp {
+    my ($self, %args) = @_;
+
+    my $pcap_h = $self->pcap_handle or return;
+
+    $args{spa}      //= $self->my_ip;
+    $args{sha}      //= $self->my_mac;
+    $args{src_mac}  //= $self->my_mac;
+    $args{dest_mac} //= $args{tha};
+    $args{opcode}   //= $ARP_OPCODE_REQUEST;
+
+    my $pkt = encode_ethernet({
+                    dest_mac => $args{tha},
+                    src_mac  => $args{src_mac},
+                    type     => $ETH_TYPE_ARP,
+                    data     => encode_arp({
+                                    sha => $args{sha},
+                                    spa => $args{spa},
+                                    tha => $args{tha},
+                                    tpa => $args{tpa},
+                                    opcode => $args{opcode},
+                                })
+                });
+
+    if (Net::Pcap::sendpacket($pcap_h, $pkt) < 0) {
+        $self->print_log("ERROR sending ARP packet: %s", $!);
+    }
+    return;
+}
+
+###############################################################################
+# $sponge->send_arp_reply(%args);
+#
+#   Send an ARP "xx IS AT yy".
+#
+###############################################################################
+sub send_arp_update {
+    my ($self, %args) = @_;
+
+    my $pcap_h = $self->pcap_handle;
+
+    if (!$pcap_h || $self->is_verbose) {
+        my $dst_mac_s = hex2mac($args{tha});
+        my $dst_ip_s  = hex2ip($args{tpa});
+        my $src_mac_s = hex2ip($args{sha});
+        my $src_ip_s  = hex2ip($args{spa});
+        $self->sverbose(1, "%sarp inform %s\@%s about %s\@%s\n",
+                        (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
+                         $dst_ip_s, $dst_mac_s,
+                         $src_ip_s, $src_mac_s,
+                    );
+    }
+    return if (!$pcap_h || $self->is_dummy);
+
+    $self->send_arp( sha => $args{sha},
+                     spa => $args{spa},
+                     tha => $args{tha},
+                     tpa => $args{tpa},
+                     opcode => $ARP_OPCODE_REPLY );
+    return;
 }
 
 ###############################################################################
@@ -470,18 +530,29 @@ sub send_reply {
 
     $self->set_state_atime($src_ip, time);
 
-    # Figure out where to send the reply...
-    my $dst_mac_s = hex2mac($arp_obj->{sha});
-    my $dst_ip_s  = hex2ip($arp_obj->{spa});
-    my $src_ip_s  = hex2ip($src_ip);
-    if ($self->is_verbose) {
+    my $pcap_h = $self->pcap_handle;
+
+    if (!$pcap_h || $self->is_dummy) {
+        my $dst_mac_s = hex2mac($arp_obj->{sha});
+        my $dst_ip_s  = hex2ip($arp_obj->{spa});
+        my $src_ip_s  = hex2ip($src_ip);
+        $self->sverbose(1, "%s: DUMMY sponge reply to %s\@%s\n",
+                           $src_ip_s, $dst_ip_s, $dst_mac_s);
+        return;
+    }
+    elsif ($self->is_verbose) {
+        my $dst_mac_s = hex2mac($arp_obj->{sha});
+        my $dst_ip_s  = hex2ip($arp_obj->{spa});
+        my $src_ip_s  = hex2ip($src_ip);
         $self->sverbose(1, "%s: sponge reply to %s\@%s\n",
                            $src_ip_s, $dst_ip_s, $dst_mac_s);
     }
-    return if $self->is_dummy;
-    Net::ARP::send_packet($self->phys_device, $src_ip_s, $dst_ip_s,
-                $self->my_mac_s, $dst_mac_s, 'reply'
-            );
+
+    $self->send_arp( spa => $src_ip,
+                     tha => $arp_obj->{sha},
+                     tpa => $arp_obj->{spa},
+                     opcode => $ARP_OPCODE_REPLY );
+    return;
 }
 
 ###############################################################################
