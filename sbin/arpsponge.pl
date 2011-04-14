@@ -230,21 +230,6 @@ sub Main {
     my $control_fh = M6::ARP::Control::Server->create_server($control_socket)
                         or die M6::ARP::Control->error;
 
-    my $pcap_h
-        = pcap_open_live(
-                $sponge->device, # capture device
-                512,             # snaplen
-                1,               # promiscuous
-                0,               # timeout (we're handling that ourselves)
-                \$err,           # error diagnostic
-        );
-
-    if (!$pcap_h) {
-        $sponge->log_fatal("cannot capture on %s: %s", $sponge->device, $err);
-    }
-
-    ####################################################################
-
     $| = ($verbose > 0 ? 1 : 0);
 
     my $sponge = new M6::ARP::Sponge(
@@ -261,7 +246,6 @@ sub Main {
             sponge_net       => $sponge_net,
             gratuitous       => $gratuitous,
             flood_protection => $flood_protection,
-            pcap_handle      => $pcap_h,
             syslog_ident     => SYSLOG_IDENT,
         );
 
@@ -283,6 +267,25 @@ sub Main {
         $sponge->user('next_sweep', time+$sweep_sec);
         $sponge->user('sweep_age', $sweep_threshold);
     }
+
+    ####################################################################
+
+    my $pcap_h
+        = pcap_open_live(
+                $sponge->device, # capture device
+                512,             # snaplen
+                1,               # promiscuous
+                0,               # timeout (we're handling that ourselves)
+                \$err,           # error diagnostic
+        );
+
+    if (!$pcap_h) {
+        $sponge->log_fatal("cannot capture on %s: %s", $sponge->device, $err);
+    }
+
+    $sponge->pcap_handle($pcap_h);
+
+    ####################################################################
 
     init_state($sponge, $init);
 
@@ -760,7 +763,7 @@ sub process_pkt {
 
     # Always "unsponge" the source IP address!
     if ($eth_obj->{type} == $ETH_TYPE_IP) {
-        my $ip_obj  = decode_ip($eth_obj->{data});
+        my $ip_obj  = decode_ipv4($eth_obj->{data});
         my $src_ip  = $ip_obj->{src_ip};
         # Update state for the source IP address.
         update_state($sponge, $src_ip, $src_mac);
@@ -777,7 +780,18 @@ sub process_pkt {
         # mac set to us, but an IP address that has nothing to do with us.
         # If we see it, we send a unicast ARP reply with the correct info
         # to the packet's source.
-        my $dst_ip = $ip_obj->{dest_ip};
+        if ($eth_obj->{dest_mac} eq $sponge->my_mac) {
+            my $dst_ip = $ip_obj->{dest_ip};
+            if (! $sponge->is_my_ip($dst_ip) ) {
+                # Hit!
+                my ($mac, $mtime) = $sponge->arp_table($dst_ip);
+                if ($mac) {
+                    $sponge->send_arp_update(tha => $src_mac, tpa => $src_ip,
+                                             sha => $mac,     spa => $dst_ip,
+                                             opcode => $ARP_OPCODE_REPLY);
+                }
+            }
+        }
         return;
     }
     else {
