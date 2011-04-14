@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# @(#)$Id$
+#
+
+DIR=$(cd $(dirname $0)/..; pwd)
+PERL5LIB=$DIR/lib
+echo PERL5LIB=$PERL5LIB
+export PERL5LIB
+IFNAME=eth0
+
+[[ $DEBUG = 1 ]] && PERL="perl -d"
+$PERL $DIR/sbin/arpsponge \
+        --dummy \
+        --verbose \
+        --rundir=./rundir/$IFNAME \
+        --sponge-network \
+        --gratuitous \
+        --init=NONE \
+        --learning=5 \
+        --queuedepth=200 \
+        --rate=30 \
+        --pending=10 \
+        --sweep=900/3600 \
+        --age=600 \
+        --flood-protection=5 \
+        91.200.17.0/26 dev $IFNAME
+
+        #--daemon=/var/run/arpsponge/eth0/pid \
