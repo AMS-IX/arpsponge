@@ -24,7 +24,7 @@ BEGIN {
 	our @ISA = qw( Exporter );
 
     my @functions = qw(
-            decode_ethernet decode_ipv4 decode_arp
+            decode_ethernet decode_ip decode_ipv4 decode_arp
             encode_ethernet encode_arp
         );
 
@@ -33,6 +33,8 @@ BEGIN {
             $ETH_TYPE_IPv4
             $ETH_TYPE_ARP
             $ETH_TYPE_IPv6
+            $ETH_ADDR_BROADCAST
+            $IPv4_ADDR_BROADCAST
             $ARP_OPCODE_REQUEST $ARP_OPCODE_REPLY
             $ARP_HTYPE_ETHERNET $ARP_HLEN_ETHERNET
             $ARP_PROTO_IPv4     $ARP_PLEN_IPv4
@@ -62,6 +64,9 @@ Readonly our $ARP_PROTO_IP        => $ETH_TYPE_IPv4;
 Readonly our $ARP_PROTO_IPv4      => $ETH_TYPE_IPv4;
 Readonly our $ARP_HLEN_ETHERNET   => 6;
 Readonly our $ARP_PLEN_IPv4       => 4;
+
+Readonly our $ETH_ADDR_BROADCAST  => 'ff' x $ARP_HLEN_ETHERNET;
+Readonly our $IPv4_ADDR_BROADCAST => 'ff' x $ARP_PLEN_IPv4;
 
 =pod
 
@@ -146,6 +151,14 @@ Ethernet C<type> for IPv6 frames.
 =item X<$ETH_TYPE_ARP>I<$ETH_TYPE_ARP>
 
 Ethernet C<type> for ARP frames.
+
+=item X<$ETH_ADDR_BROADCAST>I<$ETH_ADDR_BROADCAST>
+
+Hex string representing the ethernet broadcast address ('ff' x 6).
+
+=item X<$IPv4_ADDR_BROADCAST>I<$IPv4_ADDR_BROADCAST>
+
+Hex string representing the IPv4 broadcast address ('ff' x 4).
 
 =item X<$ARP_OPCODE_REQUEST>I<$ARP_OPCODE_REQUEST>
 
