@@ -55,8 +55,10 @@ M6::ARP::Util - IP, MAC, misc. utility routines
  $str = format_time($some_earlier_time);
  $str = relative_time($some_earlier_time);
 
- $month = is_valid_int($some_string, 1, 12);
- $count = is_valid_int($some_string, 0);
+ $month = is_valid_int($some_string, -min=>1, -max=>12);
+ $count = is_valid_int($some_string, -min=>0);
+
+ $chance = is_valid_float($some_string, -min=>0, -max=>1, -inclusive=>1);
 
 =head1 DESCRIPTION
 
@@ -229,12 +231,16 @@ sub hex_addr_in_net {
 
 =item X<is_valid_int>B<is_valid_int> ( I<ARG>
 [, B<-min> =E<gt> I<MIN>, B<-max> =E<gt> I<MAX>,
- B<-inclusive> =E<gt> I<BOOL> ])
+ B<-inclusive> =E<gt> I<BOOL>,
+ B<-err> =E<gt> I<REF> ])
 
 Check whether I<ARG> is defined and represents a valid integer. If I<MIN>
 and/or I<MAX> are given and not C<undef>, it also checks the boundaries
 (by default inclusive). Returns the integer value if the checks are successful,
 C<undef> otherwise.
+
+If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
+contain a diagnostic.
 
 Example:
 
@@ -271,19 +277,40 @@ Example:
 
 sub is_valid_int {
     my $arg = shift;
-    my %opts = (-min => undef, -max => undef, -inclusive => 1, @_);
-    
-    return if !defined $arg || length($arg) == 0;
+    my $err_s;
+    my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
+
+    if (!defined $arg || length($arg) == 0) {
+        ${$opts{-err}} = 'not a valid number';
+        return;
+    }
+
     my ($num, $unparsed) = strtol($arg);
-    return if $unparsed;
-    if ($opts{-inclusive}) {
-        return if defined $opts{-min} && $num < $opts{-min};
-        return if defined $opts{-max} && $num > $opts{-max};
+    if ($unparsed) {
+        ${$opts{-err}} = 'not a valid number';
+        return;
+    }
+    elsif ($opts{-inclusive}) {
+        if (defined $opts{-min} && $num < $opts{-min}) {
+            ${$opts{-err}} = 'number too small';
+            return;
+        }
+        if (defined $opts{-max} && $num > $opts{-max}) {
+            ${$opts{-err}} = 'number too large';
+            return;
+        }
     }
     else {
-        return if defined $opts{-min} && $num <= $opts{-min};
-        return if defined $opts{-max} && $num >= $opts{-max};
+        if (defined $opts{-min} && $num <= $opts{-min}) {
+            ${$opts{-err}} = 'number too small';
+            return;
+        }
+        if (defined $opts{-max} && $num >= $opts{-max}) {
+            ${$opts{-err}} = 'number too large';
+            return;
+        }
     }
+    ${$opts{-err}} = '';
     return $num;
 }
 
@@ -291,12 +318,16 @@ sub is_valid_int {
 
 =item X<is_valid_float>B<is_valid_float> ( I<ARG>
 [, B<-min> =E<gt> I<MIN>, B<-max> =E<gt> I<MAX>,
- B<-inclusive> =E<gt> I<BOOL> ])
+ B<-inclusive> =E<gt> I<BOOL>,
+ B<-err> =E<gt> I<REF> ])
 
 Check whether I<ARG> is defined and represents a valid floating point
 number.  If I<MIN> and/or I<MAX> are given and not C<undef>, it also
 checks the boundaries (by default inclusive). Returns the value of I<ARG>
 if the checks are successful, C<undef> otherwise.
+
+If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
+contain a diagnostic.
 
 Example:
 
@@ -328,19 +359,40 @@ Example:
 
 sub is_valid_float {
     my $arg = shift;
-    my %opts = (-min => undef, -max => undef, -inclusive => 1, @_);
-    
-    return if !defined $arg || length($arg) == 0;
+    my $err_s;
+    my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
+
+    if (!defined $arg || length($arg) == 0) {
+        ${$opts{-err}} = 'not a valid number';
+        return;
+    }
+
     my ($num, $unparsed) = strtod($arg);
-    return if $unparsed;
-    if ($opts{-inclusive}) {
-        return if defined $opts{-min} && $num < $opts{-min};
-        return if defined $opts{-max} && $num > $opts{-max};
+    if ($unparsed) {
+        ${$opts{-err}} = 'not a valid number';
+        return;
+    }
+    elsif ($opts{-inclusive}) {
+        if (defined $opts{-min} && $num < $opts{-min}) {
+            ${$opts{-err}} = 'number too small';
+            return;
+        }
+        if (defined $opts{-max} && $num > $opts{-max}) {
+            ${$opts{-err}} = 'number too large';
+            return;
+        }
     }
     else {
-        return if defined $opts{-min} && $num <= $opts{-min};
-        return if defined $opts{-max} && $num >= $opts{-max};
+        if (defined $opts{-min} && $num <= $opts{-min}) {
+            ${$opts{-err}} = 'number too small';
+            return;
+        }
+        if (defined $opts{-max} && $num >= $opts{-max}) {
+            ${$opts{-err}} = 'number too large';
+            return;
+        }
     }
+    ${$opts{-err}} = '';
     return $num;
 }
 
