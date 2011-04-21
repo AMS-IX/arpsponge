@@ -102,7 +102,7 @@ sub state_name {
     my $self  = shift;
     my $state = shift;
     if (!defined $state) {
-        return 'UNKNOWN';
+        return 'NONE';
     }
     elsif ($state < PENDING(0)) {
         return $state_name_map{$state} // 'ILLEGAL';
@@ -501,7 +501,7 @@ sub send_arp_update {
     if (!$pcap_h || $self->is_verbose) {
         my $dst_mac_s = hex2mac($args{tha});
         my $dst_ip_s  = hex2ip($args{tpa});
-        my $src_mac_s = hex2ip($args{sha});
+        my $src_mac_s = hex2mac($args{sha});
         my $src_ip_s  = hex2ip($args{spa});
         $self->sverbose(1, "%sarp inform %s\@%s about %s\@%s\n",
                         (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
@@ -511,11 +511,19 @@ sub send_arp_update {
     }
     return if (!$pcap_h || $self->is_dummy);
 
+    # Try it both ways: first a kind of gratuitous proxy reply.
     $self->send_arp( sha => $args{sha},
                      spa => $args{spa},
                      tha => $args{tha},
                      tpa => $args{tpa},
                      opcode => $ARP_OPCODE_REPLY );
+
+    # Next: just fake a request from the spa.
+    $self->send_arp( sha => $args{sha},
+                     spa => $args{spa},
+                     tha => $args{tha},
+                     tpa => $args{tpa},
+                     opcode => $ARP_OPCODE_REQUEST );
     return;
 }
 
