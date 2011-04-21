@@ -34,6 +34,7 @@ my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
     set_proberate set_flood_protection set_dummy
     set_sweep_age set_sweep_sec
     set_alive set_dead set_pending 
+    inform
 );
 
 # my $server = M6::ARP::Control::Server->create_server(
@@ -373,9 +374,11 @@ sub _cmd_set_pending {
     }
     $sponge->print_log("[client %d] %s %s %d", $self->fileno,
                         $cmd, hex2ip($ip), $state);
+    my $old_s = $sponge->state_name($sponge->get_state($ip));
     $state = $sponge->set_pending($ip, PENDING($state));
+    my $new_s = $sponge->state_name($state);
     my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
-    return $self->send_ok("state=PENDING:$state\nrate=$rate");
+    return $self->send_ok("ip=$ip\nold=$old_s\nnew=$new_s\nrate=$rate");
 }
 
 sub _cmd_set_dead {
@@ -387,10 +390,12 @@ sub _cmd_set_dead {
     if ( ! $sponge->is_my_network($ip) ) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
-    $sponge->set_dead($ip);
     $sponge->print_log("[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
+    my $old_s = $sponge->state_name($sponge->get_state($ip));
+    $sponge->set_dead($ip);
+    my $new_s = $sponge->state_name(DEAD());
     my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
-    return $self->send_ok("ip=$ip\nstate=DEAD\nrate=$rate");
+    return $self->send_ok("ip=$ip\nold=$old_s\nnew=$new_s\nrate=$rate");
 }
 
 sub _cmd_set_alive {
@@ -404,17 +409,20 @@ sub _cmd_set_alive {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
     my $mac;
+    my $old_s = $sponge->state_name($sponge->get_state($ip));
     if (@args) {
         ($mac) = $sponge->set_alive($ip, shift @args);
     }
     else {
         ($mac) = $sponge->set_alive($ip);
     }
+    my $new_s = $sponge->state_name($sponge->get_state($ip));
+    my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
     $sponge->print_log("[client %d] %s %s %s", $self->fileno, $cmd,
                         hex2ip($ip), hex2mac($mac));
-    return $self->send_ok("ip=$ip\nstate=ALIVE\nmac=$mac");
+    return $self->send_ok("ip=$ip\nold=$old_s\nnew=$new_s\n"
+                         ."rate=$rate\nmac=$mac");
 }
-
 
 sub _cmd_set_queuedepth {
     my ($self, $sponge, $cmd, @args) = @_;
@@ -546,6 +554,39 @@ sub _cmd_set_proberate {
     $sponge->user('probesleep', $newsleep);
     $rate   = 1.0 / $sponge->user('probesleep');
     return $self->send_ok(sprintf("old=%0.2f\nnew=%0.2f", $old, $rate));
+}
+
+sub _cmd_inform {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    if (@args != 2 ) {
+        return $self->send_error("$cmd <IP1> <IP2>");
+    }
+    my ($ip1, $ip2) = @args;
+
+    if (!$sponge->is_my_network($ip1)) {
+        return $self->send_error(hex2ip($ip1), ": address out of range");
+    }
+    elsif (!$sponge->is_my_network($ip2)) {
+        return $self->send_error(hex2ip($ip2), ": address out of range");
+    }
+
+    my ($mac1, $time1) = $sponge->arp_table($ip1);
+    if (!defined $mac1) {
+        $self->send_error(hex2ip($ip1), ": no MAC address available");
+        return 1;
+    }
+    my ($mac2, $time2) = $sponge->arp_table($ip2);
+    if (!defined $mac2) {
+        $self->send_error(hex2ip($ip2), ": no MAC address available");
+        return 1;
+    }
+
+    $sponge->send_arp_update(
+                        sha => $mac2, spa => $ip2,
+                        tha => $mac1, tpa => $ip1,
+                    );
+    return $self->send_ok("update sent [sha=$mac2,spa=$ip2], [tha=$mac1,tpa=$ip1]");
 }
 
 1;
