@@ -34,6 +34,7 @@ use Pod::Usage;
 use M6::ARP::Control::Client;
 use Time::HiRes qw( time sleep );
 use M6::ARP::Util qw( :all );
+use NetAddr::IP;
 use Term::ReadLine;
 
 my $SPONGE_VAR    = '@SPONGE_VAR@';
@@ -47,6 +48,7 @@ my $INTERACTIVE   = 0;
 # Values set on the Command Line.
 my $opt_verbose   = undef;
 my $opt_debug     = 0;
+my $opt_test      = 0;
 my $rundir        = $SPONGE_VAR;
 my $MAX_HISTORY   = 1000;
 my $HISTFILE      = "$::ENV{HOME}/.$0_history";
@@ -64,6 +66,7 @@ END {
 }
 
 sub rl_completion;
+sub complete_line;
 
 sub verbose(@) { print @_ if $opt_verbose; }
 
@@ -71,11 +74,12 @@ sub Main {
     my ($sockname, $args) = initialise();
 
     verbose "connecting to arpsponge on $sockname\n";
-    $CONN = M6::ARP::Control::Client->create_client($sockname)
-                or die M6::ARP::Control::Client->error."\n";
-
-    ($STATUS) = get_status($CONN, {raw=>0, format=>1});
-    verbose "$$STATUS{id}, v$$STATUS{version} (pid #$$STATUS{pid})\n";
+    if (!$opt_test) {
+        $CONN = M6::ARP::Control::Client->create_client($sockname)
+                    or die M6::ARP::Control::Client->error."\n";
+        ($STATUS) = get_status($CONN, {raw=>0, format=>1});
+        verbose "$$STATUS{id}, v$$STATUS{version} (pid #$$STATUS{pid})\n";
+    }
 
     my $err = 0;
 
@@ -89,7 +93,13 @@ sub Main {
             next if $input =~ /^\s*(?:#.*)?$/;
             my $command = do_command($CONN, $input);
 
-            if (!defined $CONN->send_command("ping")) {
+            if (!$CONN) {
+                if ($command eq 'quit') {
+                    verbose "connection closed\n";
+                    last;
+                }
+            }
+            elsif (!defined $CONN->send_command("ping")) {
                 if ($command eq 'quit') {
                     verbose "connection closed\n";
                 }
@@ -101,13 +111,344 @@ sub Main {
             }
         }
     }
-    $CONN->close;
+    $CONN && $CONN->close;
     exit $err;
+}
+
+
+sub do_command {
+    my $conn  = shift;
+    my $line = shift;
+    my %args = (-conn => $conn);
+    my @parsed;
+
+    if (parse_line($line, \@parsed, \%args)) {
+        my $func_name = "do @parsed";
+        $func_name =~ s/[\s-]+/_/g;
+        my $func; eval '$func = \&'.$func_name;
+        if (!defined $func) {
+            return print_error(qq{@parsed: NOT IMPLEMENTED});
+        }
+        else {
+            $func->($conn, \@parsed, \%args);
+            return "@parsed";
+        }
+    }
+    return;
+}
+
+
+my %Syntax = (
+    -words => {
+        'quit' => {},
+        'ping' => {
+            -default_args => { count => 1, delay => 1 },
+            -arg => {
+                -name     => 'count',
+                -optional => 1,
+                -validate => sub {check_int_arg(1,undef,@_)},
+                -arg => {
+                    -name     => 'delay',
+                    -optional => 1,
+                    -validate => sub {check_float_arg(0.01,undef,@_)},
+                },
+            },
+        },
+        'clear'    => {
+            -words => {
+                'ip'  => {
+                    -arg => {
+                        -name => 'ip',
+                        -validate => sub {check_ip_range_arg(undef,undef,@_)},
+                        -complete => sub {complete_ip_range(@_)},
+                    },
+                },
+                'arp' => {
+                    -arg => {
+                        -name => 'ip',
+                        -validate => sub {check_ip_range_arg(undef,undef,@_)},
+                        -complete => sub {complete_ip_range(@_)},
+                    },
+                }
+            },
+        },
+        'sponge'   => {
+            -arg => {
+                -name => 'ip',
+                -validate => sub {check_ip_range_arg(undef,undef,@_)},
+                -complete => sub {complete_ip_range(@_)},
+            },
+        },
+        'unsponge'   => {
+            -arg => {
+                -name => 'ip',
+                -validate => sub {check_ip_range_arg(undef,undef,@_)},
+                -complete => sub {complete_ip_range(@_)},
+            },
+        },
+        'set'      => {
+            -words => {
+                'ip'  => {
+                    -arg => {
+                        -name => 'ip',
+                        -validate => sub {check_ip_arg(undef,undef,@_)},
+                        -complete => sub {complete_ip_addr(@_)},
+                        -words => {
+                            'dead' => {},
+                            'pending' => {
+                                -arg => {
+                                    -name => 'state',
+                                    -optional => 1,
+                                    -validate => sub {check_int_arg(0,undef,@_)},
+                                },
+                            },
+                            'mac' => {
+                                -arg => {
+                                    -name => 'mac-address',
+                                    -validate => sub {check_mac_arg(undef,undef,@_)},
+                                },
+                            },
+                            'alive' => {
+                                -arg => {
+                                    -name => 'mac-address',
+                                    -optional => 1,
+                                    -validate => sub {check_mac_arg(undef,undef,@_)},
+                                },
+                            },
+                        },
+                    },
+                },
+                'max-pending' => {
+                    -arg => {
+                        -name => 'num',
+                        -validate => sub {check_int_arg(1,undef,@_)},
+                    },
+                },
+                'queuedepth' => {
+                    -arg => {
+                        -name => 'num',
+                        -validate => sub {check_int_arg(1,undef,@_)},
+                    },
+                },
+                'max-rate' => {
+                    -arg => {
+                        -name => 'rate',
+                        -validate => sub {check_float_arg(0.001,undef,@_)},
+                    },
+                },
+                'flood-protection' => {
+                    -arg => {
+                        -name => 'rate',
+                        -validate => sub {check_float_arg(0.001,undef,@_)},
+                    },
+                },
+                learning => {
+                    -arg => {
+                        -name => 'secs',
+                        -validate => sub {check_int_arg(0,undef,@_)},
+                    },
+                },
+                proberate => {
+                    -arg => {
+                        -name => 'rate',
+                        -validate => sub {check_float_arg(0.001,undef,@_)},
+                    },
+                },
+                dummy => {
+                    -arg => {
+                        -name => 'bool',
+                        -validate => sub {check_bool_arg(undef,undef,@_)},
+                        -complete => sub { qw( true false on off yes no ) },
+                    },
+                },
+                sweep => {
+                    -words => {
+                        'age' => {
+                            -arg => {
+                                -name => 'secs',
+                                -validate => sub {check_int_arg(1,undef,@_)},
+                            },
+                        },
+                        'period' => {
+                            -arg => {
+                                -name => 'secs',
+                                -validate => sub {check_int_arg(1,undef,@_)},
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        'status'   => {},
+        'show'     => {
+            -words => {
+                'status'  => {},
+                'arp'     => {
+                    -arg => {
+                        -name => 'ip',
+                        -optional => 1,
+                        -validate => sub {check_ip_range_arg(undef,undef,@_)},
+                        -complete => sub {complete_ip_range(@_)},
+                    },
+                },
+                'ip'      => {
+                    -arg => {
+                        -name => 'ip',
+                        -optional => 1,
+                        -validate => sub {check_ip_filter_arg(undef,undef,@_)},
+                        -complete => sub {complete_ip_filter(@_)},
+                    },
+                },
+                'version' => {},
+                'uptime'  => {},
+                'log'     => {
+                    -arg => {
+                        -name     => 'nlines',
+                        -optional => 1,
+                        -validate => sub {check_int_arg(1,undef,@_)},
+                    },
+                },
+            },
+        },
+        'inform'   => {
+            -arg => {
+                -name => 'dst-ip',
+                -validate => sub {check_ip_arg(undef,undef,@_)},
+                -complete => sub {complete_ip_addr(@_)},
+                -words => {
+                    'about' => {
+                        -arg => {
+                            -name => 'src-ip',
+                            -validate => sub {check_ip_arg(undef,undef,@_)},
+                            -complete => sub {complete_ip_addr(@_)},
+                        },
+                    },
+                },
+            },
+        },
+    },
+);
+
+sub parse_line {
+    my ($line, $parsed, $args) = @_;
+    chomp($line);
+    my @words = split(' ', $line);
+    $args->{'-options'} = [];
+    if (parse_words(\@words, \%Syntax, $parsed, $args)) {
+        return 1;
+    }
+    return;
+}
+
+sub check_ip_arg {
+    my ($min, $max, $arg, $argname, $silent) = @_;
+
+    if (NetAddr::IP->new($arg)) {
+        return $arg;
+    }
+    else {
+        $silent or print_error(qq{$argname: "$arg" is not a valid IP address});
+        return;
+    }
+}
+
+sub check_mac_arg {
+    my ($min, $max, $arg, $argname, $silent) = @_;
+
+    if ($arg =~ /^(?:[\da-f]{2}:){5}[\da-f]{2}$/i
+        || $arg =~ /^(?:[\da-f]{4}\.){2}[\da-f]{4}$/i
+        || $arg =~ /^[\da-f]{12}$/i) {
+        return $arg;
+    }
+    else {
+        $silent or print_error(qq{$argname: "$arg" is not a valid MAC address});
+        return;
+    }
+}
+
+sub expand_ip_range {
+    my ($arg_str, $name, $silent) = @_;
+
+    $arg_str =~ s/\s*(?:-|\.\.|to)\s*/-/g;
+    $arg_str =~ s/\s*,\s*/ /g;
+
+    my @args = split(' ', $arg_str);
+
+    #print_error("range: <$arg_str>:", map {" <$_>"} @args);
+
+    my @list;
+    for my $ip_s (@args) {
+        my ($lo_s, $hi_s) = split(/-/, $ip_s, 2);
+
+        my $lo = ip2int($lo_s);
+        if (!defined $lo) {
+            $silent or
+                print_error(qq{$name: "$lo_s" is not a valid IP address});
+            return;
+        }
+
+        my $hi;
+        if ($hi_s) {
+            $hi = ip2int($hi_s);
+            if (!defined $hi) {
+                $silent or print_error(
+                            qq{$name: "$hi_s" is not a valid IP address});
+                return;
+            }
+        }
+        else { $hi = $lo; }
+
+        if ($hi < $lo) {
+            $silent or print_error(
+                        qq{$name: "$lo_s-$hi_s" is not a valid IP range});
+            return;
+        }
+        push @list, [ $lo, $hi, $lo_s, $hi_s ];
+    }
+    return \@list;
+}
+
+sub check_ip_range_arg {
+    my ($min, $max, $arg, $argname, $silent) = @_;
+    return expand_ip_range($arg, $argname) ? $arg : undef;
+}
+
+sub complete_ip_range {
+    my $partial = shift @_;
+    my @words   = split(/,/, $partial);
+    if ($partial =~ /,$/) {
+        $partial = '';
+    }
+    else {
+        $partial = @words ? pop @words : '';
+    }
+    my $prefix  = join('', map { "$_," } @words);
+    if ($partial =~ /^(.+-)(.*)$/) {
+        $prefix .= $1;
+        $partial = $2;
+    }
+    #print_error("\npartial: <$partial>; prefix: <$prefix>");
+    return map { "$prefix$_" } complete_ip_addr($partial);
+}
+
+sub check_ip_filter_arg {
+    my ($min, $max, $arg, $argname) = @_;
+    if ($arg =~ /^all|alive|dead|pending|none$/i) {
+        return $arg;
+    }
+    return check_ip_range_arg(@_);
+}
+
+sub complete_ip_filter {
+    my $partial = shift;
+    return (qw( all alive dead pending none ), complete_ip_range($partial));
 }
 
 sub check_send_command {
     my $conn = shift;
     my $command = join(' ', @_);
+
+    return if !$conn;
 
     my $reply = $conn->send_command($command) or return;
        $reply =~ s/^\[(\S+)\]\s*\Z//m;
@@ -121,26 +462,16 @@ sub check_send_command {
 }
 
 sub expand_ip_run {
-    my $args = shift;
+    my $arg_str = shift;
     my $code = shift;
 
-    my $arg_str = join(' ', @$args);
-       $arg_str =~ s/\s*(?:-|\.\.|to)\s*/-/g;
-       $arg_str =~ s/\s*,\s*/ /;
-
-    @$args = split(' ', $arg_str);
+    my @args = split(' ', $arg_str);
 
     my @reply;
-    for my $ip_s (@$args) {
-        my ($lo_s, $hi_s) = split(/-/, $ip_s);
-        my ($lo, $hi);
-        $lo = ip2int($lo_s)
-            or return print_error(qq{"$lo_s": invalid IP address});
-        if ($hi_s) {
-            $hi = ip2int($hi_s)
-                or return print_error(qq{"$lo_s": invalid IP address});
-        }
-        else { $hi = $lo }
+    my $list = expand_ip_range($arg_str, 'ip') or return;
+
+    for my $elt (@$list) {
+        my ($lo, $hi, $lo_s, $hi_s) = @$elt;
         for (my $ip = $lo; $ip <= $hi; $ip++) {
             my $sub = $code->(ip2hex(int2ip($ip)));
             return if !defined $sub;
@@ -150,56 +481,98 @@ sub expand_ip_run {
     return join("\n", @reply);
 }
 
-sub dispatch {
-    my $conn    = shift;
-    my $parsed  = shift;
-    my $args    = shift;
-    my $valid   = shift;
-    my $params  = @_ ? shift : {};
+sub parse_words {
+    my $words      = shift;
+    my $syntax     = shift;
+    my $parsed     = shift;
+    my $args       = shift;
 
-    my $prefix = join('', map { $_.'_' } @$parsed);
-       $prefix =~ s/-/_/g;
-
-    my %commands;
-    for my $sub (@$valid) {
-        my $func_name = "do_${prefix}${sub}";
-        $func_name =~ s/-/_/g;
-        $commands{$sub} = eval '\&'.$func_name;
+    if (my $dfl = $syntax->{-default_args}) {
+        %$args = (%$dfl, %$args);
     }
 
-    my $command = lc shift @$args;
-    push @$parsed, $command;
-    if (exists $commands{lc $command}) {
-        my $func = $commands{lc $command};
-        if (defined $func) {
-            return $func->($conn, $parsed, $args, $params);
+    # Command line options (--something, -s), are stored
+    # in the '-options' array in %$args. They'll be parsed
+    # later on.
+    while (@$words && $$words[0] =~ /^-{1,2}/) {
+        push @{$args->{-options}}, shift @$words;
+    }
+
+    if (my $word_list = $syntax->{-words}) {
+        my $words_str = join(", ", sort grep { length $_ } keys %$word_list);
+        if (!@$words) {
+            if (exists $word_list->{''}) {
+                return 1;
+            }
+            else {
+                print STDERR "@$parsed: expected one of $words_str\n";
+                return;
+            }
+        }
+        if (my $literal_match = $word_list->{$words->[0]}) {
+            push @$parsed, shift @$words;
+            return parse_words($words, $literal_match, $parsed, $args);
         }
         else {
-            print_error("[INTERNAL] @$parsed: not implemented!");
+            print STDERR qq{invalid input "$$words[0]"; },
+                         qq{expected one of $words_str\n};
+            return;
         }
     }
-    else {
-        print_error("@$parsed: command unknown");
+    elsif (my $arg_spec = $syntax->{-arg}) {
+        my $arg_name = $arg_spec->{-name};
+        if (!@$words) {
+            return 1 if $arg_spec->{-optional};
+            return;
+        }
+        my $validate = $arg_spec->{-validate} // sub { $_[0] };
+        my $arg_val;
+        eval { $arg_val = $validate->($words->[0], $arg_name) };
+        if (defined $arg_val) {
+            $args->{$arg_name} = $arg_val;
+            shift @$words;
+            return parse_words($words, $arg_spec, $parsed, $args);
+        }
+        else {
+            return;
+        }
     }
-    return 0;
+    elsif (@$words) {
+        print STDERR qq{@$parsed: expected end of line instead of "$$words[0]"\n};
+        return;
+    }
+    else {
+        return 1;
+    }
 }
 
-sub do_command {
-    my $conn  = shift;
-    my @args = split(' ', shift);
+# $byte = check_int_arg(0, 255, $arg, 'byte');
+sub check_int_arg {
+    my ($min, $max, $arg, $argname, $silent) = @_;
 
-    dispatch($conn,
-                    [],
-                    [ @args ],
-                    [ qw( ping quit status show set clear sponge unsponge ) ]
-           );
-
-    return $args[0];
+    my $err;
+    if (my $val = is_valid_int($arg, -min=>$min, -max=>$max, -err=>\$err)) {
+        return $val;
+    }
+    $silent or print_error(qq{$argname: "$arg": $err});
+    return;
 }
 
-# $delay = check_bool_arg('toggle', 'dummy', $arg);
+# $percentage = check_int_arg(0.0, 100.0, $arg, 'percentage');
+sub check_float_arg {
+    my ($min, $max, $arg, $argname, $silent) = @_;
+
+    my $err;
+    if (my $val = is_valid_float($arg, -min=>$min, -max=>$max, -err=>\$err)) {
+        return $val;
+    }
+    $silent or print_error(qq{$argname: "$arg": $err});
+    return;
+}
+
+# $bool = check_bool_arg($min, $max, $arg, 'dummy');
 sub check_bool_arg {
-    my ($name, $command, $arg) = @_;
+    my ($min, $max, $arg, $argname, $silent) = @_;
 
     if ($arg =~ /^(1|yes|true|on)$/i) {
         return 1;
@@ -208,84 +581,14 @@ sub check_bool_arg {
         return 0;
     }
     else {
-        return print_error(qq{"$arg" is not a valid boolean});
+        $silent or print_error(qq{$argname: "$arg" is not a valid boolean});
+        return;
     }
-}
-
-# $delay = check_float_arg('delay', 0.001, undef, 'ping', $arg);
-sub check_float_arg {
-    my ($name, $min, $max, $command, $arg) = @_;
-
-    if ($arg !~ /^[\+\-]?(?:\d*\.)?\d+$/) {
-        return print_error(qq{"$arg" is not a valid floating point number});
-    }
-    if (defined $min && $arg < $min) {
-        if (defined $max && $max != $min) {
-            return print_error(
-                    qq{$name must be between $min and $max (inclusive)}
-                );
-        }
-        else {
-            return print_error(qq{$name must be at least $min});
-        }
-    }
-    elsif (defined $max && $arg > $max) {
-        if (defined $max && $max != $min) {
-            return print_error(
-                    qq{$name must be between $min and $max (inclusive)}
-                );
-        }
-        else {
-            return print_error(qq{$name cannot be more than $max});
-        }
-    }
-    return $arg;
-}
-
-# $param = check_int_arg('count', 1, 255, 'ping', $arg);
-sub check_int_arg {
-    my ($name, $min, $max, $command, $arg) = @_;
-
-    if ($arg !~ /^[\+\-]?\d+$/) {
-        return print_error(qq{"$arg" is not a valid integer});
-    }
-    if (defined $min && $arg < $min) {
-        if (defined $max && $max != $min) {
-            return print_error(
-                    qq{$name must be between $min and $max (inclusive)}
-                );
-        }
-        else {
-            return print_error(qq{$name must be at least $min});
-        }
-    }
-    elsif (defined $max && $arg > $max) {
-        if (defined $max && $max != $min) {
-            return print_error(
-                    qq{$name must be between $min and $max (inclusive)}
-                );
-        }
-        else {
-            return print_error(qq{$name cannot be more than $max});
-        }
-    }
-    return $arg;
-}
-
-sub check_arg_count {
-    my ($min, $max, $command, $args) = @_;
-
-    if (defined $min && int(@$args) < $min) {
-        return print_error(qq{"$command" - not enough arguments});
-    }
-    if (defined $max && int(@$args) > $max) {
-        return print_error(qq{"$command" - too many arguments});
-    }
-    return 1;
 }
 
 sub do_quit {
     my ($conn, $parsed, $args) = @_;
+    GetOptionsFromArray($$args{-options}) or return;
     my $reply = check_send_command($conn, 'quit') or return;
     print_output($reply);
 }
@@ -293,17 +596,10 @@ sub do_quit {
 sub do_ping {
     my ($conn, $parsed, $args) = @_;
 
-    my $count = 1;
-    my $delay = 1;
-    check_arg_count(0,2,"@$parsed", $args) or return;
-    if (@$args) {
-        $count = check_int_arg('count', 1, 255, "@$parsed", shift @$args)
-                // return;
-    }
-    if (@$args) {
-        $delay = check_float_arg('delay', 0.001, undef, "@$parsed", $$args[0])
-                // return;
-    }
+    GetOptionsFromArray($$args{-options}) or return;
+
+    my $count = $args->{'count'};
+    my $delay = $args->{'delay'};
 
     my @rtt;
     my ($min_rtt, $max_rtt, $tot_rtt) = (undef,undef,0);
@@ -359,24 +655,19 @@ sub do_ping {
     }
 }
 
+sub do_inform_about {
+    my ($conn, $parsed, $args) = @_;
+
+    GetOptionsFromArray($args->{-options}) or return;
+    my ($src, $dst) = (ip2hex($$args{'src-ip'}), ip2hex($$args{'dst-ip'}));
+    my $reply = check_send_command($conn, 'inform', $dst, $src) or return;
+    my ($opts, $output, $tag) = parse_server_reply($reply, {format=>0});
+    print_output($output);
+}
+
 ###############################################################################
 # SHOW commands
 ###############################################################################
-
-# cmd: show
-sub do_show {
-    my ($conn, $parsed, $args) = @_;
-    my $format  = 1;
-    my $command = join(' ', @$parsed);
-
-    check_arg_count(1,undef,$command, $args) or return;
-
-    return dispatch($conn,
-                    $parsed,
-                    $args,
-                    [ qw( status log version uptime ip arp ) ]
-           );
-}
 
 # cmd: show status
 sub do_show_status {
@@ -388,7 +679,7 @@ sub do_show_log {
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
 
-    GetOptionsFromArray($args,
+    GetOptionsFromArray($args->{-options},
                 'raw!'     => \(my $raw = 0),
                 'format!'  => \$format,
                 'reverse!' => \(my $reverse = 1),
@@ -397,15 +688,7 @@ sub do_show_log {
 
     $format &&= !$raw;
 
-    check_arg_count(0,1,"@$parsed", $args) or return;
-
-    my $nlines = 0;
-    if (@$args) {
-        $nlines = check_int_arg('line count', 1, undef, "@$parsed", shift @$args)
-                  or return;
-    }
-
-    my @args = $nlines ? ($nlines) : ();
+    my @args = defined $args->{'nlines'} ? ($args->{'nlines'}) : ();
     my $log = check_send_command($conn, 'get_log', @args) or return;
     if ($format) {
         $log =~ s/^(\S+)\t(\d+)\t/format_time($1,' ')." [$2] "/gme;
@@ -419,15 +702,14 @@ sub do_show_log {
 # cmd: show version
 sub do_show_version {
     my ($conn, $parsed, $args) = @_;
-    check_arg_count(0,0,"@$parsed", $args) or return;
+    GetOptionsFromArray($args->{-options});
     print_output($STATUS->{'version'}."\n");
 }
 
 # cmd: show uptime
 sub do_show_uptime {
     my ($conn, $parsed, $args) = @_;
-
-    check_arg_count(0,0,"@$parsed", $args) or return;
+    GetOptionsFromArray($args->{-options});
 
     ($STATUS) = get_status($conn, {raw=>0, format=>1});
 
@@ -446,8 +728,13 @@ sub do_show_uptime {
 sub do_show_arp {
     my ($conn, $parsed, $args) = @_;
 
-    if (@$args && grep { lc $_ eq 'all' } @$args) {
-        $args = [];
+    my $filter_state;
+    my $ip = $args->{'ip'};
+
+    if (defined $ip) {
+        if ($ip eq 'all') {
+            delete $args->{'ip'};
+        }
     }
 
     my ($opts, $output, $tag_fmt) =
@@ -496,12 +783,16 @@ sub do_show_ip {
     my ($conn, $parsed, $args) = @_;
 
     my $filter_state;
-    if (@$args && grep { lc $_ eq 'all' } @$args) {
-        $args = [];
-    }
+    my $ip = $args->{'ip'};
 
-    if (@$args && $$args[0] =~ /^(?:dead|alive|pending|none)$/i) {
-        $filter_state = uc shift @$args;
+    if (defined $ip) {
+        if ($ip eq 'all') {
+            delete $args->{'ip'};
+        }
+        elsif ($ip =~ /^(?:dead|alive|pending|none)$/i) {
+            $filter_state = lc $ip;
+            delete $args->{'ip'};
+        }
     }
 
     my ($opts, $output, $tag_fmt) =
@@ -522,7 +813,7 @@ sub do_show_ip {
                                     "Rate (q/min)", "Updated");
         }
         for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$output) {
-            next if defined $filter_state && $$info{state} ne $filter_state;
+            next if defined $filter_state && lc $$info{state} ne $filter_state;
             push @output,
                     sprintf("%-17s %-12s %7d %8.3f     %s",
                             $$info{ip}, $$info{state}, $$info{queue},
@@ -563,7 +854,7 @@ sub do_show_ip {
 #       $conn       connection handle
 #       $command    base command to execute
 #       $parsed     ref to list of already parsed words
-#       $args       ref to list of still to parse arguments
+#       $args       ref to hash with parameters
 #
 #   Return values:
 #       $opts       ref to hash with key=>val options from the @$args
@@ -582,7 +873,7 @@ sub shared_show_arp_ip {
             'raw'     => 0,
         );
 
-    GetOptionsFromArray($args,
+    GetOptionsFromArray($args->{-options},
             'header!'  => \$opts{header},
             'raw!'     => \$opts{raw},
             'format!'  => \$opts{format},
@@ -594,12 +885,10 @@ sub shared_show_arp_ip {
 
     $opts{format} &&= !$opts{raw};
 
-    check_arg_count(0,undef,"@$parsed", $args) or return;
-    
     my $reply = '';
-    if (@$args) {
+    if ($args->{'ip'}) {
         my $arg_count = 0;
-        $reply = expand_ip_run($args, 
+        $reply = expand_ip_run($args->{'ip'}, 
                     sub {
                         $arg_count++;
                         return check_send_command($conn, "$command $_[0]");
@@ -651,8 +940,8 @@ sub parse_server_reply {
     return if !defined $reply;
 
     if (!$opts->{raw}) {
-        $reply =~ s/^(network|ip)=([\da-f]+)$/"$1=".hex2ip($2)/gme;
-        $reply =~ s/^(mac)=([\da-f]+)$/"$1=".hex2mac($2)/gme;
+        $reply =~ s/\b(tpa|spa|network|ip)=([\da-f]+)\b/"$1=".hex2ip($2)/gme;
+        $reply =~ s/\b(tha|sha|mac)=([\da-f]+)\b/"$1=".hex2mac($2)/gme;
     }
     if (!$opts->{format}) {
         return ($opts, $reply, '');
@@ -689,34 +978,20 @@ sub parse_server_reply {
 # CLEAR commands
 ###############################################################################
 
-# cmd: clear
-sub do_clear {
-    my ($conn, $parsed, $args) = @_;
-    my $format = 1;
-
-    check_arg_count(1,undef, "@$parsed", $args) or return;
-
-    return dispatch($conn,
-                    $parsed,
-                    $args,
-                    [ qw( log ip arp ) ]
-           );
-}
-
 # cmd: clear ip
 sub do_clear_ip {
     my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,undef, "@$parsed", $args) or return;
+    my $ip = $args->{'ip'};
 
-    if (@$args && grep { lc $_ eq 'all' } @$args) {
+    if ($ip eq 'all') {
         return check_send_command($conn, 'clear_ip_all') or return;
     }
 
-    expand_ip_run($args, 
-                    sub {
-                        return check_send_command($conn, "clear_ip $_[0]");
-                    }
+    expand_ip_run($ip,
+                  sub {
+                      return check_send_command($conn, "clear_ip $_[0]");
+                  }
                 );
     return;
 }
@@ -725,12 +1000,12 @@ sub do_clear_ip {
 sub do_clear_arp {
     my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,undef, "@$parsed", $args) or return;
+    my $ip = $args->{'ip'};
 
-    expand_ip_run($args, 
-                    sub {
-                        return check_send_command($conn, "clear_arp $_[0]");
-                    }
+    expand_ip_run($ip, 
+                  sub {
+                      return check_send_command($conn, "clear_arp $_[0]");
+                  }
                 );
     return;
 }
@@ -739,235 +1014,234 @@ sub do_clear_arp {
 # SET commands
 ###############################################################################
 
-# cmd: set
-sub do_set {
-    my ($conn, $parsed, $args) = @_;
-    my $format = 1;
+sub do_set_generic {
+    my %opts      = @_;
+    my $conn      = $opts{-conn};
+    my $arg       = $opts{-val};
+    my $name      = $opts{-name};
+    my $type      = $opts{-type};
+    my $unit      = $opts{-unit} // '';
+    my $command   = $opts{-command} // "set_$name";
 
-    check_arg_count(1,undef, "@$parsed", $args) or return;
+    $command =~ s/[-\s]+/_/g;
 
-    return dispatch($conn,
-                    $parsed,
-                    $args,
-                    [ qw(
-                        ip max-pending queuedepth max-rate learning
-                        flood-protection proberate dummy sweep
-                    ) ],
-           );
-}
+    GetOptionsFromArray($opts{-options}) or return;
 
-# cmd: set max-pending
-sub do_set_max_pending {
-    my ($conn, $parsed, $args) = @_;
-
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $max = check_int_arg('max-pending', 1, 255, "@$parsed", shift @$args)
-                or return;
-    my $reply = check_send_command($conn, 'set_max_pending', $max) or return;
+    my $reply = check_send_command($conn, $command, $arg) or return;
 
     my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf("max-pending changed from %d to %d",
-                        $output->[0]->{old}, $output->[0]->{new}));
+    my $old = $output->[0]->{old};
+    my $new = $output->[0]->{new};
+
+    my $fmt = '%s';
+    given ($type) {
+        when ('boolean') {
+            $old = $old ? 'yes' : 'no';
+            $new = $new ? 'yes' : 'no';
+            $type = '%s';
+        }
+        when ('int') {
+            $type = '%d';
+        }
+        when ('float') {
+            $fmt = '%0.2f';
+        }
+    }
+    print_output(sprintf("%s changed from $fmt to $fmt%s",
+                         $name, $old, $new, $unit));
 }
 
 # cmd: set queuedepth
 sub do_set_queuedepth {
     my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $max = check_int_arg('queuedepth', 1, undef, "@$parsed", shift @$args)
-                or return;
-    my $reply = check_send_command($conn, 'set_queuedepth', $max) or return;
+    do_set_generic(-conn    => $conn,
+                   -name    => 'queuedepth',
+                   -val     => $args->{'num'},
+                   -options => $args->{-options},
+                   -type    => 'int');
+}
 
-    my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf("queuedepth changed from %d to %d",
-                        $output->[0]->{old}, $output->[0]->{new}));
+# cmd: set max-pending
+sub do_set_max_pending {
+    my ($conn, $parsed, $args) = @_;
+
+    do_set_generic(-conn    => $conn,
+                   -name    => 'max-pending',
+                   -val     => $args->{'num'},
+                   -options => $args->{-options},
+                   -unit    => ' secs',
+                   -type    => 'integer');
 }
 
 # cmd: set max-rate
 sub do_set_max_rate {
     my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $max = check_float_arg('max-rate', 1, undef, "@$parsed", shift @$args)
-                or return;
-    my $reply = check_send_command($conn, 'set_max_rate', $max) or return;
-
-    my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf("max-rate changed from %0.2f to %0.2f q/min",
-                        $output->[0]->{old}, $output->[0]->{new}));
+    do_set_generic(-conn    => $conn,
+                   -name    => 'max-rate',
+                   -val     => $args->{'rate'},
+                   -options => $args->{-options},
+                   -unit    => ' q/min',
+                   -type    => 'float');
 }
 
 # cmd: set learning
 sub do_set_learning {
     my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $max = check_int_arg('secs', 1, undef, "@$parsed", shift @$args)
-                or return;
-    my $reply = check_send_command($conn, 'set_learning', $max) or return;
-
-    my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf("learning changed from %d to %d secs",
-                        $output->[0]->{old}, $output->[0]->{new}));
+    do_set_generic(-conn    => $conn,
+                   -name    => 'learning',
+                   -val     => $args->{'secs'},
+                   -options => $args->{-options},
+                   -unit    => ' secs',
+                   -type    => 'int');
 }
 
 # cmd: set flood-protection
 sub do_set_flood_protection {
     my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $max = check_float_arg('rate', 0.01, undef, 
-                              "@$parsed", shift @$args)
-                or return;
-    my $reply = check_send_command($conn, 'set_flood_protection', $max) 
-                or return;
-
-    my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf(
-                    "flood-protection changed from %0.2f to %0.2f q/min",
-                    $output->[0]->{old}, $output->[0]->{new}));
+    do_set_generic(-conn    => $conn,
+                   -name    => 'flood-protection',
+                   -val     => $args->{'rate'},
+                   -options => $args->{-options},
+                   -unit    => ' q/sec',
+                   -type    => 'float');
 }
 
 # cmd: set proberate
 sub do_set_proberate {
     my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $max = check_float_arg('rate', 0.01, undef, 
-                              "@$parsed", shift @$args)
-                or return;
-    my $reply = check_send_command($conn, 'set_proberate', $max) 
-                or return;
-
-    my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf("proberate changed from %0.2f to %0.2f q/sec",
-                        $output->[0]->{old}, $output->[0]->{new}));
+    do_set_generic(-conn    => $conn,
+                   -name    => 'proberate',
+                   -val     => $args->{'rate'},
+                   -options => $args->{-options},
+                   -unit    => ' q/sec',
+                   -type    => 'float');
 }
 
 # cmd: set dummy
 sub do_set_dummy {
     my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $mode = check_bool_arg('rate', "@$parsed", shift @$args);
-    return if ! defined $mode;
-    my $reply = check_send_command($conn, 'set_dummy', $mode) or return;
-
-    my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf("dummy changed from <%s> to <%s>",
-                        ($output->[0]->{old} ? 'yes' : 'no'),
-                        ($output->[0]->{new} ? 'yes' : 'no'),
-                    ));
+    do_set_generic(-conn    => $conn,
+                   -name    => 'dummy',
+                   -val     => $args->{'bool'},
+                   -options => $args->{-options},
+                   -type    => 'bool');
 }
  
-# cmd: set sweep
-sub do_set_sweep {
-    my ($conn, $parsed, $args, $params) = @_;
-
-    check_arg_count(2,2, "@$parsed", $args) or return;
-
-    return dispatch($conn, $parsed, $args,
-                    [ qw( period age ) ],
-                    $params,
-           );
-}
-
 # cmd: set sweep period
 sub do_set_sweep_period {
-    my ($conn, $parsed, $args, $params) = @_;
+    my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $secs = check_int_arg('secs', 1, undef, "@$parsed", shift @$args)
-                or return;
-    my $reply = check_send_command($conn, 'set_sweep_sec', $secs) or return;
-
-    my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf("sweep period changed from %d to %d secs",
-                        $output->[0]->{old}, $output->[0]->{new}));
+    do_set_generic(-conn    => $conn,
+                   -name    => 'sweep period',
+                   -command => 'set_sweep_sec',
+                   -val     => $args->{'secs'},
+                   -options => $args->{-options},
+                   -unit    => ' secs',
+                   -type    => 'int');
 }
 
 # cmd: set sweep age
 sub do_set_sweep_age {
-    my ($conn, $parsed, $args, $params) = @_;
+    my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1,"@$parsed", $args) or return;
-    my $secs = check_int_arg('secs', 1, undef, "@$parsed", shift @$args)
-                or return;
-    my $reply = check_send_command($conn, 'set_sweep_age', $secs) or return;
-
-    my ($opts, $output, $tag) = parse_server_reply($reply);
-    print_output(sprintf("sweep age changed from %d to %d secs",
-                        $output->[0]->{old}, $output->[0]->{new}));
+    do_set_generic(-conn    => $conn,
+                   -name    => 'sweep age',
+                   -val     => $args->{'secs'},
+                   -options => $args->{-options},
+                   -unit    => ' secs',
+                   -type    => 'int');
 }
 
-# cmd: set ip
-sub do_set_ip {
-    my ($conn, $parsed, $args, $params) = @_;
+sub do_set_ip_generic {
+    my %opts      = @_;
+    my $conn      = $opts{-conn};
+    my $arg       = $opts{-val};
+    my $ip        = ip2hex($opts{-ip});
+    my $name      = $opts{-name} // 'arg';
+    my $type      = $opts{-type} // 'string';
+    my $unit      = $opts{-unit} // '';
+    my $command   = $opts{-command} // "set_ip_$name";
 
-    check_arg_count(2,undef, "@$parsed", $args) or return;
+    $command =~ s/[-\s]+/_/g;
 
-    my $ip_s = shift @$args;
+    GetOptionsFromArray($opts{-options}) or return;
 
-    my $ip = ip2hex($ip_s) or return print_error("$ip_s: invalid IP address");
+    my @command_args = ($command, $ip);
+    push(@command_args, $arg) if defined $arg;
+    my $reply = check_send_command($conn, @command_args) or return;
 
-    $params->{'ip'} = $ip;
+    my ($opts, $output, $tag) = parse_server_reply($reply);
+    my $old = $output->[0]->{old};
+    my $new = $output->[0]->{new};
 
-    return dispatch($conn, $parsed, $args,
-                    [ qw( pending alive dead mac ) ],
-                    $params,
-           );
+    my $fmt = '%s';
+    given ($type) {
+        when ('boolean') {
+            $old = $old ? 'yes' : 'no';
+            $new = $new ? 'yes' : 'no';
+            $type = '%s';
+        }
+        when ('int') {
+            $type = '%d';
+        }
+        when ('float') {
+            $fmt = '%0.2f';
+        }
+    }
+    print_output(sprintf("%s: %s changed from $fmt to $fmt%s",
+                         $output->[0]->{ip},
+                         $name, $old, $new, $unit));
 }
 
 # cmd: set ip pending
 sub do_set_ip_pending {
-    my ($conn, $parsed, $args, $params) = @_;
+    my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(undef,1, "@$parsed", $args) or return;
-
-    my $ip = $params->{'ip'};
-
-    my $state = @$args ? shift @$args : 0;
-
-    check_send_command($conn, 'set_pending', $ip, $state);
+    do_set_ip_generic(-conn    => $conn,
+                      -command => 'set_pending',
+                      -name    => 'state',
+                      -val     => $args->{'state'} // 0,
+                      -ip      => $args->{'ip'},
+                      -options => $args->{-options},
+                      -type    => 'string');
 }
 
 # cmd: set ip dead
 sub do_set_ip_dead {
-    my ($conn, $parsed, $args, $params) = @_;
+    my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(0,0, "@$parsed", $args) or return;
-
-    my $ip = $params->{'ip'};
-
-    check_send_command($conn, 'set_dead', $ip);
+    do_set_ip_generic(-conn    => $conn,
+                      -command => 'set_dead',
+                      -name    => 'state',
+                      -ip      => $args->{'ip'},
+                      -options => $args->{-options});
 }
 
 # cmd: set ip alive
 sub do_set_ip_alive {
-    my ($conn, $parsed, $args, $params) = @_;
+    my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(0,1, "@$parsed", $args) or return;
-
-    my $ip = $params->{'ip'};
-
-    if (@$args) {
-        my $mac_s = shift @$args;
-        my $mac = max2hex($mac_s)
-            or return print_error(qq{"$mac_s": invalid MAC address});
-        return check_send_command($conn, 'set_alive', $ip, $mac);
-    }
-    return check_send_command($conn, 'set_alive', $ip);
+    do_set_ip_generic(-conn    => $conn,
+                      -command => 'set_alive',
+                      -name    => 'state',
+                      -arg     => $args->{'mac-address'},
+                      -ip      => $args->{'ip'},
+                      -options => $args->{-options});
 }
 
 # cmd: set ip mac
 #
 #   Alias for "set ip alive" with a mandatory MAC argument.
 sub do_set_ip_mac {
-    my ($conn, $parsed, $args, $params) = @_;
+    my ($conn, $parsed, $args) = @_;
 
-    check_arg_count(1,1, "@$parsed", $args) or return;
-    return do_set_ip_alive($conn, $parsed, $args, $params);
+    return do_set_ip_alive($conn, $parsed, $args);
 }
 
 ###############################################################################
@@ -981,7 +1255,7 @@ sub do_status {
 
     my %opts = ( raw => 0, format => 1 );
 
-    GetOptionsFromArray($args,
+    GetOptionsFromArray($args->{-options},
             'raw!'     => \$opts{raw},
             'format!'  => \$opts{format},
             'nf'       => sub { $opts{format} = 0 },
@@ -989,8 +1263,6 @@ sub do_status {
 
     $opts{format} &&= !$opts{raw};
 
-    check_arg_count(0,0,"@$parsed", $args) or return;
-    
     my $reply = check_send_command($conn, 'get_status') or return;
 
     my ($opts, $output, $tag) = parse_server_reply($reply, \%opts);
@@ -1070,6 +1342,7 @@ sub initialise {
         'interface=s' => \$interface,
         'rundir=s'    => \$rundir,
         'socket=s'    => \$sockname,
+        'test!'       => \$opt_test,
         'manual'      => sub { pod2usage(-exitval=>0, -verbose=>2) },
     ) or pod2usage(-exitval=>2);
 
@@ -1109,6 +1382,7 @@ sub print_error {
     my $out = join('', @_);
        $out .= "\n" if $out !~ /\n\Z/;
     print STDERR $out;
+    $TERM && $TERM->on_new_line();
     return;
 }
 
@@ -1130,14 +1404,15 @@ sub print_output {
     else {
         print $out;
     }
+    $TERM && $TERM->on_new_line();
 }
 
 ##############################################################################
 # READLINE STUFF
 ##############################################################################
 
-sub list_ip_completion {
-    my ($text, $line, $start) = @_;
+sub complete_ip_addr {
+    my $partial = shift;
 
     my $network   = $$STATUS{'network'};
     my $prefixlen = $$STATUS{'prefixlen'};
@@ -1148,8 +1423,8 @@ sub list_ip_completion {
     }
     if ($fixed_octets) {
         my $fixed = join('.', (split(/\./, $network))[0..$fixed_octets-1] );
-        if ($start < length $line) {
-            my $have_len = length($line) - $start;
+        my $have_len = length($partial);
+        if ($have_len > 0 && $have_len > length($fixed)) {
             my @completions = (map { "$fixed.$_" } (0..255));
             if ($have_len >= $fixed_octets) {
                 # Turn IP addresses into "91.200.17.1[x[x[x]]]"
@@ -1171,7 +1446,7 @@ sub list_ip_completion {
             }
         }
         else {
-            return "$fixed.";
+            return ("$fixed.", "$fixed.x");
         }
     }
     else {
@@ -1179,113 +1454,136 @@ sub list_ip_completion {
     }
 }
 
-my %Completions = (
-    ''          => [qw( quit ping sponge unsponge clear set show status )],
-    'clear'     => [qw( ip arp )],
-    'set'       => [qw( ip max-pending queuedepth max-rate
-                     flood-protection learning proberate
-                     dummy sweep )],
-    'set sweep' => [qw( age period )],
-    'show'      => [qw( status arp version uptime log ip )],
-);
-
-my @Completion_Patterns = (
-  [ qr/^set ip \S+ dead$/i,                 undef ],
-
-  [ qr/^set ip \S+ pending$/i,              [ '<num>' ] ],
-  [ qr/^set ip \S+ pending \S+$/i,          undef ],
-
-  [ qr/^set ip \S+ alive$/i,                [ '<mac>', '(return)' ] ],
-  [ qr/^set ip \S+ alive \S+$/i,            undef ],
-
-  [ qr/^set pending$/i,                     [ '<num>' ] ],
-  [ qr/^set pending \S+$/i,                 undef ],
-
-  [ qr/^set max-rate$/i,                    [ '<rate>' ] ],
-  [ qr/^set max-rate \S+$/i,                undef ],
-
-  [ qr/^set queuedepth$/i,                  [ '<size>' ] ],
-  [ qr/^set queuedepth \S+$/i,              undef ],
-
-  [ qr/^set flood-protection$/i,            [ '<rate>' ] ],
-  [ qr/^set flood-protection \S+$/i,        undef ],
-
-  [ qr/^set proberate$/i,                   [ '<rate>' ] ],
-  [ qr/^set proberate \S+$/i,               undef ],
-
-  [ qr/^set learning$/i,                    [ '<secs>' ] ],
-  [ qr/^set learning \S+$/i,                undef ],
-
-  [ qr/^set sweep age$/i,                   [ '<secs>' ] ],
-  [ qr/^set sweep age \S+$/i,               undef ],
-
-  [ qr/^set sweep period$/i,                [ '<secs>' ] ],
-  [ qr/^set sweep period \S+$/i,            undef ],
-
-  [ qr/^set dummy \S+$/i,                   undef ],
-
-  [ qr/^show log$/i,                        [ qw( <count> (return) ) ] ],
-
-  [ qr/^ping$/i,                            [ qw( <count> (return) ) ] ],
-  [ qr/^ping \S+$/i,                        [ qw( <delay> (return) ) ] ],
-  [ qr/^ping \S+ \S+$/i,                    undef ], 
-);
-
-sub rl_completion {
+sub list_ip_completion {
     my ($text, $line, $start) = @_;
 
-    my $so_far = substr($line, 0, $start);
-    $so_far =~ s/\s+/ /g;
-    $so_far =~ s/(?:^ )|(?: $)//g;
-
-    if (my $list = $Completions{$so_far}) {
-        if (@$list) {
-            return @$list;
-        }
-        else {
-            print "\n\t(return)\n";
-            $TERM->on_new_line(); return;
-        }
+    my $network   = $$STATUS{'network'};
+    my $prefixlen = $$STATUS{'prefixlen'};
+    
+    my $fixed_octets = int($prefixlen / 8);
+    if ($fixed_octets == 4) {
+        return $network;
     }
-    for my $entry (@Completion_Patterns) {
-        my ($pat, $list) = @$entry;
-        if ($so_far =~ /$pat/) {
-            if ($list) {
-                print "\n\t", join(' | ', @$list), "\n";
-                $TERM->on_new_line(); return;
+    if ($fixed_octets) {
+        my $fixed = join('.', (split(/\./, $network))[0..$fixed_octets-1] );
+        my $have_len = length($line) - $start;
+        if ($have_len > 0 && $have_len > length($fixed)) {
+            my @completions = (map { "$fixed.$_" } (0..255));
+            if ($have_len >= $fixed_octets) {
+                # Turn IP addresses into "91.200.17.1[x[x[x]]]"
+                # That is, keep the part that has already matched
+                # and reveal only the next digit, turn the rest into "x".
+                my %completions = map {
+                        my $keep = substr($_, 0, $have_len+1);
+                        my $hide = length($_) > $have_len+1 
+                                    ? substr($_, $have_len+1)
+                                    : '';
+                        $hide =~ s/[\da-f]/x/gi;
+                        $keep.$hide => 1;
+                    } @completions;
+                return keys %completions;
+                #return grep { length($_) <= $have_len+1 } @completions;
             }
             else {
-                print "\n\t(return)\n";
-                $TERM->on_new_line(); return;
+                return grep { length($_) == length($fixed)+2 } @completions;
             }
         }
+        else {
+            return ("$fixed.", "$fixed.x");
+        }
     }
+    else {
+        return;
+    }
+}
 
-    given ($so_far) {
-        when (/^(?:un)?sponge$/) {
-            return ('all', list_ip_completion($text, $line, $start));
+# @completions = complete_words(\@words, $partial, \%syntax);
+#
+#   @words   - Words leading up to $partial.
+#   $partial - Word to complete.
+#   %syntax  - Syntax definition tree.
+#
+# Recursively traverse the %syntax try by looking up consecutive values of
+# @words. At the end, either the current element's "-words" entry will give
+# the list of completions, or the "-completion" function of the "-var" entry.
+#
+sub complete_words {
+    my $words      = shift;
+    my $partial    = shift;
+    my $syntax     = shift;
+
+    if (my $word_list = $syntax->{-words}) {
+        my @next = sort grep { length $_ } keys %$word_list;
+        my @literals = @next;
+        if (exists $word_list->{''}) {
+            push @literals, '';
+            push @next, '(return)';
         }
-        when (/^clear ip$/) {
-            return ('all', list_ip_completion($text, $line, $start));
+        if (!@$words) {
+            return (\@literals, \@next);
         }
-        when (/^clear arp$/) {
-            return list_ip_completion($text, $line, $start);
+        if (my $literal_match = $word_list->{$words->[0]}) {
+            shift @$words;
+            return complete_words($words, $partial, $literal_match);
         }
-        when ('set ip') {
-            return ('all', list_ip_completion($text, $line, $start));
-        }
-        when (/^set ip \S+$/) {
-            return qw( pending alive dead mac );
-        }
-        when ('show ip') {
-            return ('all', 'alive', 'dead', 'pending', 'none',
-                    list_ip_completion($text, $line, $start));
-        }
-        when ('show arp') {
-            return ('all', list_ip_completion($text, $line, $start));
+        else {
+            return([],['** error']);
         }
     }
-    return;
+    elsif (my $arg_spec = $syntax->{-arg}) {
+        my $arg_name = $arg_spec->{-name};
+        my @next = ("<$arg_name>");
+        my @literal = ();
+        if ($arg_spec->{-optional}) {
+            push @next, "(return)";
+        }
+        if (@$words == 0) {
+            if ($arg_spec->{-complete}) {
+                push @literal, $arg_spec->{-complete}->($partial);
+            }
+            return (\@literal, \@next);
+        }
+
+        my $validate = $arg_spec->{-validate} // sub { $_[0] };
+        my $arg_val;
+        eval { $arg_val = $validate->($words->[0], $arg_name, 1) };
+        if (defined $arg_val) {
+            shift @$words;
+            return complete_words($words, $partial, $arg_spec);
+        }
+        else {
+            return([], ['** error']);
+        }
+    }
+    elsif (@$words) {
+        return([], ['** error']);
+    }
+    else {
+        return([], ['(return)']);
+    }
+}
+
+# @completions = complete_line($text, $line, $start);
+#
+#   $text  - (Partial) word to complete.
+#   $line  - Input line so far.
+#   $start - Position where the $text starts in $line.
+#
+sub complete_line {
+    my ($text, $line, $start) = @_;
+
+    chomp($line);
+    my $words   = substr($line, 0, $start);
+    #print "<$words> <$text>\n";
+    my @words = split(' ', $words);
+    my ($literal, $description) = complete_words(\@words, $text, \%Syntax);
+    if (!@$literal && @$description) {
+        print "\n";
+        print map { "\t$_" } @$description;
+        print "\n";
+        $TERM->on_new_line();
+    }
+    return @$literal;
 }
 
 sub do_signal {
@@ -1301,7 +1599,7 @@ sub init_readline {
 
     my $attribs = $term->Attribs;
         #$attribs->{attempted_completion_function} = \&rl_completion;
-        $attribs->{completion_function} = \&rl_completion;
+        $attribs->{completion_function} = \&complete_line;
 
     $term->set_key('?', 'possible-completions'); # Behave as a Brocade :-)
     #$term->clear_signals();
