@@ -629,7 +629,7 @@ sub do_timer($) {
         }
 
         my $next_sweep = $sponge->user('next_sweep');
-        if ($next_sweep && time >= $next_sweep) {
+        if ($next_sweep && time >= int($next_sweep)) {
             do_sweep($sponge);
             $sponge->user('next_sweep', time+$sponge->user('sweep_sec'));
         }
