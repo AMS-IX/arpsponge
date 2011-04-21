@@ -11,6 +11,11 @@ TOPDIR	=	../..
 include $(TOPDIR)/config.mk
 include $(TOPDIR)/rules.mk
 
+INSTALLDIR	=	$(INSTLIB)/M6
+
+INSTALLFILES		=	\
+				$(INSTALLDIR)/ReadLine.pm
+
 default		:	all
 
 all		:	ARP-all
@@ -20,3 +25,5 @@ install		:	ARP-install
 clean		:	ARP-clean
 
 veryclean	:	ARP-veryclean
+
+# E.O.F. Makefile
