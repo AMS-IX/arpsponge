@@ -168,6 +168,7 @@ sub do_command {
     if (parse_line($line, \@parsed, \%args)) {
         my $func_name = "do @parsed";
         $func_name =~ s/[\s-]+/_/g;
+        DEBUG "func_name: $func_name";
         my $func; eval '$func = \&'.$func_name;
         if (!defined $func) {
             return print_error(qq{@parsed: NOT IMPLEMENTED});
@@ -217,6 +218,7 @@ sub expand_ip_range {
 
 sub check_ip_range_arg {
     my ($spec, $arg, $silent) = @_;
+    DEBUG "check_ip_range_arg: <$arg>";
     return expand_ip_range($arg, $spec->{name}) ? $arg : undef;
 }
 
@@ -234,12 +236,13 @@ sub complete_ip_range {
         $prefix .= $1;
         $partial = $2;
     }
-    #print_error("\npartial: <$partial>; prefix: <$prefix>");
+    DEBUG "\ncomplete_ip_range: partial:<$partial>; prefix:<$prefix>";
     return map { "$prefix$_" } complete_ip_address_arg($partial);
 }
 
 sub check_ip_filter_arg {
     my ($spec, $arg, $silent) = @_;
+    DEBUG "check_ip_filter_arg: <$arg>";
     if ($arg =~ /^all|alive|dead|pending|none$/i) {
         return $arg;
     }
@@ -248,6 +251,7 @@ sub check_ip_filter_arg {
 
 sub complete_ip_filter {
     my $partial = shift;
+    DEBUG "check_ip_filter: <$partial>";
     return (qw( all alive dead pending none ), complete_ip_range($partial));
 }
 
@@ -905,10 +909,11 @@ sub do_set_ip_generic {
 sub do_set_ip_pending {
     my ($conn, $parsed, $args) = @_;
 
+    DEBUG "set ip pending";
     do_set_ip_generic(-conn    => $conn,
                       -command => 'set_pending',
                       -name    => 'state',
-                      -val     => $args->{'state'} // 0,
+                      -val     => $args->{'pending'} // 0,
                       -ip      => $args->{'ip'},
                       -options => $args->{-options},
                       -type    => 'string');

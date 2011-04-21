@@ -28,8 +28,9 @@ use warnings;
 use base qw( Exporter );
 use Term::ReadLine;
 use NetAddr::IP;
-use M6::ARP::Util;
+use M6::ARP::Util qw( :all );
 use Data::Dumper;
+use Scalar::Util qw( reftype );
 
 BEGIN {
 	use Exporter;
@@ -332,14 +333,19 @@ sub complete_words {
         }
         if (@$words == 0) {
             if ($arg_spec->{complete}) {
-                push @literal, $arg_spec->{complete}->($partial);
+                if (reftype $arg_spec->{complete} eq 'CODE') {
+                    push @literal, $arg_spec->{complete}->($partial);
+                }
+                else {
+                    push @literal, @{$arg_spec->{complete}};
+                }
             }
             return (\@literal, \@next);
         }
 
         my $validate = $arg_spec->{verify} // sub { $_[0] };
         my $arg_val;
-        eval { $arg_val = $validate->($words->[0], $arg_name, 1) };
+        eval { $arg_val = $validate->($arg_spec, $words->[0], 1) };
         if (defined $arg_val) {
             shift @$words;
             return complete_words($words, $partial, $arg_spec);
