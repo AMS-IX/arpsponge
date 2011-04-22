@@ -1,9 +1,11 @@
 @(#)$Id$
 
+(Hopelessly outdated)
+
 WORKINGS
 --------
 
-We keep two tables:
+We keep three tables:
 
 	STATE
 		- Indexed by IP address
@@ -15,7 +17,7 @@ We keep two tables:
 	QUEUE
 		- Indexed by IP address
 		- Each IP maps to a circular buffer of QUEUE_DEPTH elements
-		- Buffer holds timestamps for ARP queries
+		- Buffer holds timestamps and source IPs for ARP queries
 
 Startup:
 

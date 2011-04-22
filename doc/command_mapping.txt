@@ -35,52 +35,76 @@ Basic (socket-level) Communications
 Server commands
 ---------------
 
-quit
-ping
+clear_arp
+clear_ip
+clear_ip_all
+get_arp
+get_ip
+get_log
 get_status
-get_arp     [X]
-clear_arp   X
-get_ip      [X]
-clear_ip    X
-set_dead    X
-set_alive   X [Y]
-set_pending X Y
-set_queue   X Y
-set_rate    X Y
+inform
+ping
+quit
+set_alive
+set_dead
+set_dummy
+set_flood_protection
+set_learning
+set_max_pending
+set_max_rate
+set_pending
+set_proberate
+set_queuedepth
+set_sweep_age
+set_sweep_sec
 
 Command mappings
 ----------------
 
 Client              Server
 -----------------------------------
-quit                quit
-ping                ping
-sponge X            set_dead   X
-unsponge X          set_alive  X
-clear ip X          clear_ip   X
-clear arp X         clear_arp  X
-clear log           -
-set ip X pending Y  set_pending X Y
-set ip X alive [Y]  set_alive   X Y
-set ip X dead       set_dead    X
-set ip X mac Y      set_alive   X Y
-set ip X queue Y    set_queue   X Y
-set ip X rate Y     set_rate    X Y
+clear arp X                 clear_arp       X
+clear ip X                  clear_ip        X
+ping [N [S]]                ping            N S
+quit                        quit
 
-show status         status
-show arp [X]        get_arp [X]
-show version        get_status
-show uptime         get_status
-show log            -
-show ip             get_ip
-show ip X           get_ip X, get_arp X
-show ip X state     get_ip X
-show ip X mac       get_arp X
-show ip X queue     get_ip X
-show ip X rate      get_ip X
+set ip X alive [Y]          set_alive       X Y
+set ip X dead               set_dead        X
+set ip X mac Y              set_alive       X Y
+set ip X pending N          set_pending     X Y
+set ip X queue N            set_queue       X Y
+set ip X rate Y             set_rate        X Y
+
+set dummy F                 set_dummy            F
+set flood-protection R      set_flood_protection R
+set learning S              set_learning         S
+set max-pending N           set_max_pending      N
+set max-rate R              set_max_rate         R
+set proberate R             set_proberate        R
+set queuedepth N            set_queuedepth       N
+set sweep age S             set_sweep_age        S
+set sweep period S          set_sweep_sec        S
+
+show arp [X]                get_arp         X
+show ip [X]                 get_ip          X
+
+show log [N]                get_log         N
+show status                 get_status
+show uptime                 get_status
+show version                get_status
+sponge X                    set_dead        X
+unsponge X                  set_alive       X
 
 Data Types
 ----------
+
+X: IP addres (hexstring)
+Y: MAC address (hexstring)
+N: integer > 0
+S: seconds (float)
+T: seconds (int)
+R: rate (float)
+F: boolean
 
 IP addresses are sent as hexadecimal strings.
 MAC addresses are sent as hexadecimal strings.
