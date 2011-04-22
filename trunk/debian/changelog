@@ -1,0 +1,144 @@
+arpsponge (3.10-0.3) unstable; urgency=high
+
+  * 3.10-alpha2
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 10 Aug 2010 17:03:35 +0200
+
+arpsponge (3.10-0.2) unstable; urgency=high
+
+  * 3.10-alpha
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 10 Aug 2010 17:03:35 +0200
+
+arpsponge (3.9.5-3) unstable; urgency=high
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 10 Aug 2010 17:03:35 +0200
+
+arpsponge (3.9.4-1) unstable; urgency=high
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 12 Apr 2010 10:36:21 +0200
+
+arpsponge (3.9.3-1) unstable; urgency=high
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu,  8 Apr 2010 19:07:58 +0200
+
+arpsponge (3.9.2-2) unstable; urgency=high
+
+  * Changed architecture to "all" (instead of "any").
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed,  7 Apr 2010 22:52:35 +0200
+
+arpsponge (3.9.2) unstable; urgency=high
+
+  * See upstream Changelog.
+
+ -- Arien Vijn <arien.vijn@ams-ix.net>  Sat, 26 Jan 2007 22:00:00 +0100
+
+arpsponge (3.9.1) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Wed, 26 Oct 2005 12:07:00 +0200
+
+arpsponge (3.9) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 24 Oct 2005 15:23:00 +0200
+
+arpsponge (3.8) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Wed, 19 Oct 2005 23:25:00 +0200
+
+arpsponge (3.7) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Fri, 30 Sep 2005 18:10:00 +0200
+
+arpsponge (3.6.4-1) unstable; urgency=low
+
+  * Dependency fixes.
+
+ -- Steven Bakker <sb@ams-ix.net>  Fri, 30 Sep 2005 17:49:00 +0200
+
+arpsponge (3.6.4) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Thu, 28 Jul 2005 12:41:00 +0200
+
+arpsponge (3.6.3) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Wed, 20 Jul 2005 13:11:00 +0200
+
+arpsponge (3.6.2) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 11 Jul 2005 13:11:00 +0200
+
+arpsponge (3.6.1) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 27 Jun 2005 14:01:34 +0200
+
+arpsponge (3.5) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Thu, 12 May 2005 16:35:00 +0200
+
+arpsponge (3.4.1-1) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 10 May 2005 14:25:00 +0200
+
+arpsponge (3.4-2) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 09 May 2005 18:03:00 +0200
+
+arpsponge (3.3.2-1) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 13:15:00 +0200
+
+arpsponge (3.3.1-1) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 13:15:00 +0200
+
+arpsponge (3.3-1) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 11:48:00 +0200
+
+arpsponge (3.2-1) unstable; urgency=low
+
+  * See upstream Changelog.
+
+ -- Steven Bakker <sb@ams-ix.net>  Sun, 01 May 2005 11:48:00 +0200
+
+arpsponge (3.1-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Steven Bakker <sb@ams-ix.net>  Sat, 30 Apr 2005 22:43:05 +0200
+

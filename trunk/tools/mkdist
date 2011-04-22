@@ -1,0 +1,15 @@
+#!/usr/bin/perl -n
+#
+# @(#)$Id$
+#
+SWITCH:{
+	/^\#NODIST/                    && do{
+		$nodist = 1;
+		last SWITCH};
+	($nodist && /^\#END-NODIST/)   && do{
+		$nodist = 0;
+		last SWITCH};
+	!$nodist                       && do{
+		print;
+		last SWITCH};
+}

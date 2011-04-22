@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+#
+# @(#)$Id$
+#
+
+use strict;
+use Net::Pcap;
+use Socket;
+use M6::ARP::Util qw( :all );
+use M6::ARP::NetPacket qw( :all );
+
+my $err;
+my $pd = Net::Pcap::open_live(
+    'eth0',
+    0,0,1000,\$err
+);
+
+$pd or die "Net::Pcap::open_live: $err\n";
+
+my $src_ip  = '91.200.17.40';
+my $src_mac = 'fe:00:00:96:00:0a';
+
+#my $dst_ip  = '91.200.17.55';
+#my $dst_mac = '00:30:48:d9:7f:8c';
+my $dst_ip  = '91.200.17.57';
+my $dst_mac = 'ff:ff:ff:ff:ff:ff';
+
+my $arp_packet = encode_arp({
+                        sha => mac2hex($src_mac),
+                        spa => ip2hex($src_ip),
+                        tha => mac2hex($dst_mac),
+                        tpa => ip2hex($dst_ip),
+                        opcode => $ARP_OPCODE_REQUEST,
+                    });
+                    
+my $pkt = encode_ethernet({
+                      dest_mac => mac2hex($dst_mac),
+                      src_mac => mac2hex($src_mac),
+                      type => $ETH_TYPE_ARP,
+                      data => $arp_packet
+                    });
+
+if (Net::Pcap::sendpacket($pd, $pkt) < 0) {
+    print "error: $!\n";
+}
+
+Net::Pcap::close($pd);
