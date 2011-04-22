@@ -69,7 +69,7 @@ my %Syntax = (
       '$count' => { type=>'int',   min=>1,    default=>1 },
       '$delay' => { type=>'float', min=>0.01, default=>1 },
     },
-    'clear ip $ip'   => { '$ip' => { type=>'ip-range'  } },
+    'clear ip $ip'   => { '$ip' => { type=>'ip-any'    } },
     'clear arp $ip'  => { '$ip' => { type=>'ip-range'  } },
     'show ip $ip?'   => { '$ip' => { type=>'ip-filter' } },
     'show arp $ip?'  => { '$ip' => { type=>'ip-range'  } },
@@ -127,7 +127,7 @@ sub Main {
     my $err = 0;
 
     if (@$args) {
-        my $command = do_command($CONN, join(' ', @$args));
+        my $command = do_command(join(' ', @$args), $CONN);
     }
     else {
         $M6::ReadLine::IP_NETWORK =
@@ -218,8 +218,8 @@ sub expand_ip_range {
 
 sub check_ip_range_arg {
     my ($spec, $arg, $silent) = @_;
-    DEBUG "check_ip_range_arg: <$arg>";
-    return expand_ip_range($arg, $spec->{name}) ? $arg : undef;
+    DEBUG sprintf("check_ip_range_arg: <%s> <%d>", $arg, $silent ? $silent : 0);
+    return expand_ip_range($arg, $spec->{name}, $silent) ? $arg : undef;
 }
 
 sub complete_ip_range {
@@ -253,6 +253,21 @@ sub complete_ip_filter {
     my $partial = shift;
     DEBUG "check_ip_filter: <$partial>";
     return (qw( all alive dead pending none ), complete_ip_range($partial));
+}
+
+sub check_ip_any_arg {
+    my ($spec, $arg, $silent) = @_;
+    DEBUG "check_ip_filter_arg: <$arg>";
+    if ($arg =~ /^all$/i) {
+        return $arg;
+    }
+    return check_ip_range_arg(@_);
+}
+
+sub complete_ip_any {
+    my $partial = shift;
+    DEBUG "check_ip_filter: <$partial>";
+    return (qw( all ), complete_ip_range($partial));
 }
 
 sub check_send_command {
@@ -1097,9 +1112,13 @@ sub initialise {
             'verify'   => \&check_ip_filter_arg,
             'complete' => \&complete_ip_filter,
         };
+    $M6::ReadLine::TYPES{'ip-any'} = {
+            'verify'   => \&check_ip_any_arg,
+            'complete' => \&complete_ip_any,
+        };
 
-    $INTERACTIVE = -t STDIN && -t STDOUT;
-    $opt_verbose //= $INTERACTIVE && !@ARGV;
+    $INTERACTIVE = -t STDIN && -t STDOUT && !@ARGV;
+    $opt_verbose //= $INTERACTIVE;
 
     return ($sockname, [@ARGV]);
 }
