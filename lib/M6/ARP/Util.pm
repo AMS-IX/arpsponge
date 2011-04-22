@@ -170,6 +170,7 @@ returns "a1b20304e5f6".
 =cut
 
 sub mac2hex {
+    return if !@_ or !defined $_[0];
 	my @mac = split(/[\s\.\-:\-]/, shift);
 	return undef if 12 % int(@mac);
 	my $digits = int(12 / int(@mac));
