@@ -9,16 +9,15 @@
 TOPDIR	=	../..
 
 include $(TOPDIR)/config.mk
-include $(TOPDIR)/rules.mk
 
 INSTALLDIR	=	$(INSTLIB)/M6
 
 INSTALLFILES		=	\
 				$(INSTALLDIR)/ReadLine.pm
 
-default		:	all
+include $(TOPDIR)/rules.mk
 
-all		:	ARP-all
+all			:	ARP-all
 
 install		:	ARP-install
 
