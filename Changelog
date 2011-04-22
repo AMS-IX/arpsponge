@@ -8,13 +8,70 @@
 
   Major changes:
 
-    UNIX control socket for the daemon.
-      * asctl and aslogtail "clients" for the control socket.
+    * AV Feature request implemented.
+    
+      Some routers do not update their ARP cache when an
+      IP gets unsponged. This typically happens only when
+      there is no direct BGP session between two peers, but
+      they exchange prefixes over a routeserver instead, AND
+      the data flow is only in one direction (i.e. asymmetric
+      routing):
 
-    Speed improvements:
-      * IP and MAC addresses are kept as hexstrings internally.
-      * Packet decoding now done using self-written code to prevent
-        binary -> dotted-quat -> hex translations.
+                 ->-> [C] >->-
+                /             \
+               |               |
+        (data) | -<-<-<-<-<-<- |
+               |/             \|
+              [A]             [B]
+                \             /
+        (BGP)    -<-> [RS] <->
+
+      If A gets sponged, RS loses the peering with A, and
+      will withdraw A's routes, so B will stop sending
+      traffic to A.
+
+      Now, when A gets back, it will re-establish its direct
+      peering sessions, updating its peers' ARP caches appropriately
+      (including that of RS).
+
+      If, however, for some reason, B got hold of the sponged
+      mapping while A was down, it will start sending traffic
+      to the sponge thinking it is using A as next-hop. It will
+      continue doing so until its ARP entry for A times out.
+
+      AFAICS, this can happen only for two reasons:
+
+        * B's ARP entry for A timed out and it was somehow
+          attempting to send traffic to A. This would indicate
+          a (probably very) slow withdrawal of A's prefixes by
+          RS, or (more likely), someone trying to ping A from
+          behind B.
+
+        * B picked up the gratuitous ARP from the sponge. When A
+          came back it (A) did _not_ send a gratuitous ARP, so
+          B still thinks A is at the sponge's HW address.
+
+      Given the usual configuration of a 4 hour ARP timeout,
+      the first scenario is not so likely.
+
+      In any case: in order to fix this, we need to update B's ARP
+      cache. One way is by sending a gratuitous arp on behalf of A.
+      However, this is yet another broadcast, which is exactly what
+      we're trying to avoid.
+
+      Therefore, we fake two unicast ARP packets from A. When
+      misdirected IP traffic ends up at the sponge, it will
+      send two ARP packets back to the source: a unicast reply
+      followed by a unicast request in the hopes that one of these
+      will trigger an update of the ARP entry at the other side.
+
+    * UNIX control socket for the daemon.
+        * asctl and aslogtail "clients" for the control socket.
+
+    * Speed improvements:
+        * IP and MAC addresses are kept as hexstrings internally.
+        * Packet decoding now done using self-written code to prevent
+          binary -> dotted-quat -> hex translations.
 
   arpsponge:
 
