@@ -50,28 +50,48 @@ my $app_header = "\nThis is $0, v$VERSION\n\n"
 sub verbose(@) { print @_ if $opt_verbose; }
 
 sub Main {
-    my ($sockname, $raw) = initialise();
+    my ($sockname, $raw, $follow, $lines) = initialise();
 
     verbose "connecting to arpsponge on $sockname\n";
     my $conn = M6::ARP::Control::Client->create_client($sockname)
                 or die M6::ARP::Control::Client->error."\n";
 
-    while ( my @lines = $conn->read_log_data(-blocking => 1) ) {
-        if ($raw) {
-            print @lines;
-        }
-        else {
-            for my $log (@lines) {
-                $log =~ s/^(\S+)\t(\d+)\t/format_time($1,' ')." [$2] "/e;
-                print $log;
-            }
+    if ($lines) {
+        my $reply = $conn->send_command("get_log $lines");
+        $reply =~ s/^\[(\S+)\]\s*\Z//m;
+        dump_log($raw, $reply);
+    }
+    if ($follow) {
+        while ( my @lines = $conn->read_log_data(-blocking => 1) ) {
+            dump_log($raw, @lines);
         }
     }
     $conn->close;
     exit(0);
 }
 
+sub dump_log {
+    my ($raw, @lines) = @_;
+    if ($raw) {
+        print @lines;
+    }
+    else {
+        for my $log (@lines) {
+            $log =~ s/^(\S+)\t(\d+)\t/format_time($1,' ')." [$2] "/mge;
+            print $log;
+        }
+    }
+}
+
 sub initialise {
+    my @lines_spec = grep { /^-\d+$/ } @ARGV;
+    @ARGV = grep { ! /^-\d+$/ } @ARGV;
+
+    my $lines = 10;
+    if (@lines_spec) {
+        ($lines) = $lines_spec[$#lines_spec] =~ /^-(\d+)$/;
+    }
+
     GetOptions(
         'verbose'     => \$opt_verbose,
         'help|?'      =>
@@ -79,6 +99,8 @@ sub initialise {
         'interface=s' => \(my $interface),
         'rundir=s'    => \$rundir,
         'socket=s'    => \(my $sockname),
+        'follow|f'    => \(my $follow = 0),
+        'lines=i'     => \$lines,
         'raw!'        => \(my $raw = 0),
         'manual'      => sub { pod2usage(-exitval=>0, -verbose=>2) },
     ) or pod2usage(-exitval=>2);
@@ -108,7 +130,7 @@ sub initialise {
         pod2usage(-msg => "Too many arguments", -exitval=>2);
     }
 
-    return ($sockname, $raw);
+    return ($sockname, $raw, $follow, $lines);
 }
 
 ##############################################################################
@@ -128,17 +150,22 @@ B<aslogtail>
 [B<--rundir>=I<dir>]
 [B<--interface>=I<ifname>]
 [B<--socket>=I<sock>]
+[B<--follow>]
+[B<->I<N> | B<--lines>=I<N>]
 [B<-->[B<no>]B<raw>]
 
 =head1 DESCRIPTION
 
-The C<aslogtail> program functions like C<tail -f>, but instead of operating
+The C<aslogtail> program functions like C<tail>, but instead of operating
 on a file, it connects to a running L<arpsponge(8)|arpsponge>'s control
 socket, reads log events from the daemon and prints them to F<stdout>.
 
 By default, the program connects to the first control socket it finds in
 F<@SPONGE_VAR@> (see L<FILES|/FILES>), but see L<OPTIONS|/OPTIONS> below
 for ways to override this.
+
+Like L<tail(1)|tail>, it prints 10 lines of log by default and supports
+"follow" mode (L<--follow|/--follow>).
 
 Output is in the form of:
 
@@ -152,23 +179,17 @@ E.g.:
 
 =over
 
-=item X<--verbose>B<--verbose>
+=item I<-N>, B<--lines>=I<n>
 
-The C<--verbose> flag causes the program to be a little more talkative.
+Print the last I<N> lines of the log.
 
-=item B<--rundir>=I<dir>
+=item B<--follow>
 
-Override the default top directory for the L<arpsponge> control files.
-See also L<FILES|/FILES> below.
+Stay connected and print each log line as it comes in from the daemon.
 
 =item B<--interface>=I<ifname>
 
 Connect to the L<arpsponge> instance for interface I<ifname>.
-
-=item B<--socket>=I<sock>
-
-Explicitly specify the path of the control socket to connect to. Mutually
-exclusive with L<--interface|/--interface>.
 
 =item X<--raw>X<--noraw>B<--raw>, B<--noraw>
 
@@ -178,6 +199,21 @@ If C<--raw> is specified, output will be in the form of:
 
 Where I<tstamp> is the seconds since epoch, I<pid> is the daemon's process ID
 and I<message> is the log message.
+
+=item B<--rundir>=I<dir>
+
+Override the default top directory for the L<arpsponge> control files.
+See also L<FILES|/FILES> below.
+
+=item B<--socket>=I<sock>
+
+Explicitly specify the path of the control socket to connect to. Mutually
+exclusive with L<--interface|/--interface>.
+
+=item X<--verbose>B<--verbose>
+
+The C<--verbose> flag causes the program to be a little more talkative.
+
 
 =back
 
