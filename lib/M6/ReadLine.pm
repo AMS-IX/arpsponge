@@ -140,10 +140,11 @@ sub check_ip_address_arg {
 
     my $argname = $spec->{name} // 'ip';
 
-    if (NetAddr::IP->new($arg)) {
+    my $err;
+    if ($arg = is_valid_ip($arg, -network=>$IP_NETWORK->cidr, -err=>\$err)) {
         return $arg;
     }
-    $silent or print_error(qq{$argname: "$arg" is not a valid IP address});
+    $silent or print_error(qq{$argname: $err});
     return;
 }
 
