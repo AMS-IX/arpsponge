@@ -14,15 +14,25 @@ SECTION		=	8
 
 TARGETS		=	\
 			$(NAME).pod \
-			$(NAME).$(SECTION)
+			$(NAME).$(SECTION) \
+			asctl.pod \
+			aslogtail.pod \
+			asctl.$(SECTION) \
+			aslogtail.$(SECTION)
 
 INSTALLFILES	=	\
-			$(MANDIR)/man$(SECTION)/$(NAME).$(SECTION)
+			$(MANDIR)/man$(SECTION)/$(NAME).$(SECTION) \
+			$(MANDIR)/man$(SECTION)/asctl.$(SECTION) \
+			$(MANDIR)/man$(SECTION)/aslogtail.$(SECTION)
 
 include ../rules.mk
 
 $(NAME).pod: ../sbin/$(NAME)
 	$(RM) -f $(NAME).pod
 	ln -s ../sbin/$(NAME) $(NAME).pod
+
+%.pod: ../sbin/%
+	$(RM) -f $@
+	ln -s $? $@
 
 # E.O.F. Makefile
