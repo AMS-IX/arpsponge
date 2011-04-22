@@ -31,7 +31,6 @@ export  AGE \
         GRATUITOUS \
         INIT_MODE \
         LEARNING \
-        NOTIFY \
         PENDING \
         PROBERATE \
         QUEUE_DEPTH \
@@ -69,14 +68,16 @@ start_sponge() {
         unset NETWORK
         . $file
 
-        notify="${SPONGE_VAR}/${DEVICE}/notify"
-        status="${SPONGE_VAR}/${DEVICE}/status"
-        pidfile="${SPONGE_VAR}/${DEVICE}/pid"
+        [ -n "${DEVICE}" ]  || fatal "$file: no device specified"
+        [ -n "${NETWORK}" ] || fatal "$file ($DEVICE): no network specified"
 
-        opts="--statusfile=${status}"
-        eval_bool ${NOTIFY}         && opts="$opts --notify=${notify}"
+        rundir="${SPONGE_VAR}/${DEVICE}"
+        pidfile="${rundir}/pid"
+
+        opts="--daemon --rundir=${rundir} --pidfile=${pidfile}"
         eval_bool ${SPONGE_NETWORK} && opts="$opts --sponge-network"
         eval_bool ${GRATUITOUS}     && opts="$opts --gratuitous"
+        eval_bool ${DUMMY_MODE}     && opts="$opts --dummy"
         [ -n "${INIT_MODE}" ]       && opts="$opts --init=${INIT_MODE}"
         [ -n "${LEARNING}" ]        && opts="$opts --learning=${LEARNING}"
         [ -n "${QUEUE_DEPTH}" ]     && opts="$opts --queuedepth=${QUEUE_DEPTH}"
@@ -87,24 +88,6 @@ start_sponge() {
         [ -n "${AGE}" ]             && opts="$opts --age=${AGE}"
 		if [ -n "${FLOOD_PROTECTION}" ]; then
             opts="$opts --flood-protection=${FLOOD_PROTECTION}"
-        fi
-
-        # DUMMY_MODE and --daemon are mutually exclusive
-        # so make DUMMY_MODE imply SPONGE_DEBUG
-        if eval_bool ${DUMMY_MODE}; then
-            opts="$opts --dummy"
-            SPONGE_DEBUG=true
-        else
-            opts="$opts --daemon=${pidfile}"
-        fi
-
-        if [ ! -n "${DEVICE}" ]
-        then
-            fatal "$file: no device specified"
-        fi
-        if [ ! -n "${NETWORK}" ]
-        then
-            fatal "$file ($DEVICE): no network specified"
         fi
 
         if eval_bool $SPONGE_DEBUG
@@ -119,16 +102,6 @@ start_sponge() {
         fi
 
         mkdir -p "${SPONGE_VAR}/${DEVICE}"
-
-        if eval_bool ${NOTIFY}
-        then
-            # Create notification FIFO...
-            if [ ! -p "${notify}" ]; then
-                if ! /usr/bin/mkfifo --mode=644 "${notify}"; then
-                    fatal "cannot create ${notify} fifo"
-                fi
-            fi
-        fi
 
         printf "  %-10s " "${DEVICE}"
 
@@ -152,26 +125,40 @@ start() {
 
 stop() {
     echo "Stopping ${PROG}(s):"
-    pidfiles=`ls ${SPONGE_VAR}/*/pid 2>/dev/null`
-    for pf in ${pidfiles}
+    local pid
+    local cruft
+    for pf in ${SPONGE_VAR}/*/pid
     do
-        pid=$(cat ${pf})
-        iface=$(basename $(dirname ${pf}))
-        printf "  interface=%-10s pid=%-6s " ${iface} ${pid}
-        kill -TERM ${pid}
-        sleep 1
-        if ps -p ${pid} > /dev/null 2>&1
+        if [ -f "$pf" ]
         then
-            kill -KILL ${pid}
-            echo KILLED
-        else
-            echo terminated
+            read pid cruft <"${pf}"
+            iface=$(basename $(dirname "${pf}"))
+            printf "  interface=%-10s pid=%-6s " "${iface}" "${pid}"
+            # Don't use kill -0. The point is to check whether the process
+            # exists, not whether we can send it a signal.
+            if ps -p "${pid}" > /dev/null 2>&1
+            then
+                kill -TERM "${pid}"
+                sleep 1
+                if ps -p "${pid}" > /dev/null 2>&1
+                then
+                    kill -KILL "${pid}"
+                    echo KILLED
+                else
+                    echo terminated
+                fi
+            else
+                echo already dead
+                /bin/rm -f "${pf}"
+            fi
         fi
-        /bin/rm -f ${SPONGE_VAR}/${iface}/notify
     done
 }
 
 status() {
+    local pid
+    local cruft
+
     if [ "X$1" = "Xre-init" ]
     then
         echo "Saving state:"
@@ -179,16 +166,23 @@ status() {
         echo "Dumping status:"
     fi
     pidfiles=`ls ${SPONGE_VAR}/*/pid 2>/dev/null`
-    for pf in ${pidfiles}
+    for pf in ${SPONGE_VAR}/*/pid
     do
-        pid=$(cat ${pf})
-        iface=$(basename $(dirname ${pf}))
-        printf "  interface=%-10s pid=%-6s " ${iface} ${pid}
-        kill -USR1 ${pid} 2>/dev/null && echo "[Ok]" || echo "[FAILED]"
+        if [ -f "$pf" ]
+        then
+            read pid cruft <"${pf}"
+            iface=$(basename $(dirname "${pf}"))
+            printf "  interface=%-10s pid=%-6s " "${iface}" "${pid}"
+            kill -USR1 "${pid}" 2>/dev/null && echo "[Ok]" || echo "[FAILED]"
+        fi
     done
 }
 
 case "$1" in
+    debug)
+        SPONGE_DEBUG=true
+        start
+        ;;
     start)
         start
         ;;
