@@ -64,52 +64,68 @@ sub verbose(@) { print @_ if $opt_verbose; }
 sub DEBUG(@)   { print_error(@_) if $opt_debug; }
 
 my %Syntax = (
-    'quit' => {},
+    'quit' => {
+        '?'       => 'disconnect and quit', },
+    'help' => {
+        '?'       => 'show command summary', },
     'ping $count $delay' => {
-      '$count' => { type=>'int',   min=>1,    default=>1 },
-      '$delay' => { type=>'float', min=>0.01, default=>1 },
-    },
-    'clear ip $ip'   => { '$ip' => { type=>'ip-any'    } },
-    'clear arp $ip'  => { '$ip' => { type=>'ip-range'  } },
-    'show ip $ip?'   => { '$ip' => { type=>'ip-filter' } },
-    'show arp $ip?'  => { '$ip' => { type=>'ip-range'  } },
-    'show status|version|uptime' => {},
+        '?'       => '"ping" the daemon, display response RTT',
+        '$count'  => { type=>'int',   min=>1,    default=>1 },
+        '$delay'  => { type=>'float', min=>0.01, default=>1 }, },
+    'clear ip $ip'   => {
+        '?'       => 'clear state table for given IP(s)',
+        '$ip'     => { type=>'ip-any'    } },
+    'clear arp $ip'  => {
+        '?'       => 'clear ARP table for given IP(s)',
+        '$ip'     => { type=>'ip-range'  } },
+    'show ip $ip?'   => {
+        '?'       => 'show state table for given IP(s)',
+        '$ip'     => { type=>'ip-filter' } },
+    'show arp $ip?'  => {
+        '?'       => 'show ARP table for given IP(s)',
+        '$ip'     => { type=>'ip-any'    } },
+    'show status|version|uptime' => {
+        '?'       => 'show general information' },
     'show log $nlines?' => {
-        '$nlines' => { type=>'int', min=>1 },
-    },
-    'sponge|unsponge $ip' => { '$ip' => { type=>'ip-range' } },
+        '?'       => 'show daemon log (most recent <nlines>)',
+        '$nlines' => { type=>'int', min=>1 }, },
+    'sponge|unsponge $ip' => {
+        '?'       => 'sponge/unsponge given IP(s); see also "set ip alive|dead"',
+        '$ip'     => { type=>'ip-range' } },
     'inform $dst_ip about $src_ip' => {
+        '?'       => 'force <dst_ip> to update its ARP entry for <src_ip>',
         '$dst_ip' => { type=>'ip-address' },
-        '$src_ip' => { type=>'ip-address' }
-    },
-    'set ip $ip dead'   => { '$ip' => { type=>'ip-range'  } },
+        '$src_ip' => { type=>'ip-address' } },
+    'set ip $ip dead'   => {
+        '?'       => 'sponge given IP(s)',
+        '$ip'      => { type=>'ip-range'  } },
     'set ip $ip pending $pending?' => {
+        '?'        => 'set given IP(s) to pending state <pending> (default 0)',
         '$ip'      => { type=>'ip-range'  },
-        '$pending' => { type=>'int', min=>0 },
-    },
+        '$pending' => { type=>'int', min=>0, default=>0 }, },
     'set ip $ip mac $mac' => {
+        '?'        => 'statically store <ip> -> <mac> in the ARP table',
         '$ip'      => { type=>'ip-range'    },
-        '$mac'     => { type=>'mac-address' },
-    },
+        '$mac'     => { type=>'mac-address' }, },
     'set ip $ip alive $mac?' => {
+        '?'        => 'unsponge given IP(s) (associate them with <mac>)',
         '$ip'      => { type=>'ip-range'    },
-        '$mac'     => { type=>'mac-address' },
-    },
+        '$mac'     => { type=>'mac-address' }, },
     'set max-pending|queuedepth $num' => {
-        '$num'      => { type=>'int', min=>1 },
-    },
+        '?'        => 'set queue parameters',
+        '$num'     => { type=>'int', min=>1 }, },
     'set max-rate|flood-protection|proberate $rate' => {
-        '$rate'      => { type=>'float', min=>0.001 },
-    },
+        '?'        => 'set rate parameters',
+        '$rate'    => { type=>'float', min=>0.001 }, },
     'set learning $secs' => {
-        '$secs'      => { type=>'int', min=>0 },
-    },
+        '?'        => 'switch in to/out of learning mode',
+        '$secs'    => { type=>'int', min=>0 }, },
     'set dummy $bool' => {
-        '$bool'      => { type=>'bool' },
-    },
-    'set sweep (age|period) $secs' => {
-        '$secs'      => { type=>'int', min=>1 },
-    },
+        '?'        => 'enable/disable DUMMY mode',
+        '$bool'    => { type=>'bool' }, },
+    'set sweep age|period $secs' => {
+        '?'        => 'set sweep/probe parameters',
+        '$secs'    => { type=>'int', min=>1 }, },
 );
 
 sub Main {
@@ -312,6 +328,21 @@ sub do_quit {
     GetOptionsFromArray($$args{-options}) or return;
     my $reply = check_send_command($conn, 'quit') or return;
     print_output($reply);
+}
+
+sub do_help {
+    my ($conn, $parsed, $args) = @_;
+    GetOptionsFromArray($$args{-options}) or return;
+    my $out = "= $0 command summary =\n";
+    for my $cmd (sort keys %Syntax) {
+        my $text = $cmd;
+        $text =~ s/\$(\S+)\?/[<$1>]/g;
+        $text =~ s/\$(\S+)/<$1>/g;
+        $text =~ s/(\S+\|\S+)/\($1\)/g;
+        $text .= "\n   ".$Syntax{$cmd}->{'?'}."\n";
+        $out .= "\n".$text;
+    }
+    print_output($out);
 }
 
 sub do_ping {
@@ -889,6 +920,12 @@ sub do_set_ip_generic {
     my $unit      = $opts{-unit} // '';
     my $command   = $opts{-command} // "set_ip_$name";
 
+    DEBUG "do_set_ip_generic\n"
+        . "  command = " . $command . "\n"
+        . "  ip      = " . $ip . "\n"
+        . "  name    = " . ($arg // '(none)') . "\n"
+        ;
+
     $command =~ s/[-\s]+/_/g;
 
     GetOptionsFromArray($opts{-options}) or return;
@@ -945,16 +982,26 @@ sub do_set_ip_dead {
                       -options => $args->{-options});
 }
 
+# cmd: sponge
+sub do_sponge { &do_set_ip_dead }
+
+# cmd: unsponge
+sub do_unsponge { &do_set_ip_alive }
+
 # cmd: set ip alive
 sub do_set_ip_alive {
     my ($conn, $parsed, $args) = @_;
 
-    do_set_ip_generic(-conn    => $conn,
-                      -command => 'set_alive',
-                      -name    => 'state',
-                      -arg     => $args->{'mac'},
-                      -ip      => $args->{'ip'},
-                      -options => $args->{-options});
+    DEBUG "set ip alive $$args{ip} mac="
+         .($args->{'mac'}?$args->{'mac'} : 'none');
+
+    do_set_ip_generic(
+        -conn    => $conn,
+        -command => 'set_alive',
+        -name    => 'state',
+        -val     => $args->{'mac'} ? mac2hex($args->{'mac'}) : undef,
+        -ip      => $args->{'ip'},
+        -options => $args->{-options});
 }
 
 # cmd: set ip mac
@@ -963,6 +1010,7 @@ sub do_set_ip_alive {
 sub do_set_ip_mac {
     my ($conn, $parsed, $args) = @_;
 
+    print "set ip $$args{ip} mac $$args{mac}\n";
     return do_set_ip_alive($conn, $parsed, $args);
 }
 
@@ -1139,12 +1187,19 @@ asctl - Arp Sponge ConTroL utility
 
 =head1 SYNOPSIS
 
-B<asctl>
+=over 6
+
+=item B<asctl>
+
 [B<--verbose>]
+[B<--debug>]
+[B<--test>]
 [B<--rundir>=I<dir>]
 [B<--interface>=I<ifname>]
 [B<--socket>=I<sock>]
 [I<command> ...]
+
+=back
 
 =head1 DESCRIPTION
 
@@ -1160,55 +1215,135 @@ for ways to override this.
 
 =over
 
-=item X<--verbose>B<--verbose>
+=item B<--debug>
 
-The C<--verbose> flag causes the program to be a little more talkative.
+Print debugging information to F<stderr> while executing.
+
+=item B<--interface>=I<ifname>
+
+Connect to the L<arpsponge> instance for interface I<ifname>.
 
 =item B<--rundir>=I<dir>
 
 Override the default top directory for the L<arpsponge> control files.
 See also L<FILES|/FILES> below.
 
-=item B<--interface>=I<ifname>
-
-Connect to the L<arpsponge> instance for interface I<ifname>.
-
 =item B<--socket>=I<sock>
 
 Explicitly specify the path of the control socket to connect to. Mutually
 exclusive with L<--interface|/--interface>.
 
+=item B<--test>
+
+Do not connect to any daemon or send any commands. This is really only
+used during development to check command parsing, etc.
+
+=item X<--verbose>B<--verbose>
+
+The C<--verbose> flag causes the program to be a little more talkative.
+
 =back
 
 =head1 COMMANDS
 
-    quit
-    ping [<count> [<delay>]]
-    sponge <ip>
-    unsponge <ip>
-    status
+In the list below, the following constructions are used:
 
-    clear ip { all | <ip> ... }
-    clear arp <ip> ...
+    $ip        ::= valid IPv4 address
+    $ip-range  ::= $ip[-$ip][,$ip-range]
+    $ip-any    ::= {$ip-range|all}
+    $ip-filter ::= {alive|dead|pending|none|$ip-any}
 
-    set max-pending <num>
-    set queuedepth <num>
-    set max-rate <rate>
-    set flood-protection <rate>
-    set learning <secs>
-    set proberate <rate>
-    set dummy <bool>
-    set sweep age <secs>
-    set sweep period <secs>
+=over
 
-    set ip ...
+=item B<clear arp> I<ip-range>
 
-    show status
-    show version
-    show uptime
-    show log [ <count> ]
-    show arp [ { all | <ip> ... } ]
-    show ip [ { all | alive | dead | pending | <ip> ... } ]
+clear ARP table for given IP(s)
+
+=item B<clear ip> I<ip-range>
+
+clear state table for given IP(s)
+
+=item B<help>
+
+show command summary
+
+=item B<inform> I<dst_ip> B<about> I<src_ip>
+
+force I<dst_ip> to update its ARP entry for I<src_ip>
+
+=item B<ping> I<count> I<delay>
+
+"ping" the daemon, display response RTT; continues until stopped
+by an interrupt (C<Ctrl-C>) unless I<count> is given; I<delay>
+specifies the time (in seconds) to wait between "ping"s.
+
+=item B<quit>
+
+disconnect and quit
+
+=item B<set dummy> I<bool>
+
+enable/disable DUMMY mode; I<bool> can be any of:
+C<yes>, C<true>, C<on>, C<1>,
+C<no>, C<false>, C<off>, C<0>.
+
+=item B<set ip> I<ip-range> B<alive> [I<mac>]
+
+unsponge given IP(s) (associate them with I<mac>)
+
+=item B<set ip> I<ip-range> B<dead>
+
+sponge given IP(s)
+
+=item B<set ip> I<ip-range> B<mac> I<mac>
+
+statically store <ip> -> <mac> in the ARP table
+
+=item B<set ip> I<ip-range> pending [I<pending>]
+
+set given IP(s) to pending state I<pending> (default 0)
+
+=item B<set learning> I<secs>
+
+switch in to/out of learning mode
+
+=item B<set> {B<max-pending>|B<queuedepth>} I<num>
+
+set queue parameters
+
+=item B<set> {B<max-rate>|B<flood-protection>|B<proberate>} I<rate>
+
+set rate parameters
+
+=item B<set sweep> {B<age>|B<period>} I<secs>
+
+set sweep/probe parameters
+
+=item B<show arp> [I<ip-any>]
+
+show ARP table for given IP(s)
+
+=item B<show ip> [I<ip-filter>]
+
+show state table for given IP(s)
+
+=item B<show log> [I<nlines>]
+
+show daemon log (most recent <nlines>)
+
+=item B<show> {B<status>|B<version>|B<uptime>}
+
+show general information
+
+=item B<sponge> I<ip-range>
+
+=item B<unsponge> I<ip-range>
+
+sponge/unsponge given IP(s); see also C<set ip alive> and C<set ip dead>.
+
+=back
+
+=cut
 
 =head1 COMMAND OPTIONS
 
