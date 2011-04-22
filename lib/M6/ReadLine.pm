@@ -148,14 +148,14 @@ sub check_ip_address_arg {
     return;
 }
 
-sub check_mac_arg {
+sub check_mac_address_arg {
     my ($spec, $arg, $silent) = @_;
 
     my $argname = $spec->{name} // 'mac';
 
-    if ($arg =~ /^(?:[\da-f]{2}:){5}[\da-f]{2}$/i
-        || $arg =~ /^(?:[\da-f]{4}\.){2}[\da-f]{4}$/i
-        || $arg =~ /^[\da-f]{12}$/i) {
+    if ($arg =~ /^(?:[\da-f]{1,2}[:.-]){5}[\da-f]{1,2}$/i
+        || $arg =~ /^(?:[\da-f]{1,4}[:.-]){2}[\da-f]{1,4}$/i
+        || $arg =~ /^[\da-f]{1,12}$/i) {
         return $arg;
     }
     else {
