@@ -136,7 +136,7 @@ sub Main {
     verbose "connecting to arpsponge on $sockname\n";
     if (!$opt_test) {
         $CONN = M6::ARP::Control::Client->create_client($sockname)
-                    or die M6::ARP::Control::Client->error."\n";
+                    or die "$sockname: ".M6::ARP::Control::Client->error."\n";
     }
     ($STATUS) = get_status($CONN, {raw=>0, format=>1});
     verbose "$$STATUS{id}, v$$STATUS{version} (pid #$$STATUS{pid})\n";
