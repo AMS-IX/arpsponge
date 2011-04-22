@@ -153,10 +153,6 @@ sub Main {
       'verbose+'           => \(my $verbose),
     ) or pod2usage(2);
 
-    if ($dummy && $daemon) {
-        die("$0: --dummy and --daemon are mutually exclusive\n");
-    }
-
     die($::USAGE) if $help;
     pod2usage(-exitstatus => 0, -verbose => 2) if $man;
 
@@ -1062,22 +1058,25 @@ B<@NAME@> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
 
 I<Options>:
 
-    --verbose[=n]
-    --dummy | --daemon=pidfile
-    --loglevel=level
-    --status=file
-
+    --age=secs
+    --control=socket
+    --[no]daemon
+    --dummy
+    --flood-protection=r
+    --[no]gratuitous
     --init={ALIVE|DEAD|PENDING|NONE}
-    --sponge-network
     --learning=secs
+    --loglevel=level
+    --pending=n
+    --pidfile=pidfile
+    --proberate=r
     --queuedepth=n
     --rate=r
-    --flood-protection=r
-    --pending=n
-    --proberate=n
+    --rundir=path
+    --sponge-network
+    --statusfile=file
     --sweep=interval/threshold
-    --[no]gratuitous
-    --age=secs
+    --verbose[=n]
 
 B</etc/init.d/@NAME@> {B<start>|B<stop>|B<restart>|B<status>}
 
@@ -1177,15 +1176,63 @@ of its current state upon receiving a C<HUP> or C<USR1> signal.
 
 =over
 
-=item X<--sponge-network>B<--sponge-network>
+=item X<--age>B<--age>=I<secs>
 
-Statically sponge the network base address. Although it I<is> possible
-to configure this on an interface and use it as a valid IP address, it
-is generally not done. However, some entities may still send ARPs for
-this address.
+Time until we consider an ARP entry "stale" (default @DFL_ARP_AGE@).
+This really controls how often we refresh the entries in our internal
+ARP cache.
 
-Use this option if you have not assigned the base address to any interface
-in your network.
+=item X<--control>B<--control>=I<socket>
+
+Location of the UNIX control socket. Default is
+"I<rundir>/B<control>".
+
+=item X<--daemon>B<--daemon>
+
+=item X<--no-daemon>B<--no-daemon>
+
+Put (don't put) process in background (run as a daemon).
+
+If run as a daemon, leave the process identification (PID) in
+I<pidfile> (see L<--pidfile|/--pidfile>).
+
+If I<pidfile> already exists and the value in the file is that of a
+running sponge process, the program will exit with an appropriate
+error diagnostic. Otherwise, it forks into the background, closes
+the standard input, output and error file descriptors and writes its
+PID to I<pidfile>.
+
+This option turns off C<--verbose> and enables logging to
+L<syslogd(8)|syslogd>.
+
+=item X<--dummy>B<--dummy>
+
+Dummy operation (simulate sponging). Does send probes but no sponge
+replies.
+
+=item X<--dummy>B<--dummy>
+
+Dummy operation (simulate sponging). May send some probes but never any
+sponge replies.
+
+=item X<--flood-protection>B<--flood-protection>=I<r>
+
+ARP threshold rate in queries/sec (default @DFL_FLOOD_PROTECTION@) above
+which we ignore ARP queries from a particular source.
+
+If there is a ARP broadcast storm on the platform (e.g. loops or DoS),
+it's possible that one or more IP addresses originate large amounts
+of (bogus) ARP queries.
+
+As an example, suppose we set flood protection to "3", and I<SRC_IP>
+sends over 100 ARP queries/sec for I<DST_IP>. Rather than putting
+I<DST_IP> in pending mode after a few second of this, we would check
+the ARP rate of I<SRC_IP> and see that it exceeds 3 and immediately
+reduce the queue back to 1.
+
+=item X<--gratuitious>X<--nogratuitous>B<--[no]gratuitous>
+
+Do (not) send gratuitous ARP queries when sponging an address.
 
 =item X<--init>B<--init>={B<ALIVE>|B<DEAD>|B<PENDING>|B<NONE>}
 
@@ -1242,73 +1289,9 @@ I<PENDING> and I<NONE> as it will clear the table for live IP addresses.
 
 A value of zero (0) disables the initial learning state.
 
-=item X<--age>B<--age>=I<secs>
-
-Time until we consider an ARP entry "stale" (default @DFL_ARP_AGE@).
-This really controls how often we refresh the entries in our internal
-ARP cache.
-
-=item X<--daemon>B<--daemon>=I<pidfile>
-
-Put process in background (run as a daemon). Leave the process
-identification (PID) in I<pidfile>.
-
-If I<pidfile> already exists and the value in the file is that of a
-running sponge process, the program will exit with an appropriate
-error diagnostic. Otherwise, it forks into the background, closes
-the standard input, output and error file descriptors and writes its
-PID to I<pidfile>.
-
-This option turns off C<--verbose> and enables logging to
-L<syslogd(8)|syslogd>.
-
-Mutually exclusive with the L<--dummy|/--dummy> option.
-
-=item X<--dummy>B<--dummy>
-
-Dummy operation (simulate sponging). Does send probes but no sponge
-replies.
-
-This options turns off logging to L<syslogd(8)|syslogd> and
-causes the information to be printed to F<STDOUT> instead.
-
-Mutually exclusive with the L<--daemon|/--daemon> option.
-
-=item X<--gratuitious>X<--nogratuitous>B<--[no]gratuitous>
-
-Do (not) send gratuitous ARP queries when sponging an address.
-
 =item X<--loglevel>B<--loglevel>=I<level>
 
 Logging level for L<syslogd(8)|syslogd> logging. Default is C<info>.
-
-=item X<--queuedepth>B<--queuedepth>=I<n>
-
-Number of ARP queries over which to calculate average rate (default
-@DFL_QUEUEDEPTH@).
-Sponging is not triggered until at least this number of ARP queries are seen.
-
-=item X<--rate>B<--rate>=I<r>
-
-ARP threshold rate in queries/min (default @DFL_RATE@). If the ARP queue
-(see above) is full, and the average rate of incoming queries per second
-exceeds I<r>, we move the target IP to I<PENDING> state (but see also
-L<--flood-protection|/--flood-protection>.
-
-=item X<--flood-protection>B<--flood-protection>=I<r>
-
-ARP threshold rate in queries/sec (default @DFL_FLOOD_PROTECTION@) above
-which we ignore ARP queries from a particular source.
-
-If there is a ARP broadcast storm on the platform (e.g. loops or DoS),
-it's possible that one or more IP addresses originate large amounts
-of (bogus) ARP queries.
-
-As an example, suppose we set flood protection to "3", and I<SRC_IP>
-sends over 100 ARP queries/sec for I<DST_IP>. Rather than putting
-I<DST_IP> in pending mode after a few second of this, we would check
-the ARP rate of I<SRC_IP> and see that it exceeds 3 and immediately
-reduce the queue back to 1.
 
 =item X<--pending>B<--pending>=I<n>
 
@@ -1328,6 +1311,11 @@ B<Tip>: Increasing the value pending parameter by one adds one second
 of delay before the sponge kicks in. If you increase this value significantly,
 you should consider decreasing the L<--queuedepth|/--queuedepth> parameter
 as well.
+
+=item X<--pidfile>B<--pidfile>=I<pidfile>
+
+Write daemon PID to I<pidfile> instead of the default
+(I<rundir>/pid).
 
 =item X<--proberate>B<--proberate>=I<n>
 
@@ -1367,9 +1355,37 @@ below.
 
 =back
 
+=item X<--queuedepth>B<--queuedepth>=I<n>
+
+Number of ARP queries over which to calculate average rate (default
+@DFL_QUEUEDEPTH@).
+Sponging is not triggered until at least this number of ARP queries are seen.
+
+=item X<--rate>B<--rate>=I<r>
+
+ARP threshold rate in queries/min (default @DFL_RATE@). If the ARP queue
+(see above) is full, and the average rate of incoming queries per second
+exceeds I<r>, we move the target IP to I<PENDING> state (but see also
+L<--flood-protection|/--flood-protection>.
+
+=item X<--rundir>B<--rundir>=I<path>
+
+Base directory for run-time files. Default is "F<@SPONGE_VAR@>/I<interface>".
+
+=item X<--sponge-network>B<--sponge-network>
+
+Statically sponge the network base address. Although it I<is> possible
+to configure this on an interface and use it as a valid IP address, it
+is generally not done. However, some entities may still send ARPs for
+this address.
+
+Use this option if you have not assigned the base address to any interface
+in your network.
+
 =item X<--statusfile>B<--statusfile>=I<file>
 
 Write status to I<file> when receiving the C<HUP> or C<USR1> signal.
+Default is "I<rundir>/B<status>".
 
 =item X<--sweep>B<--sweep>=I<interval>/I<threshold>
 
@@ -1396,8 +1412,8 @@ sweep ARP queries at the cost of more processing spent in sweeping.
 =item *
 
 A shorter I<threshold> results in a quicker rediscovery of a sponged
-address that has come back but has been quiet for some reason at the
-cost of more ARP queries from the host.
+address that has come back, but has been quiet for some reason, at the
+cost of more ARP queries from the daemon's host.
 
 =back
 
@@ -1414,86 +1430,19 @@ Has no effect when L<--daemon|/--daemon> is specified.
 
 =back
 
-=head1 NOTIFICATIONS
-
-The program can write notifications of "significant" events to a separate file.
-This is not really meant to be a regular file (unless you want to create
-really large files), but rather FIFOs (see L<mkfifo(1)|mkfifo>).
-
-Notifications take the form of:
-
-=over 4
-
-=item id=B<@NAME@>;action=B<init>;dev=I<DEV>;ip=I<IPADDR>;mac=I<MACADDR>
-
-This event is written when the program starts and indicates its local
-interface (I<DEV>), IP address (I<IPADDR>) and MAC address (I<MACADDR>).
-
-=item id=B<@NAME@>;action=B<flip>;ip=I<IPADDR>;mac=I<NEWMAC>;old=I<OLDMAC>
-
-IP address (I<IPADDR>) changed from I<OLDMAC> to I<NEWMAC>.
-
-=item id=B<@NAME@>;action=I<ACTION>;ip=I<IPADDR>;mac=I<MACADDR>
-
-This event is written on a number of occasions. I<ACTION> can be:
-
-=over 12
-
-=item B<learn>:
-
-Program learned a new IP address (I<IPADDR>) behind I<MACADDR>.
-
-=item B<refresh>:
-
-ARP cache entry for (I<IPADDR>, I<MACADDR>) was refreshed.
-
-=item B<clear>:
-
-Unanswered ARP query queue for I<IPADDR> was cleared, because
-a frame came in from that address with source MAC I<MACADDR>).
-
-=item B<sponge>:
-
-Sponge for I<IPADDR> kicked in. Sponging using MAC address I<MACADDR>.
-
-=item B<unsponge>:
-
-Sponge for I<IPADDR> aborted.
-Address is now owned by I<MACADDR>.
-
-=back
-
-=item id=B<@NAME@>;action=B<quit>;reason=I<REASON>
-
-Program exited because of I<REASON>, which is usually a signal of some sort.
-
-=back
-
 =head1 EXAMPLES
 
-To start the program on C<eth0> for the C<193.194.136.128/25> network,
+To start the program on C<eth0> for the C<91.200.17.0/26> network,
 simply use:
 
-   @NAME@ 193.194.136.128/25 dev eth0
-
-=head2 Using the Event Notification
-
-To use the event notification, do:
-
-   mkfifo --mode=644 /var/run/sponge.out
-
-   @NAME@ --daemon=/var/run/sponge.pid \
-             193.194.136.128/25 dev eth0 
-
-   cat /var/run/sponge.event
+   @NAME@ 91.200.17.0/26 dev eth0 
 
 =head2 Status Dumping
 
 To use the status dumping functionality, do:
 
-   @NAME@ --daemon=/var/run/sponge.pid \
-             --statusfile=/tmp/sponge.out \
-             193.194.136.128/25 dev eth0 
+   @NAME@ --daemon --statusfile=/tmp/sponge.out \
+        91.200.17.0/26 dev eth0 
 
 Then send a C<USR1> signal to the process:
 
@@ -1501,37 +1450,65 @@ Then send a C<USR1> signal to the process:
 
 Now F</tmp/sponge.out> should contain something like:
 
-   id:      @NAME@
-   network: 193.194.136.128/25
-   date:    2005-05-01 10:16:12 [1114935372]
-   started: 2005-04-30 23:26:39 [1114896399]
+  id:               @NAME@
+  pid:              27482
+  version:          @RELEASE@(146)
+  date:             2011-04-22@15:30:26 [1303479026]
+  started:          2011-04-22@11:25:53 [1303464353]
+  network:          91.200.17.0/26
+  interface:        eth0
+  ip/mac:           91.200.17.40 [fe:00:00:96:00:0a]
+  queue depth:      200
+  max rate:         30.00
+  flood protection: 5.00
+  max pending:      10
+  sweep period:     900 sec
+  sweep age:        3600 sec
+  proberate:        100 sec
+  next sweep in:    627 sec
+  learning:         no
+  dummy:            yes
 
-   <STATE>
-   # IP              State     Queries Rate (q/min) Updated
-   193.194.136.129   ALIVE           0    0.000     2005-05-01 10:15:58
-   193.194.136.130   DEAD            6    0.012     2005-05-01 09:56:40
-   193.194.136.131   ALIVE           1    0.000     2005-05-01 09:41:40
-   193.194.136.135   ALIVE           0    0.000     2005-05-01 10:16:12
-   193.194.136.139   ALIVE           0    0.000     2005-05-01 10:06:28
-   193.194.136.140   DEAD            5    0.018     2005-05-01 09:41:40
-   193.194.136.143   DEAD            5    0.021     2005-05-01 10:11:40
-   193.194.136.146   ALIVE           0    0.000     2005-05-01 09:41:40
-   193.194.136.147   DEAD            6    0.013     2005-05-01 09:26:40
-   193.194.136.148   ALIVE           0    0.000     2005-05-01 10:12:38
-   193.194.136.185   PENDING(3)      3    0.019     2005-05-01 09:43:16
-   193.194.136.205   PENDING(4)      4    0.012     2005-05-01 09:43:16
-   </STATE>
+  <STATE>
+  # IP              State          Queue Rate (q/min) Updated
+  91.200.17.0       STATIC             0    0.000     2011-04-22@11:29:38
+  91.200.17.1       ALIVE              0    0.000     2011-04-22@15:30:09
+  91.200.17.2       ALIVE              0    0.000     2011-04-22@14:37:14
+  91.200.17.3       DEAD               1    0.000     2011-04-22@15:25:53
+  91.200.17.4       ALIVE              0    0.000     2011-04-22@15:30:09
+  91.200.17.19      DEAD               1    0.000     2011-04-22@15:10:53
+  91.200.17.22      ALIVE              0    0.000     2011-04-22@15:30:10
+  91.200.17.26      ALIVE              0    0.000     2011-04-22@15:30:10
+  91.200.17.27      DEAD               1    0.000     2011-04-22@15:25:53
+  91.200.17.28      ALIVE              0    0.000     2011-04-22@15:30:10
+  91.200.17.31      DEAD               1    0.000     2011-04-22@15:23:27
+  91.200.17.32      ALIVE              0    0.000     2011-04-22@15:30:10
+  91.200.17.33      DEAD               1    0.000     2011-04-22@15:25:53
+  91.200.17.37      ALIVE              0    0.000     2011-04-22@15:30:10
+  91.200.17.38      ALIVE              0    0.000     2011-04-22@15:30:10
+  91.200.17.39      ALIVE              0    0.000     2011-04-22@15:30:10
+  91.200.17.51      DEAD               1    0.000     2011-04-22@15:25:53
+  91.200.17.52      DEAD               1    0.000     2011-04-22@15:25:53
+  91.200.17.53      DEAD               1    0.000     2011-04-22@15:25:53
+  91.200.17.61      DEAD               1    0.000     2011-04-22@15:10:53
+  </STATE>
 
-   <ARP-TABLE>
-   # MAC             IP                Epoch       Time
-   00:07:eb:46:48:e1 193.194.136.129   1114935358  2005-05-01 10:15:58
-   00:40:96:55:a7:2b 193.194.136.131   1114933300  2005-05-01 09:41:40
-   08:00:20:ec:8a:24 193.194.136.132   1114935329  2005-05-01 10:15:29
-   00:30:48:29:44:a6 193.194.136.135   1114935372  2005-05-01 10:16:12
-   00:60:2e:00:17:9f 193.194.136.139   1114934788  2005-05-01 10:06:28
-   00:30:48:29:44:a6 193.194.136.146   1114933300  2005-05-01 09:41:40
-   00:03:93:a8:d2:0c 193.194.136.148   1114935158  2005-05-01 10:12:38
-   </ARP-TABLE>
+  <ARP-TABLE>
+  # MAC             IP                Epoch       Time
+  00:07:eb:46:48:e1 91.200.17.1       1303479009  2011-04-22@15:30:09
+  00:0c:db:02:64:1c 91.200.17.2       1303475834  2011-04-22@14:37:14
+  00:06:d7:3f:64:c0 91.200.17.4       1303479009  2011-04-22@15:30:09
+  00:1b:ed:03:c2:00 91.200.17.22      1303479010  2011-04-22@15:30:10
+  00:05:dc:66:10:06 91.200.17.26      1303479010  2011-04-22@15:30:10
+  fe:00:00:64:00:0a 91.200.17.28      1303479010  2011-04-22@15:30:10
+  fe:00:01:72:00:0a 91.200.17.29      1303479010  2011-04-22@15:30:10
+  00:1b:ed:03:c2:00 91.200.17.32      1303479010  2011-04-22@15:30:10
+  fe:00:01:5e:00:0a 91.200.17.37      1303479010  2011-04-22@15:30:10
+  fe:00:01:69:00:0a 91.200.17.38      1303479010  2011-04-22@15:30:10
+  fe:00:01:68:00:0a 91.200.17.39      1303479010  2011-04-22@15:30:10
+  </ARP-TABLE>
+
+  alive=24 dead=37 pending=0 ARP_entries=25
 
 =head1 SYSTEM INIT SCRIPT
 
@@ -1567,10 +1544,13 @@ to "true", other values are "false".
 
 Directory root that holds state information for the various sponge
 instances. The script will create the directory if it doesn't exist yet.
+Together with the interface (I<$INTERFACE>) this is used to specify the
+I<rundir> to the sponge ("B<--rundir>=I<$SPONGE_VAR>/I<$INTERFACE>").
 
 =item I<DUMMY_MODE> (boolean)
 
-Use C<--dummy> on the sponge.
+Use C<--dummy> on the sponge. Note that L<asctl(1)|asctl> clients can
+(re-)set this value on the fly.
 
 =item I<INIT_MODE>
 
@@ -1663,7 +1643,9 @@ This is set up by the sponge's L<init(1)|init> script.
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>, L<arp(8)|arp>, L<mkfifo(1)|mkfifo>.
+L<asctl(1)|asctl>,
+L<aslogtail(1)|aslogtail>,
+L<perl(1)|perl>, L<arp(8)|arp>.
 
 =head1 BUGS AND LIMITATIONS
 
@@ -1679,13 +1661,6 @@ from being run if they specify different PID files.
 You can specify only one network prefix to listen to per interface.
 If you want to monitor multiple prefixes, you will have to find a common
 prefix and monitor that.
-
-=item *
-
-The notification FIFO should have I<only one> reader. Multiple readers
-will have unpredictable results: some messages are split across the
-readers (so they only see partial messages), others are seen by one but
-not the others.
 
 =item *
 
