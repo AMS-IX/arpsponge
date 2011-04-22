@@ -133,6 +133,13 @@ $(MANDIR)/man$(SECTION)/% : %
 	@$(MKDIR) $(MANDIR)/man$(SECTION) 2>&1 | sed -e 's/^mkdir //' >> $(INSTALL_LOG)
 	@$(INSTALL) $< $@
 
+$(DOCDIR)/% : %
+	@if [ ! -n "$(SKIPDOCS)" ]; then \
+		echo installing $< in $(DOCDIR); \
+		$(MKDIR) $(DOCDIR) 2>&1 | sed -e 's/^mkdir //' >> $(INSTALL_LOG); \
+		$(INSTALL) $< $@; \
+	fi
+
 $(INSTDIR1)/% : %
 	@echo installing $< in $(INSTDIR1)
 	@$(MKDIR) $(INSTDIR1) 2>&1 | sed -e 's/^mkdir //' >> $(INSTALL_LOG)
@@ -168,11 +175,11 @@ auto/$(AUTO1)/%/autosplit.ix : $(AUTO1)/%.pm
 	@PERLLIB=$$PERLLIB:$(TOPDIR)/lib; export PERLLIB; \
 	    $(TOOLDIR)/autosplit ./auto $<
 
-%-all		:	; cd $* ; make ${MFLAGS} all
-%-install	:	; cd $* ; make ${MFLAGS} install
-%-uninstall	:	; cd $* ; make ${MFLAGS} uninstall
-%-autosplit	:	; cd $* ; make ${MFLAGS} autosplit
-%-clean		:	; cd $* ; make ${MFLAGS} clean
+%-all		:	; cd $* ; $(MAKE) all
+%-install	:	; cd $* ; $(MAKE) install
+%-uninstall	:	; cd $* ; $(MAKE) uninstall
+%-autosplit	:	; cd $* ; $(MAKE) autosplit
+%-clean		:	; cd $* ; $(MAKE) clean
 
 all		:	$(TARGETS)
 

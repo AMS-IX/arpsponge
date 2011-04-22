@@ -56,7 +56,7 @@ install: build
 	dh_installdirs
 
 	# Add here commands to install the package into debian/arpsponge.
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/arpsponge
+	$(MAKE) install SKIPDOCS=1 DESTDIR=$(CURDIR)/debian/arpsponge
 
 
 # Build architecture-independent files here.
