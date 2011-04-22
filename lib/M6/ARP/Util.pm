@@ -15,6 +15,7 @@ package M6::ARP::Util;
 
 use strict;
 use POSIX qw( strftime strtod strtol );
+use NetAddr::IP;
 
 BEGIN {
 	use Exporter;
@@ -25,7 +26,7 @@ BEGIN {
 	our @EXPORT_OK = qw( 
             int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
             format_time relative_time hex_addr_in_net
-            is_valid_int is_valid_float
+            is_valid_int is_valid_float is_valid_ip
         );
 	our @EXPORT    = ();
 
@@ -55,10 +56,14 @@ M6::ARP::Util - IP, MAC, misc. utility routines
  $str = format_time($some_earlier_time);
  $str = relative_time($some_earlier_time);
 
+ $in_net = hex_addr_in_net($hex, $hexnet, $prefixlen );
+
  $month = is_valid_int($some_string, -min=>1, -max=>12);
  $count = is_valid_int($some_string, -min=>0);
 
  $chance = is_valid_float($some_string, -min=>0, -max=>1, -inclusive=>1);
+
+ $ip_string = is_valid_ip($some_string, -network=>'192.168.1.0/24');
 
 =head1 DESCRIPTION
 
@@ -232,7 +237,7 @@ sub hex_addr_in_net {
 =item X<is_valid_int>B<is_valid_int> ( I<ARG>
 [, B<-min> =E<gt> I<MIN>, B<-max> =E<gt> I<MAX>,
  B<-inclusive> =E<gt> I<BOOL>,
- B<-err> =E<gt> I<REF> ])
+ B<-err> =E<gt> I<REF> ] )
 
 Check whether I<ARG> is defined and represents a valid integer. If I<MIN>
 and/or I<MAX> are given and not C<undef>, it also checks the boundaries
@@ -319,7 +324,7 @@ sub is_valid_int {
 =item X<is_valid_float>B<is_valid_float> ( I<ARG>
 [, B<-min> =E<gt> I<MIN>, B<-max> =E<gt> I<MAX>,
  B<-inclusive> =E<gt> I<BOOL>,
- B<-err> =E<gt> I<REF> ])
+ B<-err> =E<gt> I<REF> ] )
 
 Check whether I<ARG> is defined and represents a valid floating point
 number.  If I<MIN> and/or I<MAX> are given and not C<undef>, it also
@@ -394,6 +399,54 @@ sub is_valid_float {
     }
     ${$opts{-err}} = '';
     return $num;
+}
+
+###############################################################################
+
+=item X<is_valid_ip>B<is_valid_ip> ( I<ARG>
+[, B<-network> =E<gt> I<CIDR>]
+[, B<-err> =E<gt> I<REF>]
+)
+
+Check whether I<ARG> is defined and represents a valid IPv4 address.
+If I<CIDR> is given, it also checks whether the address is part
+of I<CIDR>.  Returns the value of I<ARG> if the checks are successful,
+C<undef> otherwise.
+
+If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
+contain a diagnostic.
+
+=cut
+
+sub is_valid_ip {
+    my $arg = shift;
+    my $err_s;
+    my %opts = (-err => \$err_s, -network => undef, @_);
+
+    if (!defined $arg || length($arg) == 0) {
+        ${$opts{-err}} = q/"" is not a valid IPv4 address/;
+        return;
+    }
+
+    my $ip = NetAddr::IP->new($arg);
+    if (!$ip) {
+        ${$opts{-err}} = qq/"$arg" is not a valid IPv4 address/;
+        return;
+    }
+    
+    return $ip->addr() if !$opts{-network};
+   
+    if (my $net = NetAddr::IP->new($opts{-network})) {
+        return $ip->addr() if $net->contains($ip);
+        ${$opts{-err}} = qq/$arg is out of range /.$net->cidr();
+        return;
+    }
+    else {
+        ${$opts{-err}} = qq/** INTERNAL ** is_valid_ip(): -network /
+                       . qq/argument "$opts{-network}" is not valid/;
+        warn ${$opts{-err}};
+        return;
+    }
 }
 
 ###############################################################################
