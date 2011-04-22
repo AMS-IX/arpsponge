@@ -142,7 +142,7 @@ sub Main {
       'loglevel=s'         => \(my $loglevel         = $DFL_LOGLEVEL),
       'man'                => \(my $man),
       'pending=i'          => \(my $pending          = $DFL_PENDING),
-      'pidfile'            => \$pidfile,
+      'pidfile=s'          => \$pidfile,
       'proberate=i'        => \(my $proberate        = $DFL_PROBERATE),
       'queuedepth=i'       => \(my $queuedepth       = $DFL_QUEUEDEPTH),
       'rate=f'             => \(my $rate             = $DFL_RATE),
