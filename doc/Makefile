@@ -15,7 +15,7 @@ TARGETS		=
 INSTALLDIR  = $(DOCDIR)
 
 INSTALLFILES	= \
-			$(DOCDIR)/arpsponge_architecture.txt
+			$(DOCDIR)/arpsponge_architecture.txt \
 			$(DOCDIR)/command_mapping.txt
 
 include ../rules.mk
