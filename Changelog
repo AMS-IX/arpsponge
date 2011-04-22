@@ -2,9 +2,41 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta - steven
+
+  Code cleanups all around.
+
+  Major changes:
+
+    UNIX control socket for the daemon.
+      * asctl and aslogtail "clients" for the control socket.
+
+    Speed improvements:
+      * IP and MAC addresses are kept as hexstrings internally.
+      * Packet decoding now done using self-written code to prevent
+        binary -> dotted-quat -> hex translations.
+
+  arpsponge:
+
+    * Signals are now masked with sigprocmask().
+    * Reworked event loop for more accurate timing.
+    * Fixed set_pending/incr_pending so it will log per
+      pending update.
+    * The "notify" socket has been removed. There is now a UNIX control
+      socket that can be used to send commands and receive log events.
+    * Default "rundir" (--rundir) used to set default values for
+      statusfile, pidfile and control socket.
+    * --daemon=pidfile replaced by --[no]daemon and --pidfile=file
+    * Restored --verbose and --dummy functionality.
+
+  asctl, aslogtail:
+
+    * new
+    
 3.10 - alpha - steven
 
   * 17.nov.2010 - steven
+
     Backported fixes from mon-eun-014 for the signal handling.
 
     Notify FIFO no longer default on init startup.
