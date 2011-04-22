@@ -6,7 +6,6 @@ Build-Depends: debhelper (>= 4.0.0),
  perl (>= 5.10.0), perl-modules (>= 5.10.0),
  libsys-syslog-perl (>= 0.26),
  libnet-pcap-perl (>= 0.16),
- libnet-arp-perl (>= 1.0.2),
  libnetaddr-ip-perl (>= 4.033),
  libreadonly-perl (>= 1.02)
 Standards-Version: 3.6.1
@@ -17,7 +16,6 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  perl (>= 5.10.0), perl-modules (>= 5.10.0),
  libsys-syslog-perl (>= 0.26),
  libnet-pcap-perl (>= 0.16),
- libnet-arp-perl (>= 1.0.2),
  libnetaddr-ip-perl (>= 4.033),
  libreadonly-perl (>= 1.02),
  libreadonly-xs-perl (>= 1.04)
