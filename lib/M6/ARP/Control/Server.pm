@@ -586,7 +586,9 @@ sub _cmd_inform {
                         sha => $mac2, spa => $ip2,
                         tha => $mac1, tpa => $ip1,
                     );
-    return $self->send_ok("update sent [sha=$mac2,spa=$ip2], [tha=$mac1,tpa=$ip1]");
+    return $self->send_ok(
+            "[sha=$mac2,spa=$ip2]\n[tha=$mac1,tpa=$ip1]\nupdate sent"
+        );
 }
 
 1;
