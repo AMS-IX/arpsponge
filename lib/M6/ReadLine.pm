@@ -240,7 +240,10 @@ sub parse_words {
     }
 
     if (my $word_list = $syntax->{words}) {
-        my $words_str = join("", map { "  $_\n" } sort grep { length $_ } keys %$word_list);
+        my $words_str = join(q{}, 
+                            map { "  $_\n" } 
+                                sort grep { length $_ } keys %$word_list
+                        );
         if (!@$words) {
             if (exists $word_list->{''}) {
                 return 1;
@@ -249,9 +252,20 @@ sub parse_words {
                 return print_error("@$parsed: expected one of:\n$words_str");
             }
         }
-        if (my $literal_match = $word_list->{$words->[0]}) {
-            push @$parsed, shift @$words;
-            return parse_words($words, $literal_match, $parsed, $args);
+        my $w = $words->[0];
+        my $l = length($w);
+        my @match = grep { substr($_,0, $l) eq $w } keys %$word_list;
+        if (@match == 1) {
+            push @$parsed, $match[0];
+            shift @$words;
+            return parse_words($words, $word_list->{$match[0]},
+                               $parsed, $args);
+        }
+        elsif (@match > 1) {
+            return print_error(
+                        qq{ambibuous input "$$words[0]"; },
+                        qq{matches: }, join(', ', sort @match), "\n"
+                    );
         }
         else {
             return print_error(
@@ -317,12 +331,24 @@ sub complete_words {
         if (!@$words) {
             return (\@literals, \@next);
         }
-        if (my $literal_match = $word_list->{$words->[0]}) {
+        my $w = $words->[0];
+        my $l = length($w);
+        my @match = grep { substr($_,0, $l) eq $w } keys %$word_list;
+        if (@match == 1) {
             shift @$words;
-            return complete_words($words, $partial, $literal_match);
+            return complete_words($words, $partial, $word_list->{$match[0]});
+        }
+        elsif (@match > 1) {
+            return ([],
+                    [qq{** "$$words[0]" ambiguous; matches: }
+                    . join(', ', sort @match)]
+                );
         }
         else {
-            return([],['** error']);
+            return([],
+                   [qq{** "$$words[0]" invalid; expected: }
+                   . join(", ", sort @next)]
+                );
         }
     }
     elsif (my $arg_spec = $syntax->{arg}) {
