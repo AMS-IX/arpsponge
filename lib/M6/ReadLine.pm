@@ -430,7 +430,7 @@ sub init_readline {
 
     $INTERACTIVE = $args{interactive};
 
-    $TERM = Term::ReadLine->new( $args{name} );
+    $TERM = Term::ReadLine->new( $args{name}, *STDIN, *STDOUT );
 
     if (-f $args{history_file}) {
     }
@@ -445,6 +445,7 @@ sub init_readline {
 
     $IN  = $TERM->IN  || \*STDIN;
     $OUT = $TERM->OUT || \*STDOUT;
+
     select $OUT;
     $| = 1;
 
