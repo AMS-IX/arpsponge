@@ -33,11 +33,11 @@ BEGIN {
             $ETH_TYPE_IPv4
             $ETH_TYPE_ARP
             $ETH_TYPE_IPv6
-            $ETH_ADDR_BROADCAST
-            $IPv4_ADDR_BROADCAST
-            $ARP_OPCODE_REQUEST $ARP_OPCODE_REPLY
-            $ARP_HTYPE_ETHERNET $ARP_HLEN_ETHERNET
-            $ARP_PROTO_IPv4     $ARP_PLEN_IPv4
+            $ETH_ADDR_BROADCAST  $ETH_ADDR_NONE
+            $IPv4_ADDR_BROADCAST $IPv4_ADDR_NONE
+            $ARP_OPCODE_REQUEST  $ARP_OPCODE_REPLY
+            $ARP_HTYPE_ETHERNET  $ARP_HLEN_ETHERNET
+            $ARP_PROTO_IPv4      $ARP_PLEN_IPv4
             $ARP_PROTO_IP
         );
 
@@ -67,6 +67,8 @@ Readonly our $ARP_PLEN_IPv4       => 4;
 
 Readonly our $ETH_ADDR_BROADCAST  => 'ff' x $ARP_HLEN_ETHERNET;
 Readonly our $IPv4_ADDR_BROADCAST => 'ff' x $ARP_PLEN_IPv4;
+Readonly our $ETH_ADDR_NONE       => '00' x $ARP_HLEN_ETHERNET;
+Readonly our $IPv4_ADDR_NONE      => '00' x $ARP_PLEN_IPv4;
 
 =pod
 
@@ -159,6 +161,14 @@ Hex string representing the ethernet broadcast address ('ff' x 6).
 =item X<$IPv4_ADDR_BROADCAST>I<$IPv4_ADDR_BROADCAST>
 
 Hex string representing the IPv4 broadcast address ('ff' x 4).
+
+=item X<$ETH_ADDR_NONE>I<$ETH_ADDR_NONE>
+
+Hex string representing the "zero" ethernet address ('00' x 6).
+
+=item X<$IPv4_ADDR_NONE>I<$IPv4_ADDR_NONE>
+
+Hex string representing the IPv4 "zero" address ('00' x 4).
 
 =item X<$ARP_OPCODE_REQUEST>I<$ARP_OPCODE_REQUEST>
 
