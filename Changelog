@@ -2,7 +2,7 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
-3.10 - beta - steven
+3.10 - beta2 - steven
 
   Code cleanups all around.
 
@@ -11,59 +11,95 @@
     * AV Feature request implemented.
     
       Some routers do not update their ARP cache when an
-      IP gets unsponged. This typically happens only when
-      there is no direct BGP session between two peers, but
-      they exchange prefixes over a routeserver instead, AND
-      the data flow is only in one direction (i.e. asymmetric
-      routing):
+      IP gets unsponged. There are two cases in which this
+      can happen:
+      
+        1.  A and B have a direct peering. A goes down, address gets
+            sponged. B ARPs for A, gets the sponge's MAC and starts
+            trying to set up BGP sessions to it (port 179 SYN). When
+            A comes back, B for some reason does not update its ARP
+            cache and continues to think A is behind the sponge's MAC.
 
-                 ->-> [C] >->-
-                /             \
-               |               |
-        (data) | -<-<-<-<-<-<- |
-               |/             \|
-              [A]             [B]
-                \             /
-        (BGP)    -<-> [RS] <->
+            We're not sure why this happens. Normally, A would try to
+            re-establish its peerings as well (often also sending out
+            a gratuitous ARP), and B should quickly find out A's new address,
+            since it's getting BGP SYNs from it. Perhaps A has its peerings
+            configured in passive mode and doesn't send gratuitous ARPs, but
+            then, most routers ARP for their peer before attempting to
+            connect. In this case, B apparently doesn't ARP for A (or it would
+            find out A's real address), but rather it seems to hold on to
+            the cached (sponged) ARP entry until it times out.
 
-      If A gets sponged, RS loses the peering with A, and
-      will withdraw A's routes, so B will stop sending
-      traffic to A.
+        2.  There is no direct BGP session between A and B, but they exchange
+            prefixes over a routeserver instead, AND the data flow is only in
+            one direction (i.e. asymmetric routing):
 
-      Now, when A gets back, it will re-establish its direct
-      peering sessions, updating its peers' ARP caches appropriately
-      (including that of RS).
+                           ->-> [C] >->-
+                          /             \
+                         |               |
+                  (data) | -<-<-<-<-<-<- |
+                         |/             \|
+                        [A]             [B]
+                          \             /
+                  (BGP)    -<-> [RS] <->
 
-      If, however, for some reason, B got hold of the sponged
-      mapping while A was down, it will start sending traffic
-      to the sponge thinking it is using A as next-hop. It will
-      continue doing so until its ARP entry for A times out.
+            If A gets sponged, RS loses the peering with A, and
+            will withdraw A's routes, so B will stop sending
+            traffic to A.
 
-      AFAICS, this can happen only for two reasons:
+            Now, when A gets back, it will re-establish its direct
+            peering sessions, updating its peers' ARP caches appropriately
+            (including that of RS).
 
-        * B's ARP entry for A timed out and it was somehow
-          attempting to send traffic to A. This would indicate
-          a (probably very) slow withdrawal of A's prefixes by
-          RS, or (more likely), someone trying to ping A from
-          behind B.
+            If, however, for some reason, B got hold of the sponged
+            mapping while A was down, it will start sending traffic
+            to the sponge thinking it is using A as next-hop. It will
+            continue doing so until its ARP entry for A times out.
 
-        * B picked up the gratuitous ARP from the sponge. When A
-          came back it (A) did _not_ send a gratuitous ARP, so
-          B still thinks A is at the sponge's HW address.
+            AFAICS, this can happen only for two reasons:
 
-      Given the usual configuration of a 4 hour ARP timeout,
-      the first scenario is not so likely.
+              * B's ARP entry for A timed out and it was somehow
+                attempting to send traffic to A. This would indicate
+                a (probably very) slow withdrawal of A's prefixes by
+                RS, or (more likely), someone trying to ping A from
+                behind B.
 
-      In any case: in order to fix this, we need to update B's ARP
-      cache. One way is by sending a gratuitous arp on behalf of A.
-      However, this is yet another broadcast, which is exactly what
-      we're trying to avoid.
+              * B picked up the gratuitous ARP from the sponge. When A
+                came back it (A) did _not_ send a gratuitous ARP, so
+                B still thinks A is at the sponge's HW address.
+
+            Given the usual configuration of a 4 hour ARP timeout,
+            the first scenario is not so likely.
+
+      In any case: in order to fix this, we need to update B's ARP cache.
+      In order to do that, we need to know A's IP address. Unfortunately,
+      in case "2" we cannot know that, since there is no BGP traffic
+      between the two, so the destination IP is that of the final
+      destination.
+      
+      In case "1" however, it's easy: the destination IP is that of A.
+
+      Now, how do we update B's ARP cache?  One way is by sending a
+      gratuitous arp on behalf of A.  However, this is yet another
+      broadcast, which is exactly what we're trying to avoid.
 
       Therefore, we fake two unicast ARP packets from A. When
       misdirected IP traffic ends up at the sponge, it will
       send two ARP packets back to the source: a unicast reply
       followed by a unicast request in the hopes that one of these
-      will trigger an update of the ARP entry at the other side.
+      will trigger an update of the ARP entry at the other side:
+
+        ARP <IP-A> IS AT <MAC-A>
+        ARP WHO HAS <B> TELL <IP-A>@<MAC-A>
+
+      Testing suggests that Linux's ARP cache responds to the unicast
+      request, but not the reply. Still, the request above would result
+      in a reply from B back to A (who actually didn't initiate the
+      request). We could try:
+
+        ARP WHO HAS <A> TELL <IP-A>@<MAC-A>
+
+      I.e., a unicast proxy gratuitous ARP request :-)
 
     * UNIX control socket for the daemon.
         * asctl and aslogtail "clients" for the control socket.
