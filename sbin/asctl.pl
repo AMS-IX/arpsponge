@@ -47,6 +47,7 @@ my $opt_verbose   = 0;
 my $opt_debug     = 0;
 my $opt_test      = 0;
 my $rundir        = $SPONGE_VAR;
+my $INTERACTIVE   = 1;
 my $MAX_HISTORY   = 1000;
 my $HISTFILE      = "$::ENV{HOME}/.$0_history";
 
@@ -165,8 +166,12 @@ sub Main {
         $M6::ReadLine::IP_NETWORK =
             NetAddr::IP->new("$$STATUS{network}/$$STATUS{prefixlen}");
 
-        init_readline(interactive => $INTERACTIVE);
-        while ( defined (my $input = $TERM->readline($PROMPT)) ) {
+        init_readline() if $INTERACTIVE;
+
+        while (1) {
+            my $input = $TERM ? $TERM->readline($PROMPT) : <>;
+            last if !defined $input;
+
             next if $input =~ /^\s*(?:#.*)?$/;
             my $command = do_command($input, $CONN);
 

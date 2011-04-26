@@ -46,7 +46,7 @@ BEGIN {
                              parse_line
                              print_error print_output );
 	my  @functions   = (@check_func, @gen_functions);
-    my  @vars        = qw( $TERM $IN $OUT $INTERACTIVE $PROMPT $PAGER );
+    my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER );
 	our @EXPORT_OK   = (@functions, @vars);
 	our @EXPORT      = @gen_functions;
 	our %EXPORT_TAGS = ( func => \@functions, check => \@check_func,
@@ -56,7 +56,6 @@ BEGIN {
 our $TERM        = undef;
 our $IN          = \*STDIN;
 our $OUT         = \*STDOUT;
-our $INTERACTIVE = 1;
 our $PROMPT      = '';
 our $IP_NETWORK  = NetAddr::IP->new('0/0');
 our $SYNTAX      = {};
@@ -422,13 +421,10 @@ sub init_readline {
             'history_lines' => 1000,
             'completion'    => \&complete_line,
             'name'          => $prog,
-            'interactive'   => 1,
             @_,
     );
     $args{history_file} //= "$::ENV{HOME}/.$args{name}_history";
     $args{prompt}       //= "$args{name}> ";
-
-    $INTERACTIVE = $args{interactive};
 
     $TERM = Term::ReadLine->new( $args{name}, *STDIN, *STDOUT );
 
@@ -449,10 +445,8 @@ sub init_readline {
     select $OUT;
     $| = 1;
 
-    if ($INTERACTIVE) {
-        $PROMPT = $args{prompt};
-        $::SIG{INT} = 'IGNORE';
-    }
+    $PROMPT = $args{prompt};
+    $::SIG{INT} = 'IGNORE';
 
     return ($TERM, $PROMPT, $IN, $OUT);
 }
@@ -548,7 +542,7 @@ sub print_output {
     my $out = join('', @_);
        $out .= "\n" if $out !~ /\n\Z/;
 
-    if ($INTERACTIVE) {
+    if ($TERM) {
         open(MORE, "|$PAGER");
         print MORE $out;
         close MORE;
