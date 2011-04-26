@@ -19,6 +19,7 @@ use M6::ARP::Sponge qw( :states );
 
 use IO::Socket;
 use M6::ARP::Util qw( :all );
+use M6::ARP::NetPacket qw( :vars );
 use Time::HiRes   qw( time );
 
 use POSIX qw( strftime );
@@ -572,12 +573,12 @@ sub _cmd_inform {
     }
 
     my ($mac1, $time1) = $sponge->arp_table($ip1);
-    if (!defined $mac1) {
+    if (!defined $mac1 || $mac1 eq $ETH_ADDR_NONE) {
         $self->send_error(hex2ip($ip1), ": no MAC address available");
         return 1;
     }
     my ($mac2, $time2) = $sponge->arp_table($ip2);
-    if (!defined $mac2) {
+    if (!defined $mac2 || $mac2 eq $ETH_ADDR_NONE) {
         $self->send_error(hex2ip($ip2), ": no MAC address available");
         return 1;
     }
