@@ -64,67 +64,83 @@ sub verbose(@) { print @_ if $opt_verbose; }
 sub DEBUG(@)   { print_error(@_) if $opt_debug; }
 
 my %Syntax = (
-    'quit' => {
-        '?'       => 'disconnect and quit', },
-    'help' => {
-        '?'       => 'show command summary', },
+    'quit' => { '?'       => 'Disconnect and quit.', },
+    'help' => { '?'       => 'Show command summary.', },
     'ping $count $delay' => {
-        '?'       => '"ping" the daemon, display response RTT',
+        '?'       => '"ping" the daemon, display response RTT.',
         '$count'  => { type=>'int',   min=>1,    default=>1 },
         '$delay'  => { type=>'float', min=>0.01, default=>1 }, },
     'clear ip $ip'   => {
-        '?'       => 'clear state table for given IP(s)',
+        '?'       => 'Clear state table for given IP(s).',
         '$ip'     => { type=>'ip-any'    } },
     'clear arp $ip'  => {
-        '?'       => 'clear ARP table for given IP(s)',
+        '?'       => 'Clear ARP table for given IP(s).',
         '$ip'     => { type=>'ip-range'  } },
     'show ip $ip?'   => {
-        '?'       => 'show state table for given IP(s)',
+        '?'       => 'Show state table for given IP(s).',
         '$ip'     => { type=>'ip-filter' } },
     'show arp $ip?'  => {
-        '?'       => 'show ARP table for given IP(s)',
+        '?'       => 'Show ARP table for given IP(s).',
         '$ip'     => { type=>'ip-any'    } },
-    'show status|version|uptime' => {
-        '?'       => 'show general information' },
+    'show status'  => { '?' => 'Show daemon status.'   },
+    'show version' => { '?' => 'Show daemon version.'  },
+    'show uptime'  => { '?' => 'Show daemon uptime.'   },
     'show log $nlines?' => {
-        '?'       => 'show daemon log (most recent <nlines>)',
+        '?'       => 'Show daemon log (most recent <nlines>).',
         '$nlines' => { type=>'int', min=>1 }, },
-    'sponge|unsponge $ip' => {
-        '?'       => 'sponge/unsponge given IP(s); see also "set ip alive|dead"',
+    'sponge $ip' => {
+        '?'       => 'Sponge given IP(s); see also "set ip dead".',
+        '$ip'     => { type=>'ip-range' } },
+    'unsponge $ip' => {
+        '?'       => 'Unsponge given IP(s); see also "set ip alive".',
         '$ip'     => { type=>'ip-range' } },
     'inform $dst_ip about $src_ip' => {
-        '?'       => 'force <dst_ip> to update its ARP entry for <src_ip>',
+        '?'       => 'Force <dst_ip> to update its ARP entry for <src_ip>.',
         '$dst_ip' => { type=>'ip-address' },
         '$src_ip' => { type=>'ip-address' } },
     'set ip $ip dead'   => {
-        '?'       => 'sponge given IP(s)',
+        '?'       => 'Sponge given IP(s).',
         '$ip'      => { type=>'ip-range'  } },
     'set ip $ip pending $pending?' => {
-        '?'        => 'set given IP(s) to pending state <pending> (default 0)',
+        '?'        => 'Set given IP(s) to pending state'
+                    . ' <pending> (default 0).',
         '$ip'      => { type=>'ip-range'  },
         '$pending' => { type=>'int', min=>0, default=>0 }, },
     'set ip $ip mac $mac' => {
-        '?'        => 'statically store <ip> -> <mac> in the ARP table',
+        '?'        => 'Statically store <ip> -> <mac> in the ARP table.',
         '$ip'      => { type=>'ip-range'    },
         '$mac'     => { type=>'mac-address' }, },
     'set ip $ip alive $mac?' => {
-        '?'        => 'unsponge given IP(s) (associate them with <mac>)',
+        '?'        => 'Unsponge given IP(s) (associate them with <mac>).',
         '$ip'      => { type=>'ip-range'    },
         '$mac'     => { type=>'mac-address' }, },
-    'set max-pending|queuedepth $num' => {
-        '?'        => 'set queue parameters',
+    'set max-pending $num' => {
+        '?'        => 'Set max. number of "pending" probes before'
+                      .' sponging an IP',
         '$num'     => { type=>'int', min=>1 }, },
-    'set max-rate|flood-protection|proberate $rate' => {
-        '?'        => 'set rate parameters',
+    'set queuedepth $num' => {
+        '?'        => 'Max. ARP queue size per IP address.',
+        '$num'     => { type=>'int', min=>1 }, },
+    'set max-rate $rate' => {
+        '?'        => 'Set rate parameters.',
+        '$rate'    => { type=>'float', min=>0.001 }, },
+    'set flood-protection $rate' => {
+        '?'        => 'Set rate parameters.',
+        '$rate'    => { type=>'float', min=>0.001 }, },
+    'set proberate $rate' => {
+        '?'        => 'Set rate parameters.',
         '$rate'    => { type=>'float', min=>0.001 }, },
     'set learning $secs' => {
-        '?'        => 'switch in to/out of learning mode',
+        '?'        => 'Switch in to/out of learning mode.',
         '$secs'    => { type=>'int', min=>0 }, },
     'set dummy $bool' => {
-        '?'        => 'enable/disable DUMMY mode',
+        '?'        => 'Enable/disable DUMMY mode.',
         '$bool'    => { type=>'bool' }, },
-    'set sweep age|period $secs' => {
-        '?'        => 'set sweep/probe parameters',
+    'set sweep age $secs' => {
+        '?'        => 'Set sweep/probe parameters.',
+        '$secs'    => { type=>'int', min=>1 }, },
+    'set sweep period $secs' => {
+        '?'        => 'Set sweep/probe parameters.',
         '$secs'    => { type=>'int', min=>1 }, },
 );
 
@@ -333,16 +349,47 @@ sub do_quit {
 sub do_help {
     my ($conn, $parsed, $args) = @_;
     GetOptionsFromArray($$args{-options}) or return;
-    my $out = "= $0 command summary =\n";
-    for my $cmd (sort keys %Syntax) {
+    my ($rows, $cols) = $TERM ? $TERM->get_screen_size() : (25, 80);
+    my $maxlen = $cols - 2;
+    my $out = "=" x $maxlen;
+    my $head = uc " $0 command summary ";
+    substr($out, (length($out)-length($head))/2, length($head)) = $head;
+    $out .= "\n";
+
+    my %help;
+    my $indent = 0;
+    for my $cmd (keys %Syntax) {
         my $text = $cmd;
         $text =~ s/\$(\S+)\?/[<$1>]/g;
         $text =~ s/\$(\S+)/<$1>/g;
         $text =~ s/(\S+\|\S+)/\($1\)/g;
-        $text .= "\n   ".$Syntax{$cmd}->{'?'}."\n";
-        $out .= "\n".$text;
+        $help{$text} = $Syntax{$cmd}->{'?'};
+        $indent = length($text) if length($text) > $indent;
+    }
+    $indent += 2;
+
+    for my $cmd (sort keys %help) {
+        $out .= fmt_text($cmd, $help{$cmd}, $maxlen, $indent);
     }
     print_output($out);
+}
+
+sub fmt_text {
+    my ($prefix, $text, $maxlen, $indent) = @_;
+    $prefix .= ' ' x ($indent - length($prefix));
+    my $indent_text = ' ' x $indent;
+    my @words = split(' ', $text);
+    my $pos = length($prefix);
+    my $out = $prefix;
+    for my $w (@words) {
+        if ($pos + length($w) + 1 > $maxlen) {
+            $out .= "\n$indent_text";
+            $pos = $indent;
+        }
+        $out .= " $w";
+        $pos += length($w)+1;
+    }
+    $out .= "\n";
 }
 
 sub do_ping {
@@ -975,11 +1022,15 @@ sub do_set_ip_pending {
 sub do_set_ip_dead {
     my ($conn, $parsed, $args) = @_;
 
-    do_set_ip_generic(-conn    => $conn,
+    expand_ip_run($args->{'ip'}, 
+        sub {
+            do_set_ip_generic(-conn    => $conn,
                       -command => 'set_dead',
                       -name    => 'state',
-                      -ip      => $args->{'ip'},
+                      -ip      => hex2ip($_[0]),
                       -options => $args->{-options});
+        }
+    );
 }
 
 # cmd: sponge
@@ -995,13 +1046,19 @@ sub do_set_ip_alive {
     DEBUG "set ip alive $$args{ip} mac="
          .($args->{'mac'}?$args->{'mac'} : 'none');
 
-    do_set_ip_generic(
-        -conn    => $conn,
-        -command => 'set_alive',
-        -name    => 'state',
-        -val     => $args->{'mac'} ? mac2hex($args->{'mac'}) : undef,
-        -ip      => $args->{'ip'},
-        -options => $args->{-options});
+    my $mac = $args->{'mac'} ? mac2hex($args->{'mac'}) : undef;
+
+    expand_ip_run($args->{'ip'}, 
+        sub {
+            do_set_ip_generic(
+                -conn    => $conn,
+                -command => 'set_alive',
+                -name    => 'state',
+                -val     => $mac,
+                -ip      => hex2ip($_[0]),
+                -options => $args->{-options});
+        }
+    );
 }
 
 # cmd: set ip mac
