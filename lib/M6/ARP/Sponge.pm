@@ -288,7 +288,7 @@ sub arp_table {
     if (@_) {
         my $mac = shift;
         my $time = @_ ? shift : time;
-        if (defined $mac) {
+        if (defined $mac && $mac ne $ETH_ADDR_NONE) {
             $self->{'arp_table'}->{$ip} = [ $mac, $time ];
         }
         else {
@@ -595,7 +595,7 @@ sub set_alive {
 
     my @arp = $self->arp_table($ip);
 
-    $mac //= $arp[0] // '0000000000';
+    $mac //= $arp[0] // $ETH_ADDR_NONE;
 
     if ($self->get_state($ip) == DEAD) {
         $self->print_log("unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
