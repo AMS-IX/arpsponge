@@ -781,7 +781,7 @@ sub process_pkt {
             if (! $sponge->is_my_ip($dst_ip) ) {
                 # Hit!
                 my ($mac, $mtime) = $sponge->arp_table($dst_ip);
-                if ($mac) {
+                if ($mac && $mac ne $ETH_ADDR_NONE) {
                     $sponge->send_arp_update(tha => $src_mac, tpa => $src_ip,
                                              sha => $mac,     spa => $dst_ip,
                                              opcode => $ARP_OPCODE_REPLY);
