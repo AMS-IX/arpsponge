@@ -1223,7 +1223,7 @@ sub initialise {
         };
 
     $INTERACTIVE = -t STDIN && -t STDOUT && !@ARGV;
-    $opt_verbose //= $INTERACTIVE;
+    $opt_verbose += $INTERACTIVE;
 
     return ($sockname, [@ARGV]);
 }
