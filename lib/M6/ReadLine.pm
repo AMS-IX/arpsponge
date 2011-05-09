@@ -123,13 +123,14 @@ sub check_int_arg {
     my $argname = $spec->{name} // 'num';
 
     my $err;
-    if (my $val = is_valid_int($arg, -min=>$min, -max=>$max, -err=>\$err)) {
+    my $val = is_valid_int($arg, -min=>$min, -max=>$max, -err=>\$err);
+    if (defined $val) {
         return clear_error($val);
     }
     return print_error_cond(!$silent, qq{$argname: "$arg": $err});
 }
 
-# $percentage = check_int_arg({min=>0, max=>100}, $arg, 'percentage');
+# $percentage = check_float_arg({min=>0, max=>100}, $arg, 'percentage');
 sub check_float_arg {
     my ($spec, $arg, $silent) = @_;
     my $min     = $spec->{min};
@@ -137,7 +138,8 @@ sub check_float_arg {
     my $argname = $spec->{name} // 'num';
 
     my $err;
-    if (my $val = is_valid_float($arg, -min=>$min, -max=>$max, -err=>\$err)) {
+    my $val = is_valid_float($arg, -min=>$min, -max=>$max, -err=>\$err);
+    if (defined $val) {
         return clear_error($val);
     }
     return print_error_cond(!$silent, qq{$argname: "$arg": $err});
@@ -165,7 +167,8 @@ sub check_ip_address_arg {
     my $argname = $spec->{name} // 'ip';
 
     my $err;
-    if ($arg = is_valid_ip($arg, -network=>$IP_NETWORK->cidr, -err=>\$err)) {
+    $arg = is_valid_ip($arg, -network=>$IP_NETWORK->cidr, -err=>\$err);
+    if (defined $arg) {
         return clear_error($arg);
     }
     return print_error_cond(!$silent, qq{$argname: $err});
