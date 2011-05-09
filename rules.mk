@@ -49,6 +49,7 @@ perlit= $(PERL) -p -e \
 		    \
 		    s!\@SPONGE_VAR@!$(SPONGE_VAR)!g;	\
 		    s!\@SPONGE_OPTIONS@!$(SPONGE_OPTIONS)!g;	\
+		    s!\@DFL_SOCK_PERMS@!$(DFL_SOCK_PERMS)!g;	\
 			\
 		    s!\@IFCONFIG@!$(IFCONFIG)!g;	\
 		    s!\@DFL_RATE@!$(DFL_RATE)!g;	\

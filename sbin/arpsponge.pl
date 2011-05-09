@@ -64,14 +64,14 @@ my $DFL_QUEUEDEPTH       = '@DFL_QUEUEDEPTH@';
 my $DFL_PROBERATE        = '@DFL_PROBERATE@';
 my $DFL_FLOOD_PROTECTION = '@DFL_FLOOD_PROTECTION@';
 my $DFL_INIT             = '@DFL_INIT@';
-my $DFL_SOCK_PERM        = '@DFL_SOCK_PERM@';
+my $DFL_SOCK_PERMS       = '@DFL_SOCK_PERMS@';
 
 $::USAGE=<<EOF;
 Usage: $0 [options] IPADDR/PREFIXLEN dev IFNAME
 
 Options:
   --age=secs              - time in seconds until we consider an ARP entry
-                           "stale" ($DFL_ARP_AGE)
+                            "stale" ($DFL_ARP_AGE)
   --control=socket        - location of the control socket (<rundir>/control)
   --[no]daemon            - put process in background
   --dummy                 - simulate sponging; turns off syslog
@@ -84,6 +84,7 @@ Options:
   --loglevel=level        - syslog logging level ("$DFL_LOGLEVEL")
   --pending=n             - number of seconds we send ARP queries before
                             sponging ($DFL_PENDING)
+  --permissions=u:g:m     - permissions for the control socket
   --pidfile=pidfile       - override default pidfile (<rundir>/pid)
   --proberate=n           - number queries/sec we send when learning or
                             sweeping ($DFL_PROBERATE)
@@ -143,6 +144,7 @@ sub Main {
       'loglevel=s'         => \(my $loglevel         = $DFL_LOGLEVEL),
       'man'                => \(my $man),
       'pending=i'          => \(my $pending          = $DFL_PENDING),
+      'permissions=s'      => \(my $permissions      = $DFL_SOCK_PERMS),
       'pidfile=s'          => \$pidfile,
       'proberate=i'        => \(my $proberate        = $DFL_PROBERATE),
       'queuedepth=i'       => \(my $queuedepth       = $DFL_QUEUEDEPTH),
@@ -213,20 +215,6 @@ sub Main {
     }
 
     ####################################################################
-
-    # Create the control socket.
-
-    $control_socket //= "$rundir/control";
-
-    if (-e $control_socket) {
-        if (!unlink $control_socket) {
-            die("$0: cannot delete stale $control_socket: $!\n");
-        }
-    }
-
-    my $control_fh = M6::ARP::Control::Server->create_server($control_socket)
-                        or die M6::ARP::Control->error;
-
     $| = ($verbose > 0 ? 1 : 0);
 
     my $sponge = new M6::ARP::Sponge(
@@ -257,13 +245,19 @@ sub Main {
     $sponge->user('learning', $learning);
     $proberate = $DFL_PROBERATE if $proberate < 0 || $proberate > 1e6;
     $sponge->user('probesleep', 1.0/$proberate);
-    $sponge->user('control', $control_fh);
 
     if ($sweep_sec) {
         $sponge->user('sweep_sec', $sweep_sec);
         $sponge->user('next_sweep', time+$sweep_sec);
         $sponge->user('sweep_age', $sweep_threshold);
     }
+
+
+    ####################################################################
+
+    # Create the control socket.
+    $control_socket //= "$rundir/control";
+    my $control_fh = create_control_socket($sponge, $control_socket, $permissions);
 
     ####################################################################
 
@@ -304,6 +298,43 @@ sub Main {
     packet_capture_loop($sponge);
 
     exit(0);
+}
+
+sub create_control_socket {
+    my ($sponge, $control_socket, $permissions) = @_;
+
+    if (-e $control_socket) {
+        if (!unlink $control_socket) {
+            die("$0: cannot delete stale $control_socket: $!\n");
+        }
+    }
+
+    my $control_fh = M6::ARP::Control::Server->create_server($control_socket)
+                        or die M6::ARP::Control->error."\n";
+
+    $sponge->user('control', $control_fh);
+
+    my @dfl_perms  = split(':', $DFL_SOCK_PERMS);
+    my @perms      = split(':', $permissions);
+    my $sock_owner = $perms[0] // $dfl_perms[0];
+    my $sock_group = $perms[1] // $dfl_perms[1];
+    my $sock_perms = oct($perms[2] // $dfl_perms[2]);
+
+    my $sock_uid = getpwnam($sock_owner)
+                        or die qq{$0: unknown username "$sock_owner"\n};
+
+    my $sock_gid = getgrnam($sock_group)
+                        or die qq{$0: unknown group "$sock_group"\n};
+
+    chown($sock_uid, $sock_gid, $control_socket)
+        or $sponge->print_log(qq{chown %s:%s %s: %s},
+                              $sock_owner, $sock_group, $control_socket, $!);
+
+    chmod($sock_perms, $control_socket)
+        or $sponge->print_log(qq{chmod %04o %s: %s},
+                              $sock_perms, $control_socket, $!);
+
+    return $control_fh;
 }
 
 ###############################################################################
@@ -1069,6 +1100,7 @@ I<Options>:
     --learning=secs
     --loglevel=level
     --pending=n
+    --permissions=owner:group:mode
     --pidfile=pidfile
     --proberate=r
     --queuedepth=n
@@ -1186,7 +1218,7 @@ ARP cache.
 =item X<--control>B<--control>=I<socket>
 
 Location of the UNIX control socket. Default is
-"I<rundir>/B<control>".
+"I<rundir>/B<control>". See also L<--permissions|/--permissions> below.
 
 =item X<--daemon>B<--daemon>
 
@@ -1206,15 +1238,14 @@ PID to I<pidfile>.
 This option turns off C<--verbose> and enables logging to
 L<syslogd(8)|syslogd>.
 
+=item X<--daemon>X<--no-daemon>B<--daemon>, B<no-daemon>
+
+Run (don't run) as a daemon in the background.
+
 =item X<--dummy>B<--dummy>
 
 Dummy operation (simulate sponging). Does send probes but no sponge
 replies.
-
-=item X<--dummy>B<--dummy>
-
-Dummy operation (simulate sponging). May send some probes but never any
-sponge replies.
 
 =item X<--flood-protection>B<--flood-protection>=I<r>
 
@@ -1312,6 +1343,11 @@ B<Tip>: Increasing the value pending parameter by one adds one second
 of delay before the sponge kicks in. If you increase this value significantly,
 you should consider decreasing the L<--queuedepth|/--queuedepth> parameter
 as well.
+
+=item X<--permissions>B<--permisions>=[I<owner>]:[I<group>]:[I<mode>]
+
+Set the permissions on the L<control socket|/--control>. Default is
+C<@DFL_SOCK_PERMS@>.
 
 =item X<--pidfile>B<--pidfile>=I<pidfile>
 
