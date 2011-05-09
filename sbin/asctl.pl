@@ -840,7 +840,7 @@ sub do_set_generic {
     GetOptionsFromArray($opts{-options}) or return;
 
     my $reply = check_send_command($conn, $command, $arg) or return;
-    
+
     my ($opts, $output, $tag) = parse_server_reply($reply);
     my $old = $output->[0]->{old};
     my $new = $output->[0]->{new};
