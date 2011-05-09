@@ -133,7 +133,7 @@ my %Syntax = (
         '?'        => 'Set rate parameters.',
         '$rate'    => { type=>'float', min=>0.001 }, },
     'set learning $secs' => {
-        '?'        => 'Switch in to/out of learning mode.',
+        '?'        => 'Switch to/out of learning mode.',
         '$secs'    => { type=>'int', min=>0 }, },
     'set dummy $bool' => {
         '?'        => 'Enable/disable DUMMY mode.',
@@ -840,7 +840,7 @@ sub do_set_generic {
     GetOptionsFromArray($opts{-options}) or return;
 
     my $reply = check_send_command($conn, $command, $arg) or return;
-
+    
     my ($opts, $output, $tag) = parse_server_reply($reply);
     my $old = $output->[0]->{old};
     my $new = $output->[0]->{new};
