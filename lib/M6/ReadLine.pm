@@ -49,7 +49,8 @@ BEGIN {
                              last_error set_error clear_error
                              print_output );
 	my  @functions   = (@check_func, @gen_functions);
-    my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER );
+    my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER
+                           $HISTORY_FILE $IP_NETWORK );
 	our @EXPORT_OK   = (@functions, @vars);
 	our @EXPORT      = @gen_functions;
 	our %EXPORT_TAGS = ( func => \@functions, check => \@check_func,
@@ -644,35 +645,121 @@ __END__
 
 =head1 NAME
 
-MODNAME - singing and dancing module
+M6::ReadLine - AMS-IX extensions on top of Term::ReadLine
 
 =head1 SYNOPSIS
 
- use MODNAME;
+ use M6::ReadLine qw( :all );
+
+ init_readline(
+            'history_lines' => 1000,
+            'completion'    => \&M6::ReadLine::complete_line,
+            'name'          => $prog,
+            'history_file'  => "$::ENV{HOME}/.${prog}_history";
+        );
+
+    ...
+
+ exit_readline();
 
 =head1 DESCRIPTION
 
-=head1 CONSTANTS
+AMS-IX extensions on top of Term::ReadLine.
 
-=head1 CONSTRUCTORS
+=head1 VARIABLES
 
-=head1 METHODS
+=over
+
+=item I<$TERM>
+
+=item I<$IN>
+
+=item I<$OUT>
+
+=item I<$PROMPT>
+
+=item I<$PAGER>
+
+=item I<$HISTORY_FILE>
+
+=item I<$IP_NETWORK>
+
+=back
 
 =head1 FUNCTIONS
 
-=head1 EXAMPLES
+=head2 Initialisation / Clean-up
 
-=head1 FILES
+=over
+
+=item X<compile_syntax>B<compile_syntax>
+
+=item X<exit_readline>B<exit_readline>
+
+=item X<init_readline>B<init_readline>
+
+=back
+
+=head2 Validation
+
+=over
+
+=item X<check_bool_arg>B<check_bool_arg>
+
+=item X<check_float_arg>B<check_float_arg>
+
+=item X<check_int_arg>B<check_int_arg>
+
+=item X<check_ip_address_arg>B<check_ip_address_arg>
+
+=item X<check_mac_address_arg>B<check_mac_address_arg>
+
+=item X<match_prefix>B<match_prefix>
+
+=item X<parse_line>B<parse_line>
+
+=item X<parse_words>B<parse_words>
+
+=back
+
+=head2 Completion
+
+=over
+
+=item X<complete_ip_address_arg>B<complete_ip_address_arg>
+
+=item X<complete_line>B<complete_line>
+
+=item X<complete_words>B<complete_words>
+
+=back
+
+=head2 Output / Error Handling
+
+=over
+
+=item X<clear_error>B<clear_error>
+
+=item X<last_error>B<last_error>
+
+=item X<print_error>B<print_error>
+
+=item X<print_error_cond>B<print_error_cond>
+
+=item X<print_output>B<print_output>
+
+=item X<set_error>B<set_error>
+
+=back
 
 =head1 SEE ALSO
 
+L<Term::ReadLine|Term::ReadLine>(3pm),
+L<Term::ReadLine::Gnu|Term::ReadLine::Gnu>(3pm),
 L<perl(1)|perl>.
-
-=head1 CAVEATS
 
 =head1 AUTHOR
 
 Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011.
 
 =cut
-
