@@ -41,10 +41,13 @@ BEGIN {
             check_int_arg
             check_float_arg
             check_bool_arg
+            match_prefix
         );
-	my  @gen_functions = qw( compile_syntax init_readline
+	my  @gen_functions = qw( compile_syntax init_readline exit_readline
                              parse_line
-                             print_error print_output );
+                             print_error_cond print_error
+                             last_error set_error clear_error
+                             print_output );
 	my  @functions   = (@check_func, @gen_functions);
     my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER );
 	our @EXPORT_OK   = (@functions, @vars);
@@ -53,17 +56,20 @@ BEGIN {
                          all => \@EXPORT_OK, vars => \@vars );
 }
 
-our $TERM        = undef;
-our $IN          = \*STDIN;
-our $OUT         = \*STDOUT;
-our $PROMPT      = '';
-our $IP_NETWORK  = NetAddr::IP->new('0/0');
-our $SYNTAX      = {};
-our $PAGER       = join(' ', qw(
+our $TERM         = undef;
+our $IN           = \*STDIN;
+our $OUT          = \*STDOUT;
+our $PROMPT       = '';
+our $HISTORY_FILE = '';
+our $IP_NETWORK   = NetAddr::IP->new('0/0');
+our $SYNTAX       = {};
+our $PAGER        = join(' ', qw(
                         less --no-lessopen --no-init
                              --dumb  --quit-at-eof
                              --quit-if-one-screen
                     ));
+
+my $ERROR  = undef;
 
 our %TYPES = (
         'int' => {
@@ -88,6 +94,26 @@ our %TYPES = (
         },
     );
 
+# $word = match_prefix($input, \@words [, $silent]);
+sub match_prefix {
+    my ($input, $words, $silent) = @_;
+
+    my $word;
+    for my $w (sort @$words) {
+        if (substr(lc $w, 0, length($input)) eq lc $input) {
+            if (!defined $word) {
+                $word = $w;
+            }
+            else {
+                return print_error_cond(!$silent,
+                        qq{"$input" is ambiguous: matches "$word" and "$w"}
+                    );
+            }
+        }
+    }
+    return clear_error($word);
+}
+
 # $byte = check_int_arg(\%spec, $arg, 'byte');
 sub check_int_arg {
     my ($spec, $arg, $silent) = @_;
@@ -97,10 +123,9 @@ sub check_int_arg {
 
     my $err;
     if (my $val = is_valid_int($arg, -min=>$min, -max=>$max, -err=>\$err)) {
-        return $val;
+        return clear_error($val);
     }
-    $silent or print_error(qq{$argname: "$arg": $err});
-    return;
+    return print_error_cond(!$silent, qq{$argname: "$arg": $err});
 }
 
 # $percentage = check_int_arg({min=>0, max=>100}, $arg, 'percentage');
@@ -112,10 +137,9 @@ sub check_float_arg {
 
     my $err;
     if (my $val = is_valid_float($arg, -min=>$min, -max=>$max, -err=>\$err)) {
-        return $val;
+        return clear_error($val);
     }
-    $silent or print_error(qq{$argname: "$arg": $err});
-    return;
+    return print_error_cond(!$silent, qq{$argname: "$arg": $err});
 }
 
 # $bool = check_bool_arg($min, $max, $arg, 'dummy');
@@ -125,13 +149,13 @@ sub check_bool_arg {
     my $argname = $spec->{name} // 'bool';
 
     if ($arg =~ /^(1|yes|true|on)$/i) {
-        return 1;
+        return clear_error(1);
     }
     elsif ($arg =~ /^(0|no|false|off)$/i) {
-        return 0;
+        return clear_error(0);
     }
-    $silent or print_error(qq{$argname: "$arg" is not a valid boolean});
-    return;
+    return print_error_cond(!$silent,
+                qq{$argname: "$arg" is not a valid boolean});
 }
 
 sub check_ip_address_arg {
@@ -141,10 +165,9 @@ sub check_ip_address_arg {
 
     my $err;
     if ($arg = is_valid_ip($arg, -network=>$IP_NETWORK->cidr, -err=>\$err)) {
-        return $arg;
+        return clear_error($arg);
     }
-    $silent or print_error(qq{$argname: $err});
-    return;
+    return print_error_cond(!$silent, qq{$argname: $err});
 }
 
 sub check_mac_address_arg {
@@ -155,10 +178,10 @@ sub check_mac_address_arg {
     if ($arg =~ /^(?:[\da-f]{1,2}[:.-]){5}[\da-f]{1,2}$/i
         || $arg =~ /^(?:[\da-f]{1,4}[:.-]){2}[\da-f]{1,4}$/i
         || $arg =~ /^[\da-f]{1,12}$/i) {
-        return $arg;
+        return clear_error($arg);
     }
     else {
-        $silent or print_error(qq{$argname: "$arg" is not a valid MAC address});
+        print_error_cond($silent, qq{$argname: "$arg" is not a valid MAC address});
         return;
     }
 }
@@ -377,7 +400,9 @@ sub complete_words {
             return complete_words($words, $partial, $arg_spec);
         }
         else {
-            return([], ['** error']);
+            return([],
+                ['** error'.(defined last_error() ? ': '.last_error() : '')]
+            );
         }
     }
     elsif (@$words || length($partial)) {
@@ -415,6 +440,16 @@ sub complete_line {
     return @$literal;
 }
 
+sub exit_readline {
+    return if !$TERM;
+
+    if (defined $HISTORY_FILE) {
+        if (! $TERM->WriteHistory($HISTORY_FILE)) {
+            print_error("** WARNING: cannot save history to $HISTORY_FILE");
+        }
+    }
+}
+
 sub init_readline {
     my ($prog) = $0 =~ /.*?([^\/]+)$/;
     my %args = (
@@ -428,7 +463,12 @@ sub init_readline {
 
     $TERM = Term::ReadLine->new( $args{name}, *STDIN, *STDOUT );
 
+    $HISTORY_FILE = $args{history_file};
     if (-f $args{history_file}) {
+        if (! $TERM->ReadHistory($HISTORY_FILE)) {
+            print_error("** WARNING: cannot read history",
+                        " from $HISTORY_FILE\n");
+        }
     }
 
     my $attribs = $TERM->Attribs;
@@ -521,17 +561,59 @@ sub _compile_branch {
     return _compile_syntax_element($curr, $spec, @rest);
 }
 
+
+# print_error_cond($bool, $msg, ...);
+#
+#   Always returns false, prints to STDERR if $bool is true,
+#   always ends with a newline.
+#
+sub print_error_cond {
+    my $cond = shift;
+    my $out = join('', @_);
+
+    chomp($out);
+
+    if ($cond) {
+        print STDERR $out, "\n";
+        $TERM && $TERM->on_new_line();
+    }
+    return set_error($out);
+}
+
 # print_error($msg, ...);
 #
 #   Always returns false, always prints to STDERR, always ends
 #   with a newline.
 #
 sub print_error {
-    my $out = join('', @_);
-       $out .= "\n" if $out !~ /\n\Z/;
-    print STDERR $out;
-    $TERM && $TERM->on_new_line();
+    return print_error_cond(1, @_);
+}
+
+# set_error($msg, ...);
+#
+#   Always returns false, set "last" error message.
+#
+sub set_error {
+    $ERROR = join('', @_);
+    chomp($ERROR);
     return;
+}
+
+# clear_error();
+#
+#   Always returns true, clear "last" error.
+#
+sub clear_error {
+    $ERROR = undef;
+    return @_ == 1 ? $_[0] : @_;
+}
+
+# last_error($msg, ...);
+#
+#   Returns "last" error message.
+#
+sub last_error {
+    return $ERROR;
 }
 
 # print_output($msg, ...);

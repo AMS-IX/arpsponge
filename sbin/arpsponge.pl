@@ -64,6 +64,7 @@ my $DFL_QUEUEDEPTH       = '@DFL_QUEUEDEPTH@';
 my $DFL_PROBERATE        = '@DFL_PROBERATE@';
 my $DFL_FLOOD_PROTECTION = '@DFL_FLOOD_PROTECTION@';
 my $DFL_INIT             = '@DFL_INIT@';
+my $DFL_SOCK_PERM        = '@DFL_SOCK_PERM@';
 
 $::USAGE=<<EOF;
 Usage: $0 [options] IPADDR/PREFIXLEN dev IFNAME

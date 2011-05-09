@@ -64,6 +64,7 @@ END {
 sub verbose(@) { print @_ if $opt_verbose; }
 sub DEBUG(@)   { print_error(@_) if $opt_debug; }
 
+my @IP_STATES = qw(all alive dead pending none);
 my %Syntax = (
     'quit' => { '?'       => 'Disconnect and quit.', },
     'help' => { '?'       => 'Show command summary.', },
@@ -197,6 +198,10 @@ sub Main {
     exit $err;
 }
 
+END {
+    exit_readline();
+}
+
 sub do_command {
     my ($line, $conn) = @_;
     my %args = (-conn => $conn);
@@ -280,8 +285,11 @@ sub complete_ip_range {
 sub check_ip_filter_arg {
     my ($spec, $arg, $silent) = @_;
     DEBUG "check_ip_filter_arg: <$arg>";
-    if ($arg =~ /^all|alive|dead|pending|none$/i) {
-        return $arg;
+    if (my $s = match_prefix($arg, \@IP_STATES, $silent)) {
+        return $s;
+    }
+    elsif (defined last_error()) {
+        return;
     }
     return check_ip_range_arg(@_);
 }
@@ -289,7 +297,7 @@ sub check_ip_filter_arg {
 sub complete_ip_filter {
     my $partial = shift;
     DEBUG "check_ip_filter: <$partial>";
-    return (qw( all alive dead pending none ), complete_ip_range($partial));
+    return (@IP_STATES, complete_ip_range($partial));
 }
 
 sub check_ip_any_arg {
@@ -593,7 +601,7 @@ sub do_show_ip {
         if ($ip eq 'all') {
             delete $args->{'ip'};
         }
-        elsif ($ip =~ /^(?:dead|alive|pending|none)$/i) {
+        elsif (grep { lc $ip eq $_ } @IP_STATES) {
             $filter_state = lc $ip;
             delete $args->{'ip'};
         }
