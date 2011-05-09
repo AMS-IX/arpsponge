@@ -2,6 +2,22 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta3 - steven
+
+    general:
+      * Added dependency on Term::ReadLine::Gnu.
+
+    asctl:
+      * Always use STDIN and STDOUT as in/output in Term::ReadLine.
+      * Fix verbosity in the face of interactiveness.
+      * Non-interactivity implies no ReadLine.
+      * Make sure history is read and written.
+      * Match prefixes for commands and arguments.
+      * Output/Error messages more consistent.
+
+    arpsponge:
+      * Control socket permissions.
+
 3.10 - beta2 - steven
 
   Code cleanups all around.
