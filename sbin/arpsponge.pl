@@ -321,10 +321,10 @@ sub create_control_socket {
     my $sock_perms = oct($perms[2] // $dfl_perms[2]);
 
     my $sock_uid = getpwnam($sock_owner)
-                        or die qq{$0: unknown username "$sock_owner"\n};
+                        // die qq{$0: unknown username "$sock_owner"\n};
 
     my $sock_gid = getgrnam($sock_group)
-                        or die qq{$0: unknown group "$sock_group"\n};
+                        // die qq{$0: unknown group "$sock_group"\n};
 
     chown($sock_uid, $sock_gid, $control_socket)
         or $sponge->print_log(qq{chown %s:%s %s: %s},
