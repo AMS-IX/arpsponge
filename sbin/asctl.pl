@@ -369,11 +369,43 @@ sub do_quit {
     print_output($reply);
 }
 
+sub do_help_pod {
+    my $maxlen = 72;
+    my $out = qq{=head1 COMMAND SUMMARY\n\n}
+            . qq{=over\n}
+            ;
+
+    my %help;
+    for my $cmd (keys %Syntax) {
+        my $text = $cmd;
+        $text =~ s/(^|\s)([a-z][\w\-]*)/$1B<$2>/g;
+        $text =~ s/\$(\S+)\?/[I<$1>]/g;
+        $text =~ s/\$(\S+)/I<$1>/g;
+        $text =~ s/(\S+)\|(\S+)/{B<$1>|B<$1>}/g;
+        $help{$text} = $Syntax{$cmd}->{'?'};
+    }
+
+    for my $cmd (sort keys %help) {
+        $out .= qq{\n=item $cmd\n\n}
+              . fmt_text('', $help{$cmd}, $maxlen, 0)
+              ;
+    }
+    $out .= "\n=back\n";
+    print_output($out);
+}
+
 sub do_help {
     my ($conn, $parsed, $args) = @_;
-    GetOptionsFromArray($$args{-options}) or return;
+    my $pod = 0;
+    GetOptionsFromArray($$args{-options}, 'pod' => \$pod) or return;
+
+    if ($pod) {
+        do_help_pod();
+        return;
+    }
+
     my ($rows, $cols) = $TERM ? $TERM->get_screen_size() : (25, 80);
-    my $maxlen = $cols - 2;
+    my $maxlen = $cols - 4;
     my $out = "=" x $maxlen;
     my $head = uc " $0 command summary ";
     substr($out, (length($out)-length($head))/2, length($head)) = $head;
@@ -409,8 +441,9 @@ sub fmt_text {
             $out .= "\n$indent_text";
             $pos = $indent;
         }
-        $out .= " $w";
-        $pos += length($w)+1;
+        if ($pos>$indent) { $out .= ' '; $pos++ }
+        $out .= $w;
+        $pos += length($w);
     }
     $out .= "\n";
 }
@@ -873,12 +906,20 @@ sub do_probe {
         }
     }
 
+    my $start = time;
+    my $n = 0;
     expand_ip_run($ip, 
-                  sub {
-                      return check_send_command($conn, "probe $_[0]");
-                  },
-                  $delay,
-                );
+        sub {
+            my $r = check_send_command($conn, "probe $_[0]") or return;
+            my ($o, $out, $t) = parse_server_reply($r, {format=>0});
+            print_output($out);
+            $n++;
+        },
+        $delay,
+    );
+    my $elapsed = time - $start;
+
+    print_output(sprintf("%d probe(s) sent in %0.2fs", $n, $elapsed));
     return;
 }
 
@@ -1247,7 +1288,13 @@ sub get_status {
 
 sub initialise {
     my ($sockname, $interface);
+    my $opt_c = undef;
+
     GetOptions(
+        'command|c=s' => sub {
+                            $opt_c = $_[1];
+                            die('!FINISH');
+                         },
         'verbose+'    => \$opt_verbose,
         'debug!'      => \$opt_debug,
         'help|?'      =>
@@ -1258,6 +1305,10 @@ sub initialise {
         'test!'       => \$opt_test,
         'manual'      => sub { pod2usage(-exitval=>0, -verbose=>2) },
     ) or pod2usage(-exitval=>2);
+
+    if ($opt_c) {
+        unshift @ARGV, $opt_c;
+    }
 
     $opt_verbose += $opt_debug;
 
@@ -1327,7 +1378,7 @@ asctl - Arp Sponge ConTroL utility
 [B<--rundir>=I<dir>]
 [B<--interface>=I<ifname>]
 [B<--socket>=I<sock>]
-[I<command> ...]
+[[B<--command>] I<command> ...]
 
 =back
 
@@ -1344,6 +1395,18 @@ for ways to override this.
 =head1 OPTIONS
 
 =over
+
+=item B<--command> I<command> ...
+
+Signals to the program that whatever follows the C<--command> option should be
+considered as input to the program. This is useful if you want to specify
+options to the program's commands. The following are sort of equivalent:
+
+  asctl -c show status --no-format
+  asctl -- show status --no-format
+  asctl 'show status --no-format'
+
+Note that you cannot specify C<--command> without at least one argument.
 
 =item B<--debug>
 
@@ -1406,6 +1469,12 @@ force I<dst_ip> to update its ARP entry for I<src_ip>
 "ping" the daemon, display response RTT; continues until stopped
 by an interrupt (C<Ctrl-C>) unless I<count> is given; I<delay>
 specifies the time (in seconds) to wait between "ping"s.
+
+=item B<probe> [B<--delay>=I<sec> | B<--rate>=I<rate>] I<ip-range> 
+
+Send broadcast ARP queries (probes) for addresses in I<ip-range>.
+By default, the request rate is 10 probes per second (delay is 0.1),
+but this can be changed with the C<--delay> or C<--rate> options.
 
 =item B<quit>
 
