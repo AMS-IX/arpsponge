@@ -595,8 +595,8 @@ sub _cmd_inform {
 sub _cmd_probe {
     my ($self, $sponge, $cmd, @args) = @_;
 
-    if (@args != 2 ) {
-        return $self->send_error("$cmd <IP1>");
+    if (@args != 1 ) {
+        return $self->send_error("$cmd <IP>");
     }
     my $ip = shift @args;
 
