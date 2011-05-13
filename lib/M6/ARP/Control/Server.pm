@@ -34,8 +34,8 @@ my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
     set_queuedepth set_max_rate set_max_pending set_learning
     set_proberate set_flood_protection set_dummy
     set_sweep_age set_sweep_sec
-    set_alive set_dead set_pending 
-    inform
+    set_alive set_dead set_pending
+    probe inform
 );
 
 # my $server = M6::ARP::Control::Server->create_server(
@@ -590,6 +590,22 @@ sub _cmd_inform {
     return $self->send_ok(
             "[sha=$mac2,spa=$ip2]\n[tha=$mac1,tpa=$ip1]\nupdate sent"
         );
+}
+
+sub _cmd_probe {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    if (@args != 2 ) {
+        return $self->send_error("$cmd <IP1>");
+    }
+    my $ip = shift @args;
+
+    if (!$sponge->is_my_network($ip)) {
+        return $self->send_error(hex2ip($ip), ": address out of range");
+    }
+
+    $sponge->send_probe($ip);
+    return $self->send_ok("[ip=$ip] probe sent");
 }
 
 1;

@@ -38,9 +38,14 @@ use M6::ReadLine qw( :all );
 use NetAddr::IP;
 use Term::ReadLine;
 
-my $SPONGE_VAR    = '@SPONGE_VAR@';
-my $CONN          = undef;
-my $STATUS        = {};
+my $SPONGE_VAR      = '@SPONGE_VAR@';
+my $CONN            = undef;
+my $STATUS          = {};
+
+my $DFL_PROBE_DELAY = 0.1;
+my $MIN_PROBE_DELAY = 0.001;
+my $DFL_PROBE_RATE  = 1/$DFL_PROBE_DELAY;
+my $MAX_PROBE_RATE  = 1/$MIN_PROBE_DELAY;
 
 # Values set on the Command Line.
 my $opt_verbose   = 0;
@@ -77,6 +82,9 @@ my %Syntax = (
         '$ip'     => { type=>'ip-any'    } },
     'clear arp $ip'  => {
         '?'       => 'Clear ARP table for given IP(s).',
+        '$ip'     => { type=>'ip-range'  } },
+    'probe $ip'   => {
+        '?'       => 'Send ARP requests for given IP(s).',
         '$ip'     => { type=>'ip-range'  } },
     'show ip $ip?'   => {
         '?'       => 'Show state table for given IP(s).',
@@ -334,7 +342,8 @@ sub check_send_command {
 
 sub expand_ip_run {
     my $arg_str = shift;
-    my $code = shift;
+    my $code    = shift;
+    my $delay   = shift;
 
     my @args = split(' ', $arg_str);
 
@@ -347,6 +356,7 @@ sub expand_ip_run {
             my $sub = $code->(ip2hex(int2ip($ip)));
             return if !defined $sub;
             push @reply, $sub if length($sub);
+            sleep($delay) if defined $delay && $delay > 0;
         }
     }
     return join("\n", @reply);
@@ -796,6 +806,8 @@ sub do_clear_ip {
 
     my $ip = $args->{'ip'};
 
+    GetOptionsFromArray($args->{-options}) or return;
+
     if ($ip eq 'all') {
         return check_send_command($conn, 'clear_ip_all') or return;
     }
@@ -814,10 +826,58 @@ sub do_clear_arp {
 
     my $ip = $args->{'ip'};
 
+    GetOptionsFromArray($args->{-options}) or return;
+
     expand_ip_run($ip, 
                   sub {
                       return check_send_command($conn, "clear_arp $_[0]");
                   }
+                );
+    return;
+}
+
+###############################################################################
+# PROBE commands
+###############################################################################
+
+# cmd: probe
+sub do_probe {
+    my ($conn, $parsed, $args) = @_;
+
+    my $ip = $args->{'ip'};
+    my %opts;
+
+    GetOptionsFromArray($args->{-options},
+            'delay=f'  => \$opts{delay},
+            'rate=f'   => \$opts{raw},
+        ) or return;
+
+    my $delay = $opts{'delay'};
+    my $rate  = $opts{'rate'};
+    if (defined $delay) {
+        if (defined $rate) {
+            print_error("** warning: --rate ignored in favour of --delay");
+        }
+        if ($delay <= 0) {
+            print_error("** warning: delay of $delay ignored;",
+                        " using $DFL_PROBE_DELAY");
+            $delay = $DFL_PROBE_DELAY;
+        }
+    }
+    elsif (defined $rate) {
+        if ($rate > $MAX_PROBE_RATE) {
+            my $dfl_rate = sprintf("%0.2f", $DFL_PROBE_RATE);
+            print_error("** warning: rate of $rate ignored;",
+                        " using $dfl_rate");
+            $delay = $DFL_PROBE_DELAY;
+        }
+    }
+
+    expand_ip_run($ip, 
+                  sub {
+                      return check_send_command($conn, "probe $_[0]");
+                  },
+                  $delay,
                 );
     return;
 }
