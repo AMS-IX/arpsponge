@@ -73,7 +73,7 @@ my @IP_STATES = qw(all alive dead pending none);
 my %Syntax = (
     'quit' => { '?'       => 'Disconnect and quit.', },
     'help' => { '?'       => 'Show command summary.', },
-    'ping $count $delay' => {
+    'ping $count? $delay?' => {
         '?'       => '"ping" the daemon, display response RTT.',
         '$count'  => { type=>'int',   min=>1,    default=>1 },
         '$delay'  => { type=>'float', min=>0.01, default=>1 }, },
