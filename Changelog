@@ -2,6 +2,11 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta5 - steven
+
+    asctl:
+      * Small fix in asctl for "ping" command arguments.
+
 3.10 - beta3 - steven
 
     general:

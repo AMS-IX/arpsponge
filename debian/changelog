@@ -1,3 +1,9 @@
+arpsponge (3.10-0.8) unstable; urgency=low
+
+  * 3.10-beta5
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed,  8 Jun 2011 16:16:13 +0200
+
 arpsponge (3.10-0.7) unstable; urgency=low
 
   * 3.10-beta4
