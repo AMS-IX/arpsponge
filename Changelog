@@ -2,6 +2,18 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta6 - steven
+
+    arpsponge:
+      * The actual select/dispatch bit has been split off
+        from packet_capture_loop() into handle_input().
+      * Instead of calling sleep() between sending packets,
+        the probe/sweep loops use handle_input() so they can
+        still process packets/commands during their idle moments.
+        This hopefully reduces the chances of missing ARP replies
+        and keeps the sponge responsive during probe/sweep runs,
+        even if the proberate is set low.
+
 3.10 - beta5 - steven
 
     asctl:

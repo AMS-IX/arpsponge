@@ -111,6 +111,11 @@ my $control_socket = undef;
 my $block_sigset   = POSIX::SigSet->new(SIGUSR1, SIGHUP, SIGALRM);
 my $timer_cycle    = 1.0;
 
+# Keep track of how many errors we've seen and when we logged the
+# last error. This is used to suppress too much logging.
+my $last_err       = 0;
+my $err_count      = 0;
+
 # ============================================================================
 END {
     if (defined $wrote_pid && $$ == $wrote_pid) {
@@ -274,6 +279,23 @@ sub Main {
         $sponge->log_fatal("cannot capture on %s: %s", $sponge->device, $err);
     }
 
+    if (pcap_setnonblock($pcap_h, 0, \$err) < 0) {
+        $sponge->log_fatal("cannot capture in non-blocking mode: %s", $err);
+    }
+
+    my $pcap_fd = pcap_get_selectable_fd($pcap_h);
+    if ($pcap_fd < 0) {
+        $sponge->log_fatal("cannot get selectable fd for %s", $sponge->device);
+    }
+
+    my $pcap_fh = IO::Handle->new();
+    if (!$pcap_fh->fdopen($pcap_fd, "r")) {
+        $sponge->log_fatal("fdopen(%s,'r') for %s failed: %s",
+                           $pcap_fd, $sponge->device, $!);
+    }
+
+    $sponge->user('pcap_fd', $pcap_fd);
+    $sponge->user('pcap_fh', $pcap_fh);
     $sponge->pcap_handle($pcap_h);
 
     ####################################################################
@@ -338,43 +360,23 @@ sub create_control_socket {
 }
 
 ###############################################################################
-# packet_capture_loop($sponge);
+# handle_input
 #
-#    Loop over incoming traffic for sponge instance $sponge.
+#    Handle input (packets, etc.) for a specific amount of time.
 #
 ###############################################################################
-sub packet_capture_loop {
-    my $sponge = shift;
+sub handle_input {
+    my $sponge     = shift;
+    my $next_alarm = shift;
 
-    my $err = '';
-    my $pcap_h = $sponge->pcap_handle;
-
-    if (pcap_setnonblock($pcap_h, 0, \$err) < 0) {
-        $sponge->log_fatal("cannot capture in non-blocking mode: %s", $err);
-    }
-
-    my $pcap_fd = pcap_get_selectable_fd($pcap_h);
-    
-    if ($pcap_fd < 0) {
-        $sponge->log_fatal("cannot get selectable fd for %s", $sponge->device);
-    }
-
-    my $pcap_fh = IO::Handle->new();
-    if (!$pcap_fh->fdopen($pcap_fd, "r")) {
-        $sponge->log_fatal("fdopen(%s,'r') for %s failed: %s",
-                           $pcap_fd, $sponge->device, $!);
-    }
-
+    my $pcap_h     = $sponge->pcap_handle;
+    my $pcap_fd    = $sponge->user('pcap_fd');
+    my $pcap_fh    = $sponge->user('pcap_fh');
     my $control_fh = $sponge->user('control');
     my $control_fd = $control_fh->fileno;
 
     # Prepare the bit vector for the select() calls.
-    my $select = IO::Select->new($pcap_fh, $control_fh);
-
-    # Keep track of how many errors we've seen and when we logged the
-    # last error. This is used to suppress too much logging.
-    my $err_count = 0;
-    my $last_err  = 0;
+    my $select = $sponge->user('select');
 
     # [1] We keep track of the alarms ourselves rather than setting timers
     #     with alarm(), since the ALRM signal handler may be delayed, which
@@ -388,16 +390,12 @@ sub packet_capture_loop {
     # [4] If packets come in before the timer expires, we process them and
     #     adjust the timeout in the next round.
 
-    # [1] Schedule our next periodic task run.
-    my ($now, $next_alarm) = reset_timer($sponge, time);
-
     while (1) {
-        $now = time;
+        my $now = time;
         if ($now >= $next_alarm) {  # [2]
-            # We've overrun our timer during the previous iteration,
-            # so let's handle that now.
-            do_timer($sponge);
-            ($now, $next_alarm) = reset_timer($sponge, $next_alarm);
+            # We've overrun our timeout during the previous iteration,
+            # so let's return now.
+            return;
         }
 
         # [3] Wait for something to happen (timeout, signal or packet).
@@ -456,6 +454,33 @@ sub packet_capture_loop {
                 $ready_fh->close;
             }
         }
+    }
+}
+
+
+###############################################################################
+# packet_capture_loop($sponge);
+#
+#    Loop over incoming traffic for sponge instance $sponge.
+#
+###############################################################################
+sub packet_capture_loop {
+    my $sponge = shift;
+
+    # Prepare the bit vector for the select() calls.
+    $sponge->user('select', IO::Select->new(
+                                $sponge->user('pcap_fh'),
+                                $sponge->user('control'),
+                            )
+            );
+
+    # [1] Schedule our next periodic task run.
+    my ($now, $next_alarm) = reset_timer($sponge, time);
+
+    while (1) {
+        handle_input($sponge, $next_alarm);
+        do_timer($sponge);
+        ($now, $next_alarm) = reset_timer($sponge, $next_alarm);
     }
 
     # We don't really ever exit this loop...
@@ -602,7 +627,8 @@ sub reset_timer {
         # to offset from current time. This is not elegant,
         # but it's better than running timer triggers in tight
         # circles.
-        $sponge->print_log("timer event LAG: %s; %s",
+        my $caller = (caller(1))[3];
+        $sponge->print_log("$caller - timer event LAG: %s; %s",
             strftime("planned=%H:%M:%S",
                     localtime($next_alarm+$timer_cycle)),
             strftime("adjusted=%H:%M:%S",
@@ -648,7 +674,7 @@ sub do_timer($) {
                 $sponge->incr_pending($ip);
                 $sponge->verbose(2, "probed $ip, state=",
                                         $sponge->get_state($ip), "\n");
-                sleep($sleep);
+                handle_input($sponge, time+$sleep);
             }
             $n++;
         }
@@ -735,7 +761,7 @@ sub do_sweep($) {
             $sponge->send_probe($ip);
             $sponge->set_state_mtime($ip, time);
             $nprobe++;
-            sleep($sleep);
+            handle_input($sponge, time+$sleep);
         }
         elsif ($verbose>1) {
                 $sponge->sverbose(1, "SKIP PROBE %s (%d < %d)\n",
@@ -1384,10 +1410,9 @@ much defeats the purpose of the thing.
 
 =item NOTE:
 
-It seems that the Perl interface to C<usleep> introduces at least
-0.01 seconds of delay, so your proberate may not go above 100 and
-probably gets stuck at 50 or so. See also 
-L<Bugs and Limitations|/BUGS AND LIMITATIONS>
+Due to the way the C<proberate> delays are implemented, it's possible
+that you will not be able to go higher than 100 and possibly even get stuck
+at 50 or so.  See also L<Bugs and Limitations|/BUGS AND LIMITATIONS>
 below.
 
 =back
@@ -1701,16 +1726,12 @@ prefix and monitor that.
 
 =item *
 
-The C<--proberate> is implemented by using
-the L<usleep()|Time::HiRes/usleep> function from
-L<Time::HiRes|Time::HiRes>. Depending on your hardware, OS and general
-system load, the actual sleep time may be off by a considerable margin.
+The C<--proberate> is implemented by using a C<select> loop on the
+network interface and control socket. Therefore, a fixed, system-dependent
+overhead delay is introduced between packets, and, in case traffic is coming
+in, further overhead in handling that traffic.
 
-For example, on a 1.4GHz Pentium M, a C<usleep> of 0.01 yields 0.015
-on average.  On an AMD Opteron 244 running at 1.8 GHz, this becomes
-0.012. On a Pentium III running at 1 GHz, this is 0.02. This means that
-you will typically get a lower probe rate than what you specify on the
-command line. Hence, the parameter should be seen as an upper limit,
+As a result of this, the parameter should be seen as an upper limit,
 not an exact figure.
 
 =back
