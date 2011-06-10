@@ -38,7 +38,7 @@ use IO::String;
 use IO::Select;
 use IO::Socket;
 
-use M6::ARP::Sponge     qw( :states );
+use M6::ARP::Sponge     qw( :states :flags );
 use M6::ARP::Util       qw( :all );
 use M6::ARP::Control::Server;
 
@@ -72,6 +72,7 @@ Usage: $0 [options] IPADDR/PREFIXLEN dev IFNAME
 Options:
   --age=secs              - time in seconds until we consider an ARP entry
                             "stale" ($DFL_ARP_AGE)
+  --arp-update-methods=.. - how to update neighbor ARP caches
   --control=socket        - location of the control socket (<rundir>/control)
   --[no]daemon            - put process in background
   --dummy                 - simulate sponging; turns off syslog
@@ -137,28 +138,29 @@ sub start_daemon($$);
 ###############################################################################
 sub Main {
     GetOptions(
-      'age=i'              => \(my $age              = $DFL_ARP_AGE),
-      'control=s'          => \$control_socket,
-      'daemon!'            => \(my $daemon),
-      'dummy!'             => \(my $dummy),
-      'flood-protection=f' => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
-      'gratuitous!'        => \(my $gratuitous),
-      'help|?'             => \(my $help),
-      'init=s'             => \(my $init             = $DFL_INIT),
-      'learning=i'         => \(my $learning         = $DFL_LEARN),
-      'loglevel=s'         => \(my $loglevel         = $DFL_LOGLEVEL),
-      'man'                => \(my $man),
-      'pending=i'          => \(my $pending          = $DFL_PENDING),
-      'permissions=s'      => \(my $permissions      = $DFL_SOCK_PERMS),
-      'pidfile=s'          => \$pidfile,
-      'proberate=i'        => \(my $proberate        = $DFL_PROBERATE),
-      'queuedepth=i'       => \(my $queuedepth       = $DFL_QUEUEDEPTH),
-      'rate=f'             => \(my $rate             = $DFL_RATE),
-      'rundir=s'           => \(my $rundir),
-      'sponge-network'     => \(my $sponge_net),
-      'statusfile=s'       => \(my $statusfile),
-      'sweep=s'            => \(my $sweep_sec),
-      'verbose+'           => \(my $verbose),
+      'age=i'               => \(my $age              = $DFL_ARP_AGE),
+      'arp-update-method=s' => \(my $arp_update_methods),
+      'control=s'           => \$control_socket,
+      'daemon!'             => \(my $daemon),
+      'dummy!'              => \(my $dummy),
+      'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
+      'gratuitous!'         => \(my $gratuitous),
+      'help|?'              => \(my $help),
+      'init=s'              => \(my $init             = $DFL_INIT),
+      'learning=i'          => \(my $learning         = $DFL_LEARN),
+      'loglevel=s'          => \(my $loglevel         = $DFL_LOGLEVEL),
+      'man'                 => \(my $man),
+      'pending=i'           => \(my $pending          = $DFL_PENDING),
+      'permissions=s'       => \(my $permissions      = $DFL_SOCK_PERMS),
+      'pidfile=s'           => \$pidfile,
+      'proberate=i'         => \(my $proberate        = $DFL_PROBERATE),
+      'queuedepth=i'        => \(my $queuedepth       = $DFL_QUEUEDEPTH),
+      'rate=f'              => \(my $rate             = $DFL_RATE),
+      'rundir=s'            => \(my $rundir),
+      'sponge-network'      => \(my $sponge_net),
+      'statusfile=s'        => \(my $statusfile),
+      'sweep=s'             => \(my $sweep_sec),
+      'verbose+'            => \(my $verbose),
     ) or pod2usage(2);
 
     die($::USAGE) if $help;
@@ -187,7 +189,7 @@ sub Main {
     die("Too many parameters\n$::USAGE")   if @ARGV > 3;
 
     my $network = NetAddr::IP->new($ARGV[0])
-        or die qq{"Bad network address or prefix length in "$ARGV[0]"\n};
+        or die qq{Bad network address or prefix length in "$ARGV[0]"\n};
 
     ####################################################################
 
@@ -257,6 +259,37 @@ sub Main {
         $sponge->user('sweep_age', $sweep_threshold);
     }
 
+    if ($arp_update_methods) {
+        my $flags = ARP_UPDATE_NONE;
+        my %flags = (
+                'request'    => ARP_UPDATE_REQUEST,
+                'reply'      => ARP_UPDATE_REPLY,
+                'gratuitous' => ARP_UPDATE_GRATUITOUS,
+                'all'        => ARP_UPDATE_ALL,
+            );
+        for my $method (split(/\s*,\s*/, lc $arp_update_methods)) {
+            my $negate = 0;
+            if ($method =~ s/^\!//) {
+                $negate = 1;
+            }
+            if ($method eq 'none') {
+                $method = 'all';
+                $negate = !$negate;
+            }
+            if ($flags{$method}) {
+                if ($negate) {
+                    $flags &= ~ $flags{$method};
+                }
+                else {
+                    $flags |= $flags{$method};
+                }
+            }
+            else {
+                die qq{Bad parameter "$method" for --arp-update-methods\n};
+            }
+        }
+        $sponge->arp_update_flags($flags);
+    }
 
     ####################################################################
 
@@ -838,11 +871,10 @@ sub process_pkt {
             my $dst_ip = $ip_obj->{dest_ip};
             if (! $sponge->is_my_ip($dst_ip) ) {
                 # Hit!
-                my ($mac, $mtime) = $sponge->arp_table($dst_ip);
-                if ($mac && $mac ne $ETH_ADDR_NONE) {
+                my ($dst_mac, $mtime) = $sponge->arp_table($dst_ip);
+                if ($dst_mac && $dst_mac ne $ETH_ADDR_NONE) {
                     $sponge->send_arp_update(tha => $src_mac, tpa => $src_ip,
-                                             sha => $mac,     spa => $dst_ip,
-                                             opcode => $ARP_OPCODE_REPLY);
+                                             sha => $dst_mac, spa => $dst_ip);
                 }
             }
         }
@@ -1117,6 +1149,7 @@ B<@NAME@> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
 I<Options>:
 
     --age=secs
+    --arp-update-methods={all,none,request,reply,gratuitous}*
     --control=socket
     --[no]daemon
     --dummy
@@ -1240,6 +1273,58 @@ of its current state upon receiving a C<HUP> or C<USR1> signal.
 Time until we consider an ARP entry "stale" (default @DFL_ARP_AGE@).
 This really controls how often we refresh the entries in our internal
 ARP cache.
+
+=item X<--arp-update-methods>B<--arp-update-methods>=[B<!>]I<method>,...
+
+Some routers do not update their ARP cache when an IP gets unsponged.
+We detect this by looking for traffic destined to our MAC, with a
+destination IP that is not ours. If the destination IP is in our local
+LAN, we should attempt to update the packet source's ARP cache.
+
+This can be done in three ways:
+
+=over
+
+=item C<request>
+
+Send an unsollicited unicast reply:
+
+  ARP <IP-A> IS AT <MAC-A>
+
+Where I<IP-A> and I<MAC-A> are of the router targeted by the stray packet.
+
+=item C<reply>
+
+Send an unicast request by proxy (i.e. fake the requestor):
+
+  ARP WHO HAS <IP-B> TELL <IP-A>@<MAC-A>
+
+Where I<IP-B> is the IP address of the neighbour whose cache needs to be updated.
+
+=item C<gratuitous>
+
+Send a unicast gratuitous ARP on behalf of I<IP-A>:
+
+  ARP WHO HAS <IP-A> TELL <IP-A>@<MAC-A>
+
+=item C<all>, C<none>
+
+All or none of the above, resp.
+
+=back
+
+The methods can be specified as a comma-separated list, e.g.:
+
+   request,reply
+
+Each element can be prefixed by C<!> to negate it, so the following are
+equivalent:
+
+   request,reply
+
+   all,!gratuitous
+
+Default value is C<all>.
 
 =item X<--control>B<--control>=I<socket>
 

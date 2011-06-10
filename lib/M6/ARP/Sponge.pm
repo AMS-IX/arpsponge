@@ -34,16 +34,24 @@ use Sys::Syslog;
 use IO::Select;
 
 BEGIN {
-    our $VERSION = 1.06;
+    our $VERSION = 1.07;
 
     my @states = qw( STATIC DEAD ALIVE PENDING );
+    my @update_flags = qw(
+                ARP_UPDATE_REPLY
+                ARP_UPDATE_REQUEST
+                ARP_UPDATE_GRATUITOUS
+                ARP_UPDATE_NONE
+                ARP_UPDATE_ALL
+            );
 
-    our @EXPORT_OK = ( @states );
+    our @EXPORT_OK = ( @states, @update_flags );
     our @EXPORT    = ();
 
     our %EXPORT_TAGS = ( 
             'states' => \@states,
-            'all'    => [ @states ]
+            'flags'  => \@update_flags,
+            'all'    => [ @states, @update_flags ]
         );
 }
 
@@ -55,6 +63,12 @@ END {
 use constant STATIC  => -3;
 use constant DEAD    => -2;
 use constant ALIVE   => -1;
+
+use constant ARP_UPDATE_REPLY      => 0x01;
+use constant ARP_UPDATE_REQUEST    => 0x02;
+use constant ARP_UPDATE_GRATUITOUS => 0x04;
+use constant ARP_UPDATE_NONE       => 0x00;
+use constant ARP_UPDATE_ALL        => 0x07;
 
 sub PENDING { 0 + $_[$#_] };
 
@@ -72,6 +86,7 @@ __PACKAGE__->mk_accessors(qw(
                 arp_age         gratuitous          flood_protection
                 max_rate        max_pending         sponge_net
                 log_buffer      log_buffer_size     pcap_handle
+                arp_update_flags
         ));
 
 ###############################################################################
@@ -172,10 +187,11 @@ sub new {
 
     my ($prog) = $0 =~ m|([^/]+)$|;
     my $self = {
-            'log_buffer_size' => 256,
-            'syslog_ident'    => $prog,
-            'loglevel'        => 'info',
-            'queuedepth'      => $M6::ARP::Queue::DFL_DEPTH,
+            'log_buffer_size'   => 256,
+            'syslog_ident'      => $prog,
+            'loglevel'          => 'info',
+            'arp_uypdate_flags' => ARP_UPDATE_ALL,
+            'queuedepth'        => $M6::ARP::Queue::DFL_DEPTH,
         };
 
     while (@_ >= 2) {
@@ -511,19 +527,34 @@ sub send_arp_update {
     }
     return if (!$pcap_h || $self->is_dummy);
 
-    # Try it both ways: first a kind of gratuitous proxy reply.
-    $self->send_arp( sha => $args{sha},
-                     spa => $args{spa},
-                     tha => $args{tha},
-                     tpa => $args{tpa},
-                     opcode => $ARP_OPCODE_REPLY );
+    my $update_flags = $self->arp_update_flags;
 
-    # Next: just fake a request from the spa.
-    $self->send_arp( sha => $args{sha},
-                     spa => $args{spa},
-                     tha => $args{tha},
-                     tpa => $args{tpa},
-                     opcode => $ARP_OPCODE_REQUEST );
+    # Try various ways of updating the neighbour's cache...
+    if ($update_flags & ARP_UPDATE_REPLY) {
+        $self->send_arp( sha => $args{sha},
+                         spa => $args{spa},
+                         tha => $args{tha},
+                         tpa => $args{tpa},
+                         opcode => $ARP_OPCODE_REPLY );
+    }
+
+    if ($update_flags & ARP_UPDATE_REQUEST) {
+        $self->send_arp( sha => $args{sha},
+                         spa => $args{spa},
+                         tha => $args{tha},
+                         tpa => $args{tpa},
+                         opcode => $ARP_OPCODE_REQUEST );
+    }
+
+    # Third option: fake a gratuitous ARP: "unicast proxy gratuitous ARP
+    # request" :-)
+    if ($update_flags & ARP_UPDATE_GRATUITOUS) {
+        $self->send_arp( sha => $args{sha},
+                         spa => $args{spa},
+                         tha => $args{tha},
+                         tpa => $args{spa},
+                         opcode => $ARP_OPCODE_REQUEST );
+    }
     return;
 }
 

@@ -15,7 +15,7 @@ package M6::ARP::Control::Server;
 
 use strict;
 use base qw( M6::ARP::Control::Base );
-use M6::ARP::Sponge qw( :states );
+use M6::ARP::Sponge qw( :states :flags );
 
 use IO::Socket;
 use M6::ARP::Util qw( :all );
@@ -35,6 +35,7 @@ my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
     set_proberate set_flood_protection set_dummy
     set_sweep_age set_sweep_sec
     set_alive set_dead set_pending
+    set_arp_update_flags
     probe inform
 );
 
@@ -196,6 +197,7 @@ sub _get_status_info_s {
         sprintf("%s=%d\n", 'next_sweep', $sponge->user('next_sweep')),
         sprintf("%s=%d\n", 'learning', $sponge->user('learning')),
         sprintf("%s=%d\n", 'dummy', int($sponge->is_dummy)),
+        sprintf("%s=%d\n", 'arp_update_flags', $sponge->arp_update_flags),
     );
     return join('', @response);
 }
@@ -465,6 +467,20 @@ sub _cmd_set_max_pending {
     $sponge->max_pending($max);
     $max    = $sponge->max_pending();
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $max));
+}
+
+sub _cmd_set_arp_update_flags {
+    my ($self, $sponge, $cmd, @args) = @_;
+    my $flags = is_valid_int($args[0], -min=>ARP_UPDATE_NONE, -max=>ARP_UPDATE_ALL);
+    if (!defined $flags) {
+        return $self->send_error(
+                sprintf("%s <%d-%d>", $cmd, ARP_UPDATE_NONE(), ARP_UPDATE_ALL())
+            );
+    }
+    my $old = $sponge->arp_update_flags;
+    $flags &= ARP_UPDATE_ALL; # Sanitise.
+    $sponge->arp_update_flags($flags);
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $flags));
 }
 
 sub _cmd_set_sweep_sec {
