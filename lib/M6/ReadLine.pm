@@ -30,6 +30,7 @@ use Term::ReadLine;
 use NetAddr::IP;
 use M6::ARP::Util qw( :all );
 use Data::Dumper;
+use M6::ARP::Sponge qw( :flags );
 use Scalar::Util qw( reftype );
 
 BEGIN {
@@ -92,6 +93,10 @@ our %TYPES = (
         'ip-address' => {
             'verify'   => \&check_ip_address_arg,
             'complete' => \&complete_ip_address_arg,
+        },
+        'string' => {
+            'verify'   => sub { return clear_error($_[1]) },
+            'complete' => []
         },
     );
 

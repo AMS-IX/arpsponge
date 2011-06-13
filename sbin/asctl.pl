@@ -37,6 +37,7 @@ use M6::ARP::Util qw( :all );
 use M6::ReadLine qw( :all );
 use NetAddr::IP;
 use Term::ReadLine;
+use M6::ARP::Const qw( :all );
 
 my $SPONGE_VAR      = '@SPONGE_VAR@';
 my $CONN            = undef;
@@ -108,6 +109,11 @@ my %Syntax = (
         '?'       => 'Force <dst_ip> to update its ARP entry for <src_ip>.',
         '$dst_ip' => { type=>'ip-address' },
         '$src_ip' => { type=>'ip-address' } },
+    'set arp-update-flags $flags' => {
+        '?'       => 'Set the methods (comma-separated list) by which the'
+                    .'sponge is to update its neighbor caches',
+        '$flags'  => { type=>'arp-update-flags' },
+        },
     'set ip $ip dead'   => {
         '?'       => 'Sponge given IP(s).',
         '$ip'      => { type=>'ip-range'  } },
@@ -322,6 +328,36 @@ sub complete_ip_any {
     DEBUG "check_ip_filter: <$partial>";
     return (qw( all ), complete_ip_range($partial));
 }
+
+sub check_arp_update_flags {
+    my ($spec, $arg, $silent) = @_;
+    DEBUG "check_arp_update_flags: $arg";
+    if (defined $arg && length($arg)) {
+        my $err;
+        my $flags = parse_update_flags($arg, -err => \$err);
+        if (!defined $flags) {
+            $silent or print_error($err);
+            return;
+        }
+        return $flags;
+    }
+}
+
+sub complete_arp_update_flags {
+    my $partial = shift @_;
+    my @words   = split(/,/, $partial);
+    if ($partial =~ /,$/) {
+        $partial = '';
+    }
+    else {
+        $partial = @words ? pop @words : '';
+    }
+    my $prefix  = join('', map { "$_," } @words);
+    DEBUG "\ncomplete_arp_update_flags partial:<$partial>; prefix:<$prefix>";
+    return map { ("$prefix$_", "$prefix!$_") }  
+                keys %M6::ARP::Const::STR_TO_UPDATE_FLAG;
+}
+
 
 sub check_send_command {
     my $conn = shift;
@@ -797,6 +833,9 @@ sub parse_server_reply {
     if (!$opts->{raw}) {
         $reply =~ s/\b(tpa|spa|network|ip)=([\da-f]+)\b/"$1=".hex2ip($2)/gme;
         $reply =~ s/\b(tha|sha|mac)=([\da-f]+)\b/"$1=".hex2mac($2)/gme;
+        $reply =~ s/\b(arp_update_flags)=(\d+)\b
+                   /"$1=".join(q{,}, update_flags_to_str($2))
+                   /gxme;
     }
     if (!$opts->{format}) {
         return ($opts, $reply, '');
@@ -942,12 +981,18 @@ sub do_set_generic {
 
     my $reply = check_send_command($conn, $command, $arg) or return;
 
+    DEBUG "do_set_generic: reply=<$reply>";
+
     my ($opts, $output, $tag) = parse_server_reply($reply);
     my $old = $output->[0]->{old};
     my $new = $output->[0]->{new};
 
     my $fmt = '%s';
     given ($type) {
+        when ('arp-update-flags') {
+            $old = '('.join(',', update_flags_to_str($old)).')';
+            $new = '('.join(',', update_flags_to_str($new)).')';
+        }
         when ('boolean') {
             $old = $old ? 'yes' : 'no';
             $new = $new ? 'yes' : 'no';
@@ -973,6 +1018,17 @@ sub do_set_queuedepth {
                    -val     => $args->{'num'},
                    -options => $args->{-options},
                    -type    => 'int');
+}
+
+# cmd: set arp-update-flags
+sub do_set_arp_update_flags {
+    my ($conn, $parsed, $args) = @_;
+
+    do_set_generic(-conn    => $conn,
+                   -name    => 'arp_update_flags',
+                   -val     => $args->{'flags'},
+                   -options => $args->{-options},
+                   -type    => 'arp-update-flags');
 }
 
 # cmd: set max-pending
@@ -1240,6 +1296,7 @@ sub do_status {
         sprintf("$tag%s\n", 'learning', 
                     $$info{learning}?"yes ($$info{learning} secs)":'no'),
         sprintf("$tag%s\n", 'dummy', $$info{dummy}?'yes':'no'),
+        sprintf("$tag%s\n", 'arp update flags', $$info{arp_update_flags}),
     );
 }
 
@@ -1344,6 +1401,10 @@ sub initialise {
     $M6::ReadLine::TYPES{'ip-any'} = {
             'verify'   => \&check_ip_any_arg,
             'complete' => \&complete_ip_any,
+        };
+    $M6::ReadLine::TYPES{'arp-update-flags'} = {
+            'verify'   => \&check_arp_update_flags,
+            'complete' => \&complete_arp_update_flags,
         };
 
     $INTERACTIVE = -t STDIN && -t STDOUT && !@ARGV;

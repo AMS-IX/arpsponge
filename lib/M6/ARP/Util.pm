@@ -27,6 +27,7 @@ BEGIN {
             int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
             format_time relative_time hex_addr_in_net
             is_valid_int is_valid_float is_valid_ip
+            arpflags2int int2arpflags
         );
 	our @EXPORT    = ();
 

@@ -22,9 +22,10 @@ package M6::ARP::Sponge;
 
 use strict;
 
-use base qw( M6::ARP::Base Exporter );
+use base qw( M6::ARP::Base );
 
 use M6::ARP::Queue;
+use M6::ARP::Const      qw( :all );
 use M6::ARP::Util       qw( :all );
 use M6::ARP::NetPacket  qw( :all );
 
@@ -33,50 +34,11 @@ use Net::ARP;
 use Sys::Syslog;
 use IO::Select;
 
-BEGIN {
-    our $VERSION = 1.07;
-
-    my @states = qw( STATIC DEAD ALIVE PENDING );
-    my @update_flags = qw(
-                ARP_UPDATE_REPLY
-                ARP_UPDATE_REQUEST
-                ARP_UPDATE_GRATUITOUS
-                ARP_UPDATE_NONE
-                ARP_UPDATE_ALL
-            );
-
-    our @EXPORT_OK = ( @states, @update_flags );
-    our @EXPORT    = ();
-
-    our %EXPORT_TAGS = ( 
-            'states' => \@states,
-            'flags'  => \@update_flags,
-            'all'    => [ @states, @update_flags ]
-        );
-}
+our $VERSION = 1.07;
 
 END {
     closelog;
 }
-
-# State constants/macros
-use constant STATIC  => -3;
-use constant DEAD    => -2;
-use constant ALIVE   => -1;
-
-use constant ARP_UPDATE_REPLY      => 0x01;
-use constant ARP_UPDATE_REQUEST    => 0x02;
-use constant ARP_UPDATE_GRATUITOUS => 0x04;
-use constant ARP_UPDATE_NONE       => 0x00;
-use constant ARP_UPDATE_ALL        => 0x07;
-
-sub PENDING { 0 + $_[$#_] };
-
-my %state_name_map = (
-        STATIC() => 'STATIC',
-        DEAD()   => 'DEAD',
-        ALIVE()  => 'ALIVE',
-    );
 
 # Accessors; use the factory :-)
 __PACKAGE__->mk_accessors(qw( 
@@ -113,19 +75,7 @@ sub user {
     return $oldval;
 }
 
-sub state_name {
-    my $self  = shift;
-    my $state = shift;
-    if (!defined $state) {
-        return 'NONE';
-    }
-    elsif ($state < PENDING(0)) {
-        return $state_name_map{$state} // 'ILLEGAL';
-    }
-    else {
-        return sprintf("PENDING(%d)", $state - PENDING(0));
-    }
-}
+sub state_name { return state_to_string($_[1]) }
 
 ###############################################################################
 #
@@ -190,7 +140,7 @@ sub new {
             'log_buffer_size'   => 256,
             'syslog_ident'      => $prog,
             'loglevel'          => 'info',
-            'arp_uypdate_flags' => ARP_UPDATE_ALL,
+            'arp_update_flags'  => ARP_UPDATE_ALL,
             'queuedepth'        => $M6::ARP::Queue::DFL_DEPTH,
         };
 

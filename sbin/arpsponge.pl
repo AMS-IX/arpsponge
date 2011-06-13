@@ -38,7 +38,8 @@ use IO::String;
 use IO::Select;
 use IO::Socket;
 
-use M6::ARP::Sponge     qw( :states :flags );
+use M6::ARP::Sponge;
+use M6::ARP::Const      qw( :all );
 use M6::ARP::Util       qw( :all );
 use M6::ARP::Control::Server;
 
@@ -146,7 +147,7 @@ sub Main {
       'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
       'gratuitous!'         => \(my $gratuitous),
       'help|?'              => \(my $help),
-      'init=s'              => \(my $init             = $DFL_INIT),
+      'init=s'              => \(my $init_arg         = $DFL_INIT),
       'learning=i'          => \(my $learning         = $DFL_LEARN),
       'loglevel=s'          => \(my $loglevel         = $DFL_LOGLEVEL),
       'man'                 => \(my $man),
@@ -170,17 +171,6 @@ sub Main {
     if (length($sweep_sec)) {
         ($sweep_sec, $sweep_threshold) = $sweep_sec =~ m|^(\d+)/(\d+)$|
             or die("Bad value for --sweep\n$::USAGE");
-    }
-
-    ####################################################################
-
-    $init =~ s|\s||g;
-    ($init, my $secs) = split(':', uc $init);
-    if ($init =~ /^\s*(ALIVE|DEAD|PENDING|NONE)\s*$/i) {
-        $init = $1;
-    }
-    else {
-        die("$0: --init: bad argument \"$init\"\n");
     }
 
     ####################################################################
@@ -240,6 +230,14 @@ sub Main {
             flood_protection => $flood_protection,
             syslog_ident     => SYSLOG_IDENT,
         );
+
+    if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
+        my $init = is_valid_state($init_arg, -err => \(my $err));
+        if (defined $err) {
+            die("$0: --init: bad argument \"$init\": $err\n");
+        }
+        init_state($sponge, $init);
+    }
 
     $sponge->is_dummy($dummy);
     $sponge->is_verbose($verbose);
@@ -332,8 +330,6 @@ sub Main {
     $sponge->pcap_handle($pcap_h);
 
     ####################################################################
-
-    init_state($sponge, $init);
 
     $sponge->print_log("Initializing $0 on [%s, %s, %s]",
                     $sponge->device, $sponge->my_ip_s, $sponge->my_mac_s);
@@ -729,7 +725,7 @@ sub do_timer($) {
 #    Initialize the states for all IP addresses.
 #
 ###############################################################################
-sub init_state($) {
+sub init_state {
     my $sponge = shift;
     my $state  = shift;
 

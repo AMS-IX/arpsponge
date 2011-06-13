@@ -15,12 +15,12 @@ package M6::ARP::Control::Server;
 
 use strict;
 use base qw( M6::ARP::Control::Base );
-use M6::ARP::Sponge qw( :states :flags );
 
 use IO::Socket;
-use M6::ARP::Util qw( :all );
+use M6::ARP::Const     qw( :states :flags );
+use M6::ARP::Util      qw( :all );
 use M6::ARP::NetPacket qw( :vars );
-use Time::HiRes   qw( time );
+use Time::HiRes        qw( time );
 
 use POSIX qw( strftime );
 
