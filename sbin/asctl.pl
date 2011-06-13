@@ -354,8 +354,20 @@ sub complete_arp_update_flags {
     }
     my $prefix  = join('', map { "$_," } @words);
     DEBUG "\ncomplete_arp_update_flags partial:<$partial>; prefix:<$prefix>";
-    return map { ("$prefix$_", "$prefix!$_") }  
-                keys %M6::ARP::Const::STR_TO_UPDATE_FLAG;
+    
+    my @names;
+    for my $name (keys %M6::ARP::Const::STR_TO_UPDATE_FLAG) {
+        if (substr($name, 0, length($partial)) eq $partial) {
+            push @names, $name;
+        }
+        if (substr("!$name", 0, length($partial)) eq $partial) {
+            push @names, $name;
+        }
+    }
+    if (@names==1) {
+        push @names, "$names[0],";
+    }
+    return map { "$prefix$_" } @names;
 }
 
 
