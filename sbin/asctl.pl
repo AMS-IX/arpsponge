@@ -32,7 +32,7 @@ use Getopt::Long qw( GetOptions GetOptionsFromArray );
 use POSIX qw( strftime floor );
 use Pod::Usage;
 use M6::ARP::Control::Client;
-use M6::ARP::Log qw( :standard );
+use M6::ARP::Log qw( :standard :macros );
 use Time::HiRes qw( time sleep );
 use M6::ARP::Util qw( :all );
 use M6::ReadLine qw( :all );
@@ -111,7 +111,7 @@ my %Syntax = (
         '?'       => 'Force <dst_ip> to update its ARP entry for <src_ip>.',
         '$dst_ip' => { type=>'ip-address' },
         '$src_ip' => { type=>'ip-address' } },
-    'set arp-update-flags $flags' => {
+    'set arp_update_flags $flags' => {
         '?'       => 'Set the methods (comma-separated list) by which the'
                     .'sponge is to update its neighbor caches',
         '$flags'  => { type=>'arp-update-flags' },
@@ -132,17 +132,20 @@ my %Syntax = (
         '?'        => 'Unsponge given IP(s) (associate them with <mac>).',
         '$ip'      => { type=>'ip-range'    },
         '$mac'     => { type=>'mac-address' }, },
-    'set max-pending $num' => {
+    'set max_pending $num' => {
         '?'        => 'Set max. number of "pending" probes before'
                       .' sponging an IP',
         '$num'     => { type=>'int', min=>1 }, },
+    'set log_level $level' => {
+        '?'        => 'Set logging threshold',
+        '$level'   => { type=>'log-level', min=>1 }, },
     'set queuedepth $num' => {
         '?'        => 'Max. ARP queue size per IP address.',
         '$num'     => { type=>'int', min=>1 }, },
-    'set max-rate $rate' => {
+    'set max_rate $rate' => {
         '?'        => 'Set rate parameters.',
         '$rate'    => { type=>'float', min=>0.001 }, },
-    'set flood-protection $rate' => {
+    'set flood_protection $rate' => {
         '?'        => 'Set rate parameters.',
         '$rate'    => { type=>'float', min=>0.001 }, },
     'set proberate $rate' => {
@@ -154,10 +157,10 @@ my %Syntax = (
     'set dummy $bool' => {
         '?'        => 'Enable/disable DUMMY mode.',
         '$bool'    => { type=>'bool' }, },
-    'set sweep age $secs' => {
+    'set sweep_age $secs' => {
         '?'        => 'Set sweep/probe parameters.',
         '$secs'    => { type=>'int', min=>1 }, },
-    'set sweep period $secs' => {
+    'set sweep_period $secs' => {
         '?'        => 'Set sweep/probe parameters.',
         '$secs'    => { type=>'int', min=>1 }, },
 );
@@ -329,6 +332,24 @@ sub complete_ip_any {
     my $partial = shift;
     DEBUG "check_ip_filter: <$partial>";
     return (qw( all ), complete_ip_range($partial));
+}
+
+sub check_log_level {
+    my ($spec, $arg, $silent) = @_;
+    DEBUG "check_log_level $arg";
+    if (defined $arg && length($arg)) {
+        my $err;
+        my $level = is_valid_log_level($arg, -err => \$err);
+        if (!defined $level) {
+            $silent or print_error($err);
+            return;
+        }
+        return $level;
+    }
+}
+
+sub complete_log_level {
+    return map { log_level_to_string($_) } (LOG_EMERG .. LOG_DEBUG);
 }
 
 sub check_arp_update_flags {
@@ -855,6 +876,7 @@ sub parse_server_reply {
         $reply =~ s/\b(arp_update_flags)=(\d+)\b
                    /"$1=".join(q{,}, update_flags_to_str($2))
                    /gxme;
+        $reply =~ s/\b(log_level)=(\d+)\b/"$1=".log_level_to_string($2)/gme;
     }
     if (!$opts->{format}) {
         return ($opts, $reply, '');
@@ -1008,6 +1030,10 @@ sub do_set_generic {
 
     my $fmt = '%s';
     given ($type) {
+        when ('log-level') {
+            $old = log_level_to_string($old);
+            $new = log_level_to_string($new);
+        }
         when ('arp-update-flags') {
             $old = '('.join(',', update_flags_to_str($old)).')';
             $new = '('.join(',', update_flags_to_str($new)).')';
@@ -1048,6 +1074,17 @@ sub do_set_arp_update_flags {
                    -val     => $args->{'flags'},
                    -options => $args->{-options},
                    -type    => 'arp-update-flags');
+}
+
+# cmd: set log-level
+sub do_set_log_level {
+    my ($conn, $parsed, $args) = @_;
+
+    do_set_generic(-conn    => $conn,
+                   -name    => 'log_level',
+                   -val     => $args->{'level'},
+                   -options => $args->{-options},
+                   -type    => 'log-level');
 }
 
 # cmd: set max-pending
@@ -1330,18 +1367,19 @@ sub do_param {
     }
     my $info = $output->[0];
     print_output(
-        sprintf("$tag%d\n", 'queue depth:', $$info{queue_depth}),
-        sprintf("$tag%0.2f q/min\n", 'max rate:', $$info{max_rate}),
-        sprintf("$tag%0.2f q/sec\n", 'flood protection:',
+        sprintf("$tag= %d\n", 'queue_depth', $$info{queue_depth}),
+        sprintf("$tag= %0.2f q/min\n", 'max_rate', $$info{max_rate}),
+        sprintf("$tag= %0.2f q/sec\n", 'flood_protection',
                 $$info{flood_protection}),
-        sprintf("$tag%d\n", 'max pending:', $$info{max_pending}),
-        sprintf("$tag%d secs\n", 'sweep period:', $$info{sweep_period}),
-        sprintf("$tag%d secs\n", 'sweep age:', $$info{sweep_age}),
-        sprintf("$tag%d pkts/sec\n", 'proberate:', $$info{proberate}),
-        sprintf("$tag%s\n", 'learning', 
+        sprintf("$tag= %d\n", 'max_pending', $$info{max_pending}),
+        sprintf("$tag= %d secs\n", 'sweep_period', $$info{sweep_period}),
+        sprintf("$tag= %d secs\n", 'sweep_age', $$info{sweep_age}),
+        sprintf("$tag= %d pkts/sec\n", 'proberate', $$info{proberate}),
+        sprintf("$tag= %s\n", 'learning', 
                     $$info{learning}?"yes ($$info{learning} secs)":'no'),
-        sprintf("$tag%s\n", 'dummy', $$info{dummy}?'yes':'no'),
-        sprintf("$tag%s\n", 'arp update flags', $$info{arp_update_flags}),
+        sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
+        sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
+        sprintf("$tag= %s\n", 'log_level', $$info{log_level}),
     );
 }
 
@@ -1450,6 +1488,10 @@ sub initialise {
     $M6::ReadLine::TYPES{'arp-update-flags'} = {
             'verify'   => \&check_arp_update_flags,
             'complete' => \&complete_arp_update_flags,
+        };
+    $M6::ReadLine::TYPES{'log-level'} = {
+            'verify'   => \&check_log_level,
+            'complete' => \&complete_log_level,
         };
 
     $INTERACTIVE = -t STDIN && -t STDOUT && !@ARGV;
