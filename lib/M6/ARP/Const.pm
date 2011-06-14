@@ -59,8 +59,6 @@ our %STR_TO_UPDATE_FLAG = (
          map { ($UPDATE_FLAG_TO_STR{$_} => $_) } keys %UPDATE_FLAG_TO_STR,
     );
 
-
-
 # State constants/macros
 use constant STATIC  => -3;
 use constant DEAD    => -2;
