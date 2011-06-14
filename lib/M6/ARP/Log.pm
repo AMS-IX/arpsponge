@@ -36,6 +36,7 @@ BEGIN {
         log_fatal
         log_is_verbose log_verbose log_sverbose
         log_level is_log_level
+        is_valid_log_level log_level_to_string
         add_notify remove_notify print_notify
         get_log_buffer clear_log_buffer log_buffer_size
     );
@@ -86,7 +87,7 @@ our %LOGLEVEL_TO_STR = (
         map { ($STR_TO_LOGLEVEL{$_} => $_) } keys %STR_TO_LOGLEVEL,
     );
 
-my $Min_Level       = LOG_NOTICE;
+my $Log_Level       = LOG_NOTICE;
 my @Log_Buffer      = ();
 my $Log_Buffer_Size = 256;
 my $Notify;
@@ -115,8 +116,8 @@ sub init_log {
 
 sub log_buffer_size { return __log_getset(\$Log_Buffer_Size, @_) }
 sub log_is_verbose  { return __log_getset(\$Verbose, @_) }
-sub log_level       { return __log_getset(\$Min_Level, @_) }
-sub is_log_level    { return shift >= $Min_Level }
+sub log_level       { return __log_getset(\$Log_Level, @_) }
+sub is_log_level    { return $_[0] <= $Log_Level }
 
 sub get_log_buffer {
     return \@Log_Buffer;
@@ -186,7 +187,7 @@ sub print_notify($@) {
 sub print_log_level($$@) {
     my ($level, $format, @args) = @_;
 
-    return if $level < $Min_Level;
+    return if $level > $Log_Level;
 
     # Add message to circular log buffer.
     foreach (split(/\n/, sprintf($format, @args))) {
@@ -296,12 +297,13 @@ Return the string representation of the numerical I<LOGLEVEL>.
 =cut
 
 sub log_level_to_string {
-    my $level = shift;
-    if ($level < LOG_DEBUG) {
-        $level = LOG_DEBUG;
+    my $level = int(shift);
+
+    if ($level > LOG_DEBUG()) {
+        $level = LOG_DEBUG();
     }
-    elsif ($level > LOG_EMERG) {
-        $level = LOG_EMERG;
+    elsif ($level < LOG_EMERG()) {
+        $level = LOG_EMERG();
     }
     return $LOGLEVEL_TO_STR{$level};
 }
