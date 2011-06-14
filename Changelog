@@ -2,6 +2,27 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta7/beta8 - steven
+
+  arpsponge, asctl:
+    - Added arp_update_flags to specify how to force neighbor
+      cache updates.
+    - Added log_level to specify the minimum log level.
+    - Split off some of the output from "show status" to new
+      "show parameters".
+    - Added "set log_level".
+
+  asctl:
+    - Parameter names for "set" now use underscores
+      instead of hyphens.
+
+  general:
+    - Logging split off into separate module (M6::ARP::Log).
+        - Rename verbose/sverbose to log_verbose, log_sverbose.
+    - State and update flag definitions defined in separate module
+      (M6::ARP::Const), making it easier for server and client
+      to share these values.
+
 3.10 - beta6 - steven
 
     arpsponge:
