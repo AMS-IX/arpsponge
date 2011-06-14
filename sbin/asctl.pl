@@ -32,6 +32,7 @@ use Getopt::Long qw( GetOptions GetOptionsFromArray );
 use POSIX qw( strftime floor );
 use Pod::Usage;
 use M6::ARP::Control::Client;
+use M6::ARP::Log qw( :standard );
 use Time::HiRes qw( time sleep );
 use M6::ARP::Util qw( :all );
 use M6::ReadLine qw( :all );
@@ -93,6 +94,7 @@ my %Syntax = (
     'show arp $ip?'  => {
         '?'       => 'Show ARP table for given IP(s).',
         '$ip'     => { type=>'ip-any'    } },
+    'show parameters' => { '?' => 'Show daemon parameters.'   },
     'show status'  => { '?' => 'Show daemon status.'   },
     'show version' => { '?' => 'Show daemon version.'  },
     'show uptime'  => { '?' => 'Show daemon uptime.'   },
@@ -575,6 +577,11 @@ sub do_inform_about {
 # cmd: show status
 sub do_show_status {
     return do_status(@_);
+}
+
+# cmd: show status
+sub do_show_parameters {
+    return do_param(@_);
 }
 
 # cmd: show log
@@ -1293,6 +1300,36 @@ sub do_status {
         sprintf("$tag%s\n", 'interface:', $$info{interface}),
         sprintf("$tag%s\n", 'IP:', $$info{ip}),
         sprintf("$tag%s\n", 'MAC:', $$info{mac}),
+        sprintf("$tag%s (in %d secs) [%d]\n", 'next sweep:',
+                format_time($$info{next_sweep}),
+                $$info{next_sweep}-$$info{date},
+                $$info{next_sweep}),
+    );
+}
+
+sub do_param {
+    my ($conn, $parsed, $args) = @_;
+    my $format = 1;
+
+    my %opts = ( raw => 0, format => 1 );
+
+    GetOptionsFromArray($args->{-options},
+            'raw!'     => \$opts{raw},
+            'format!'  => \$opts{format},
+            'nf'       => sub { $opts{format} = 0 },
+        ) or return;
+
+    $opts{format} &&= !$opts{raw};
+
+    my $reply = check_send_command($conn, 'get_param') or return;
+
+    my ($opts, $output, $tag) = parse_server_reply($reply, \%opts);
+
+    if (!$opts->{format}) {
+        return print_output($output);
+    }
+    my $info = $output->[0];
+    print_output(
         sprintf("$tag%d\n", 'queue depth:', $$info{queue_depth}),
         sprintf("$tag%0.2f q/min\n", 'max rate:', $$info{max_rate}),
         sprintf("$tag%0.2f q/sec\n", 'flood protection:',
@@ -1301,10 +1338,6 @@ sub do_status {
         sprintf("$tag%d secs\n", 'sweep period:', $$info{sweep_period}),
         sprintf("$tag%d secs\n", 'sweep age:', $$info{sweep_age}),
         sprintf("$tag%d pkts/sec\n", 'proberate:', $$info{proberate}),
-        sprintf("$tag%s (in %d secs) [%d]\n", 'next sweep:',
-                format_time($$info{next_sweep}),
-                $$info{next_sweep}-$$info{date},
-                $$info{next_sweep}),
         sprintf("$tag%s\n", 'learning', 
                     $$info{learning}?"yes ($$info{learning} secs)":'no'),
         sprintf("$tag%s\n", 'dummy', $$info{dummy}?'yes':'no'),

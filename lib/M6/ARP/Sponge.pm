@@ -79,16 +79,6 @@ sub state_name { return state_to_string($_[1]) }
 #
 ###############################################################################
 
-# Not really an object attribute...
-sub syslog_ident {
-    my $self = shift;
-    if (@_) {
-        $M6::ARP::Log::Syslog_Ident = shift;
-        return $self;
-    }
-    return $M6::ARP::Log::Syslog_Ident;
-}
-
 sub queue            { shift->{'queue'} }
 sub device           { shift->{'device'} }
 sub phys_device      { shift->{'phys_device'} }
@@ -168,10 +158,10 @@ sub new {
     $self->init_all_state();
 
     if (log_is_verbose) {
-        sverbose(1, "Device: %s\n", $self->device);
-        sverbose(1, "Device: %s\n", $self->phys_device);
-        sverbose(1, "MAC:    %s\n", $self->my_mac_s);
-        sverbose(1, "IP:     %s\n", $self->my_ip_s);
+        log_sverbose(1, "Device: %s\n", $self->device);
+        log_sverbose(1, "Device: %s\n", $self->phys_device);
+        log_sverbose(1, "MAC:    %s\n", $self->my_mac_s);
+        log_sverbose(1, "IP:     %s\n", $self->my_ip_s);
     }
     return $self;
 }
@@ -348,7 +338,7 @@ sub send_probe {
     my ($self, $target_ip) = @_;
 
     if (log_is_verbose >=2) {
-        sverbose(2,
+        log_sverbose(2,
             "Probing [dev=%s]: %s\n", $self->phys_device, hex2ip($target_ip)
         );
     }
@@ -371,7 +361,7 @@ sub gratuitous_arp {
     my ($self, $ip) = @_;
 
     if (log_is_verbose) {
-        sverbose(1, "%sgratuitous ARP [dev=%s]: %s\n",
+        log_sverbose(1, "%sgratuitous ARP [dev=%s]: %s\n",
                 ($self->is_dummy ? '[DUMMY] ' : ''),
                 $self->phys_device, hex2ip($ip));
     }
@@ -439,7 +429,7 @@ sub send_arp_update {
         my $dst_ip_s  = hex2ip($args{tpa});
         my $src_mac_s = hex2mac($args{sha});
         my $src_ip_s  = hex2ip($args{spa});
-        sverbose(1, "%sarp inform %s\@%s about %s\@%s\n",
+        log_sverbose(1, "%sarp inform %s\@%s about %s\@%s\n",
                         (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
                          $dst_ip_s, $dst_mac_s,
                          $src_ip_s, $src_mac_s,
@@ -495,7 +485,7 @@ sub send_reply {
         my $dst_mac_s = hex2mac($arp_obj->{sha});
         my $dst_ip_s  = hex2ip($arp_obj->{spa});
         my $src_ip_s  = hex2ip($src_ip);
-        sverbose(1, "%s: DUMMY sponge reply to %s\@%s\n",
+        log_sverbose(1, "%s: DUMMY sponge reply to %s\@%s\n",
                            $src_ip_s, $dst_ip_s, $dst_mac_s);
         return;
     }
@@ -503,7 +493,7 @@ sub send_reply {
         my $dst_mac_s = hex2mac($arp_obj->{sha});
         my $dst_ip_s  = hex2ip($arp_obj->{spa});
         my $src_ip_s  = hex2ip($src_ip);
-        sverbose(1, "%s: sponge reply to %s\@%s\n",
+        log_sverbose(1, "%s: sponge reply to %s\@%s\n",
                            $src_ip_s, $dst_ip_s, $dst_mac_s);
     }
 
@@ -555,7 +545,7 @@ sub set_alive {
         log_notice("clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
     }
     elsif (log_is_verbose && $self->queue->depth($ip) > 0) {
-        sverbose(1,
+        log_sverbose(1,
                 "clearing: ip=%s mac=%s\n", hex2ip($ip), hex2mac($mac));
     }
 
@@ -564,11 +554,11 @@ sub set_alive {
 
     if (log_is_verbose) {
         if (!@arp) {
-            sverbose(1, "learned: ip=%s mac=%s old=none\n",
+            log_sverbose(1, "learned: ip=%s mac=%s old=none\n",
                                hex2ip($ip), hex2mac($mac));
         }
         elsif ($arp[0] ne $mac) {
-            sverbose(1, "learned: ip=%s mac=%s old=%s\n",
+            log_sverbose(1, "learned: ip=%s mac=%s old=%s\n",
                               hex2ip($ip), hex2mac($mac), hex2mac($arp[0]));
         }
     }

@@ -31,7 +31,6 @@ use Time::HiRes         qw( time sleep );
 use POSIX               qw( strftime :signal_h :errno_h );
 
 use File::Path          qw( mkpath );
-use Sys::Syslog;
 
 use IO::File;
 use IO::String;
@@ -39,6 +38,7 @@ use IO::Select;
 use IO::Socket;
 
 use M6::ARP::Sponge;
+use M6::ARP::Log        qw( :standard );
 use M6::ARP::Const      qw( :all );
 use M6::ARP::Util       qw( :all );
 use M6::ARP::Control::Server;
@@ -138,6 +138,8 @@ sub start_daemon($$);
 # Main program code :-)
 ###############################################################################
 sub Main {
+    init_log(SYSLOG_IDENT);
+
     GetOptions(
       'age=i'               => \(my $age              = $DFL_ARP_AGE),
       'arp-update-method=s' => \(my $arp_update_methods),
@@ -146,7 +148,7 @@ sub Main {
       'dummy!'              => \(my $dummy),
       'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
       'gratuitous!'         => \(my $gratuitous),
-      'help|?'              => \(my $help),
+      'help|?'              => sub { print $::USAGE; exit 0 },
       'init=s'              => \(my $init_arg         = $DFL_INIT),
       'learning=i'          => \(my $learning         = $DFL_LEARN),
       'loglevel=s'          => \(my $loglevel         = $DFL_LOGLEVEL),
@@ -164,28 +166,29 @@ sub Main {
       'verbose+'            => \(my $verbose),
     ) or pod2usage(2);
 
-    die($::USAGE) if $help;
     pod2usage(-exitstatus => 0, -verbose => 2) if $man;
+
+    log_is_verbose($verbose);
 
     my $sweep_threshold  = undef;
     if (length($sweep_sec)) {
         ($sweep_sec, $sweep_threshold) = $sweep_sec =~ m|^(\d+)/(\d+)$|
-            or die("Bad value for --sweep\n$::USAGE");
+            or log_fatal("Bad value for --sweep");
     }
 
     ####################################################################
 
-    die("Not enough parameters\n$::USAGE") if @ARGV < 3;
-    die("Too many parameters\n$::USAGE")   if @ARGV > 3;
+    log_fatal("Not enough parameters\n$::USAGE") if @ARGV < 3;
+    log_fatal("Too many parameters\n$::USAGE")   if @ARGV > 3;
 
     my $network = NetAddr::IP->new($ARGV[0])
-        or die qq{Bad network address or prefix length in "$ARGV[0]"\n};
+        or log_fatal qq{Bad network address or prefix length in "$ARGV[0]"\n};
 
     ####################################################################
 
     my ($device);
 
-    die("Invalid parameter syntax: expected \"dev\" instead of \"$ARGV[1]\"\n")
+    log_fatal("Invalid parameter syntax: expected \"dev\" instead of \"$ARGV[1]\"\n")
         unless lc $ARGV[1] eq 'dev';
 
     $device = $ARGV[2];
@@ -204,7 +207,7 @@ sub Main {
             $msg .= "$file: " if length $file;
             $msg .= "$str\n";
         }
-        die($msg);
+        log_fatal($msg);
     }
 
     if ($daemon) {
@@ -228,19 +231,17 @@ sub Main {
             sponge_net       => $sponge_net,
             gratuitous       => $gratuitous,
             flood_protection => $flood_protection,
-            syslog_ident     => SYSLOG_IDENT,
         );
 
     if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
         my $init = is_valid_state($init_arg, -err => \(my $err));
         if (defined $err) {
-            die("$0: --init: bad argument \"$init\": $err\n");
+            log_fatal("bad --init argument \"$init\": $err\n");
         }
         init_state($sponge, $init);
     }
 
     $sponge->is_dummy($dummy);
-    $sponge->is_verbose($verbose);
 
     $sponge->user('version', $VERSION);
     $sponge->user('net_lo', $network->first->numeric);
@@ -283,7 +284,7 @@ sub Main {
                 }
             }
             else {
-                die qq{Bad parameter "$method" for --arp-update-methods\n};
+                log_fatal qq{Bad --arp-update-methods parameter "$method"};
             }
         }
         $sponge->arp_update_flags($flags);
@@ -331,7 +332,7 @@ sub Main {
 
     ####################################################################
 
-    $sponge->print_log("Initializing $0 on [%s, %s, %s]",
+    log_notice("Initializing $0 on [%s, %s, %s]",
                     $sponge->device, $sponge->my_ip_s, $sponge->my_mac_s);
 
     # If we have to run in daemon mode, do so.
@@ -356,12 +357,12 @@ sub create_control_socket {
 
     if (-e $control_socket) {
         if (!unlink $control_socket) {
-            die("$0: cannot delete stale $control_socket: $!\n");
+            log_fatal("$0: cannot delete stale $control_socket: $!\n");
         }
     }
 
     my $control_fh = M6::ARP::Control::Server->create_server($control_socket)
-                        or die M6::ARP::Control->error."\n";
+                        or log_fatal "%s", M6::ARP::Control->error;
 
     $sponge->user('control', $control_fh);
 
@@ -372,17 +373,17 @@ sub create_control_socket {
     my $sock_perms = oct($perms[2] // $dfl_perms[2]);
 
     my $sock_uid = getpwnam($sock_owner)
-                        // die qq{$0: unknown username "$sock_owner"\n};
+                        // log_fatal qq{$0: unknown username "$sock_owner"\n};
 
     my $sock_gid = getgrnam($sock_group)
-                        // die qq{$0: unknown group "$sock_group"\n};
+                        // log_fatal qq{$0: unknown group "$sock_group"\n};
 
     chown($sock_uid, $sock_gid, $control_socket)
-        or $sponge->print_log(qq{chown %s:%s %s: %s},
+        or log_err(qq{chown %s:%s %s: %s},
                               $sock_owner, $sock_group, $control_socket, $!);
 
     chmod($sock_perms, $control_socket)
-        or $sponge->print_log(qq{chmod %04o %s: %s},
+        or log_err(qq{chmod %04o %s: %s},
                               $sock_perms, $control_socket, $!);
 
     return $control_fh;
@@ -435,8 +436,7 @@ sub handle_input {
         if ($err_count > 1 && $now > $last_err + 15) {
             # We've seen multiple select errors in the last 15 seconds.
             # Only the first was logged. Log the number of repetitions.
-            $sponge->print_log("select error repeated ",
-                               $err_count-1, " time(s)");
+            log_err("select error repeated %d time(s)", $err_count-1);
             $err_count = 0;
         }
 
@@ -445,7 +445,7 @@ sub handle_input {
             if ($! == EINTR) { # Ignore EINTR errors; they are expected.
                 $err_count++;
                 if ($err_count == 1) { # Suppress multiple errors.
-                    $sponge->print_log("error in select(): $!");
+                    log_err("error in select(): %s", $!);
                     $last_err = $now;
                 }
             }
@@ -464,9 +464,8 @@ sub handle_input {
             elsif ($ready_fd == $control_fd) {
                 if (my $client = $control_fh->accept()) {
                     $select->add($client);
-                    $sponge->add_notify($client);
-                    $sponge->print_log("[client %d] connected",
-                                        $client->fileno);
+                    add_notify($client);
+                    log_info("[client %d] connected", $client->fileno);
                 }
                 else {
                     $sponge->log_fatal(
@@ -477,9 +476,8 @@ sub handle_input {
             }
             elsif (!$ready_fh->handle_command($sponge)) {
                 $select->remove($ready_fh);
-                $sponge->remove_notify($ready_fh);
-                $sponge->print_log("[client %d] disconnected",
-                                    $ready_fh->fileno);
+                remove_notify($ready_fh);
+                log_info("[client %d] disconnected", $ready_fh->fileno);
                 $ready_fh->close;
             }
         }
@@ -513,8 +511,7 @@ sub packet_capture_loop {
     }
 
     # We don't really ever exit this loop...
-    $sponge->print_log("unexpected end of loop!");
-    die("$0: unexpected end of loop!\n");
+    log_fatal("unexpected end of loop!\n");
 }
 
 ###############################################################################
@@ -529,7 +526,7 @@ sub get_status_info_s {
     my $learning = $sponge->user('learning');
 
     my @response = (
-        sprintf("%-17s %s\n", 'id:', $sponge->syslog_ident),
+        sprintf("%-17s %s\n", 'id:', SYSLOG_IDENT),
         sprintf("%-17s %d\n", 'pid:', $$),
         sprintf("%-17s %s\n", 'version:', $sponge->user('version')),
         sprintf("%-17s %s [%d]\n", 'date:', format_time($now), $now),
@@ -657,7 +654,7 @@ sub reset_timer {
         # but it's better than running timer triggers in tight
         # circles.
         my $caller = (caller(1))[3];
-        $sponge->print_log("$caller - timer event LAG: %s; %s",
+        log_info("$caller - timer event LAG: %s; %s",
             strftime("planned=%H:%M:%S",
                     localtime($next_alarm+$timer_cycle)),
             strftime("adjusted=%H:%M:%S",
@@ -680,19 +677,18 @@ sub do_timer($) {
     my $sponge = shift;
 
     my $learning = $sponge->user('learning');
-    #$sponge->print_log("timer; learning:$learning");
     if ($learning > 0) {
         do_learn($sponge);
         $sponge->user('learning', $learning-1);
         if ($learning-1 == 0) {
-            $sponge->print_log("exiting learning state");
+            log_notice("exiting learning state");
         }
     }
     else {
         my $pending  = $sponge->pending;
         my $sleep    = $sponge->user('probesleep');
 
-        $sponge->verbose(2, "Probing pending addresses...\n");
+        log_verbose(2, "Probing pending addresses...\n");
         my $n = 0;
         for my $ip (sort keys %$pending) {
             if ($$pending{$ip} > PENDING($sponge->max_pending)) {
@@ -701,14 +697,14 @@ sub do_timer($) {
             else {
                 $sponge->send_probe($ip);
                 $sponge->incr_pending($ip);
-                $sponge->verbose(2, "probed $ip, state=",
+                log_verbose(2, "probed $ip, state=",
                                         $sponge->get_state($ip), "\n");
                 handle_input($sponge, time+$sleep);
             }
             $n++;
         }
-        if ($n > 1 || $sponge->is_verbose > 1) {
-            $sponge->print_log("%d pending IPs probed", $n);
+        if ($n > 1 || log_is_verbose() > 1) {
+            log_notice("%d pending IPs probed", $n);
         }
 
         my $next_sweep = $sponge->user('next_sweep');
@@ -750,7 +746,7 @@ sub init_state {
 sub do_learn($) {
     my $sponge = shift;
 
-    $sponge->verbose(1, "LEARN: ",
+    log_verbose(1, "LEARN: ",
                 int($sponge->user('learning')), " secs left\n");
     return;
 }
@@ -770,21 +766,21 @@ sub do_sweep($) {
     my $threshold = $sponge->user('sweep_age');
     my $sleep     = $sponge->user('probesleep');
 
-    $sponge->print_log("sweeping for quiet entries on %s/%d",
+    log_notice("sweeping for quiet entries on %s/%d",
                         hex2ip($sponge->network), $sponge->prefixlen);
     
     my $lo = $sponge->user('net_lo');
     my $hi = $sponge->user('net_hi');
 
     my $nprobe = 0;
-    my $verbose = $sponge->is_verbose;
-    $sponge->is_verbose($verbose-1) if $verbose>0;
+    my $verbose = log_is_verbose();
+    log_is_verbose($verbose-1) if $verbose>0;
     for (my $num = $lo; $num <= $hi; $num++) {
         my $ip = sprintf("%08x", $num);
         my $age = time - $sponge->state_mtime($ip);
         if ($age >= $threshold) {
             if ($verbose>1) {
-                $sponge->sverbose(1, "DO PROBE %s (%d >= %d)\n",
+                log_sverbose(1, "DO PROBE %s (%d >= %d)\n",
                                 hex2ip($ip), $age, $threshold);
             }
             $sponge->send_probe($ip);
@@ -793,12 +789,12 @@ sub do_sweep($) {
             handle_input($sponge, time+$sleep);
         }
         elsif ($verbose>1) {
-                $sponge->sverbose(1, "SKIP PROBE %s (%d < %d)\n",
+                log_sverbose(1, "SKIP PROBE %s (%d < %d)\n",
                                 hex2ip($ip), $age, $threshold);
         }
     }
-    $sponge->is_verbose($verbose);
-    $sponge->print_log("probed $nprobe IP address(es)");
+    log_is_verbose($verbose);
+    log_notice("probed $nprobe IP address(es)");
 }
 
 ###############################################################################
@@ -817,7 +813,7 @@ sub update_state {
         $sponge->set_alive($src_ip, $src_mac);
     }
     else {
-        $sponge->print_log(
+        log_warning(
             "traffic from STATIC sponged IP: src.mac=%s src.ip=%s",
             hex2mac($src_mac), hex2ip($src_ip),
         );
@@ -896,7 +892,7 @@ sub process_pkt {
 
     if ( $arp_obj->{sha} ne $src_mac ) {
         # Interesting ...
-        $sponge->print_log(
+        log_warning(
             "ARP spoofing: src.mac=%s arp.sha=%s arp.spa=%s arp.tpa=%s",
             hex2mac($src_mac), hex2mac($arp_obj->{sha}),
             hex2ip($src_ip),   hex2ip($dst_ip),
@@ -906,7 +902,7 @@ sub process_pkt {
     if ( ! $sponge->is_my_network($dst_ip) ) {
         # We only store/sponge ARPs for our "local" IP addresses.
 
-        $sponge->print_log("misplaced ARP: src.mac=%s arp.spa=%s arp.tpa=%s",
+        log_warning("misplaced ARP: src.mac=%s arp.spa=%s arp.tpa=%s",
                         hex2mac($src_mac),
                         hex2ip($src_ip),
                         hex2ip($dst_ip),
@@ -920,8 +916,8 @@ sub process_pkt {
     if ($sponge->is_my_ip($dst_ip)) {
         # ARPs for our IPs require no action (handled by the kernel),
         # except for maybe updating our internal ARP table.
-        if ($sponge->is_verbose) {
-            $sponge->sverbose(1, "ARP WHO HAS %s TELL %s (for our IP)\n",
+        if (log_is_verbose()) {
+            log_sverbose(1, "ARP WHO HAS %s TELL %s (for our IP)\n",
                                 hex2ip($dst_ip), hex2ip($src_ip));
         }
         $sponge->set_alive($dst_ip, $sponge->my_mac);
@@ -930,7 +926,7 @@ sub process_pkt {
     elsif ($src_ip eq $NULL_IP) {
         # DHCP duplicate IP detection.
         # See RFC 2131, p38, bottom.
-        $sponge->print_log(
+        log_notice(
                 "DHCP duplicate IP detection: src.mac=%s arp.tpa=%s\n",
                 hex2mac($src_mac), hex2ip($dst_ip)
             );
@@ -944,15 +940,15 @@ sub process_pkt {
         return;
     }
 
-    if ($sponge->is_verbose >= 2) {
-        $sponge->sverbose(2, "ARP WHO HAS %s TELL %s ",
+    if (log_is_verbose() >= 2) {
+        log_sverbose(2, "ARP WHO HAS %s TELL %s ",
                           hex2ip($dst_ip), hex2ip($src_ip));
         if ($state <= DEAD) {
             my $age = time - $sponge->state_mtime($dst_ip);
-            $sponge->sverbose(2, "[sponged=yes; %d secs ago]\n", $age);
+            log_sverbose(2, "[sponged=yes; %d secs ago]\n", $age);
         }
         else {
-            $sponge->verbose(2, "[sponged=no]\n");
+            log_verbose(2, "[sponged=no]\n");
         }
     }
 
@@ -975,7 +971,7 @@ sub process_pkt {
                     my $r1 = $sponge->queue->rate($dst_ip);
                     my $d2 = $sponge->queue->reduce($dst_ip, $fprate);
                     my $r2 = $sponge->queue->rate($dst_ip);
-                    $sponge->print_log(
+                    log_notice(
                             "%s queue reduced: [depth,rate] = "
                             ."[%d,%0.1f] -> [%d,%0.1f]",
                             hex2ip($dst_ip), $d1, $r1, $d2, $r2
@@ -1019,19 +1015,18 @@ sub start_daemon($$) {
         if ($pid) {
             chomp(my $proc = `ps h -p $pid -o args`);
             if ($proc =~ /$0/) {
-                $sponge->print_log("$0 already running (pid = %d)", $pid);
-                die("$0: already running (pid = $pid)\n");
+                log_fatal("already running (pid = $pid)\n");
             }
         }
         print STDERR "$0: WARNING: removing stale PID file $pidfile\n";
-        $sponge->print_log("removing stale PID file %s", $pidfile);
+        log_warning("removing stale PID file %s", $pidfile);
         unlink $pidfile;
     }
 
     if (my $pid = fork) {
         # Parent process. We are going to exit, letting our child
         # roam free.
-        $sponge->verbose(1, "$0: going into the background; pid=$pid\n");
+        log_verbose(1, "$0: going into the background; pid=$pid\n");
         exit(0);
     }
 
@@ -1043,8 +1038,7 @@ sub start_daemon($$) {
     }
     else {
         my $err = $!;
-        $sponge->print_log("FATAL: cannot write pid to %s: %s", $pidfile, $err);
-        die("$0: cannot write pid to $pidfile: $err\n");
+        log_fatal("cannot write pid to %s: %s", $pidfile, $err);
     }
 
     # Close the standard file descriptors.
@@ -1053,7 +1047,7 @@ sub start_daemon($$) {
     close STDIN;
 
     # Verbosity and dummyness have no place in a daemon.
-    $sponge->is_verbose(0);
+    log_is_verbose(0);
     $sponge->is_dummy(0);
     return undef;
 }
@@ -1068,7 +1062,7 @@ sub process_signal {
     my $sponge = shift;
     my $name = shift;
 
-    $sponge->print_log("Received %s signal -- exiting", $name);
+    log_crit("Received %s signal -- exiting", $name);
     exit(1);
 }
 
@@ -1091,7 +1085,7 @@ sub do_status {
         $filename = '/dev/null';
     }
 
-    $sponge->print_log("SIG%s; dumping status to %s", $signal, $filename);
+    log_info("SIG%s; dumping status to %s", $signal, $filename);
 
     # Open the status file as read/write, non-blocking,
     # and don't buffer anything. This is useful if the destination
@@ -1100,7 +1094,7 @@ sub do_status {
     my $fh = new IO::File($filename, O_RDWR|O_CREAT);
 
     unless ($fh) {
-        $sponge->print_log("cannot write status to %s: %s", $filename, $!);
+        log_err("cannot write status to %s: %s", $filename, $!);
         return;
     }
 
@@ -1122,7 +1116,7 @@ sub do_status {
                         $nalive, $ndead, $npending, $nmac));
     ##########################################################################
     $fh->close;
-    $sponge->print_log("alive=%d dead=%d pending=%d ARP_entries=%d",
+    log_notice("status dumped; alive=%d dead=%d pending=%d ARP_entries=%d",
                         $nalive, $ndead, $npending, $nmac);
 }
 

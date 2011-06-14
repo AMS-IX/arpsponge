@@ -34,8 +34,10 @@ BEGIN {
         log_notice
         log_info
         log_fatal
-        log_is_verbose verbose sverbose
+        log_is_verbose log_verbose log_sverbose
+        log_level is_log_level
         add_notify remove_notify print_notify
+        get_log_buffer clear_log_buffer log_buffer_size
     );
 
     our @macros = qw(
@@ -46,7 +48,6 @@ BEGIN {
     our @vars = qw(
         $FACILITY
         $LOGOPT
-        $Min_Level
         $Debug
         $Verbose
     );
@@ -65,7 +66,6 @@ BEGIN {
 our $FACILITY  = 'user';
 our $LOGOPT    = 'pid';
 
-our $Min_Level      = LOG_NOTICE;
 our $Default_Level  = LOG_NOTICE;
 our $Debug          = 0;
 our $Verbose        = 0;
@@ -82,12 +82,27 @@ our %STR_TO_LOGLEVEL = (
         'debug'   => LOG_DEBUG,
     );
 
+our %LOGLEVEL_TO_STR = (
+        map { ($STR_TO_LOGLEVEL{$_} => $_) } keys %STR_TO_LOGLEVEL,
+    );
+
+my $Min_Level       = LOG_NOTICE;
 my @Log_Buffer      = ();
-my $Log_Buffer_Size = 100;
+my $Log_Buffer_Size = 256;
 my $Notify;
 
 END {
     closelog;
+}
+
+sub __log_getset {
+    my $ref = shift;
+    if (@_) {
+        my $old = $$ref;
+        $$ref = shift;
+        return $old;
+    }
+    return $$ref;
 }
 
 sub init_log {
@@ -98,27 +113,17 @@ sub init_log {
     return 1;
 }
 
-sub log_buffer_size {
-    if (@_) {
-        my $old = $Log_Buffer_Size;
-        $Log_Buffer_Size = int(shift);
-        return $old;
-    }
-    return $Log_Buffer_Size;
-}
+sub log_buffer_size { return __log_getset(\$Log_Buffer_Size, @_) }
+sub log_is_verbose  { return __log_getset(\$Verbose, @_) }
+sub log_level       { return __log_getset(\$Min_Level, @_) }
+sub is_log_level    { return shift >= $Min_Level }
 
 sub get_log_buffer {
-    my $num = @_ ? shift : int @Log_Buffer;
-    return @Log_Buffer[0..$num-1];
+    return \@Log_Buffer;
 }
 
-sub log_is_verbose { 
-    if (@_) {
-        my $old = $Verbose;
-        $Verbose = int(shift);
-        return $old;
-    }
-    return $Verbose;
+sub clear_log_buffer {
+    @Log_Buffer = ();
 }
 
 sub log_emerg($@)   { print_log_level(LOG_EMERG,    @_) }
@@ -232,12 +237,12 @@ sub log_fatal($;@) {
 }
 
 ###############################################################################
-# verbose($level, $arg, ...);
+# log_verbose($level, $arg, ...);
 #
 #   Print the arguments to STDOUT if verbosity is at least $level.
 #
 ###############################################################################
-sub verbose($$@) {
+sub log_verbose($$@) {
     my ($level, @args)  = @_;
 
     if (log_is_verbose >= $level) {
@@ -246,13 +251,13 @@ sub verbose($$@) {
 }
 
 ###############################################################################
-# sverbose($level, $fmt, $arg, ...);
+# log_sverbose($level, $fmt, $arg, ...);
 #
 #   Print the arguments to STDOUT if verbosity is at least $level.
 #   Functions like sprintf();
 #
 ###############################################################################
-sub sverbose($$@) {
+sub log_sverbose($$@) {
     my ($level, $fmt, @args) = @_;
     if (log_is_verbose >= $level) {
         print STDOUT strftime("%Y-%m-%d %H:%M:%S ", localtime(time)),
@@ -282,6 +287,23 @@ sub is_valid_log_level {
 
     ${$opts{-err}} = q/"$arg" is not a valid syslog level/;
     return;
+}
+
+=item X<log_level_to_string>B<log_level_to_string> ( I<LOGLEVEL> )
+
+Return the string representation of the numerical I<LOGLEVEL>.
+
+=cut
+
+sub log_level_to_string {
+    my $level = shift;
+    if ($level < LOG_DEBUG) {
+        $level = LOG_DEBUG;
+    }
+    elsif ($level > LOG_EMERG) {
+        $level = LOG_EMERG;
+    }
+    return $LOGLEVEL_TO_STR{$level};
 }
 
 1;
