@@ -25,29 +25,25 @@ use strict;
 use base qw( M6::ARP::Base );
 
 use M6::ARP::Queue;
+use M6::ARP::Log;
 use M6::ARP::Const      qw( :all );
 use M6::ARP::Util       qw( :all );
 use M6::ARP::NetPacket  qw( :all );
 
 use POSIX               qw( strftime );
 use Net::ARP;
-use Sys::Syslog;
 use IO::Select;
 
 our $VERSION = 1.07;
 
-END {
-    closelog;
-}
-
 # Accessors; use the factory :-)
 __PACKAGE__->mk_accessors(qw( 
-                syslog_ident    is_verbose          is_dummy
+                is_dummy
                 queuedepth      my_ip               my_mac
-                network         prefixlen           loglevel
+                network         prefixlen
                 arp_age         gratuitous          flood_protection
                 max_rate        max_pending         sponge_net
-                log_buffer      log_buffer_size     pcap_handle
+                pcap_handle
                 arp_update_flags
         ));
 
@@ -82,6 +78,17 @@ sub state_name { return state_to_string($_[1]) }
 #                   Object Attributes
 #
 ###############################################################################
+
+# Not really an object attribute...
+sub syslog_ident {
+    my $self = shift;
+    if (@_) {
+        $M6::ARP::Log::Syslog_Ident = shift;
+        return $self;
+    }
+    return $M6::ARP::Log::Syslog_Ident;
+}
+
 sub queue            { shift->{'queue'} }
 sub device           { shift->{'device'} }
 sub phys_device      { shift->{'phys_device'} }
@@ -135,11 +142,7 @@ sub set_state    {
 sub new {
     my $type = shift;
 
-    my ($prog) = $0 =~ m|([^/]+)$|;
     my $self = {
-            'log_buffer_size'   => 256,
-            'syslog_ident'      => $prog,
-            'loglevel'          => 'info',
             'arp_update_flags'  => ARP_UPDATE_ALL,
             'queuedepth'        => $M6::ARP::Queue::DFL_DEPTH,
         };
@@ -159,20 +162,17 @@ sub new {
     $self->my_ip( $self->get_ip );
     $self->my_mac( $self->get_mac );
 
-    $self->{log_buffer}  = [];
     $self->{user}        = {};
-    $self->{notify}      = IO::Select->new();
     $self->{queue}       = new M6::ARP::Queue($self->queuedepth);
 
     $self->init_all_state();
 
-    if ($self->is_verbose) {
-        $self->sverbose(1, "Device: %s\n", $self->device);
-        $self->sverbose(1, "Device: %s\n", $self->phys_device);
-        $self->sverbose(1, "MAC:    %s\n", $self->my_mac_s);
-        $self->sverbose(1, "IP:     %s\n", $self->my_ip_s);
+    if (log_is_verbose) {
+        sverbose(1, "Device: %s\n", $self->device);
+        sverbose(1, "Device: %s\n", $self->phys_device);
+        sverbose(1, "MAC:    %s\n", $self->my_mac_s);
+        sverbose(1, "IP:     %s\n", $self->my_ip_s);
     }
-    openlog($self->syslog_ident, 'cons,pid', 'user');
     return $self;
 }
 
@@ -203,36 +203,6 @@ sub init_all_state {
         $self->set_alive($ip, $self->my_mac);
     }
     return $self;
-}
-
-###############################################################################
-# $sponge->add_notify($fh);
-#
-#   Add $fh to the list of notification handles. $fh is assumed
-#   to be a M6::ARP::Control::Server reference.
-#
-#   Returns the $fh argument.
-#
-###############################################################################
-sub add_notify {
-    my ($self, $fh) = @_;
-    $self->{'notify'}->add($fh);
-    return $fh;
-}
-
-###############################################################################
-# $sponge->remove_notify($fh);
-#
-#   Remove $fh from the list of notification handles. $fh is assumed
-#   to be a M6::ARP::Control::Server reference.
-#
-#   Returns the $fh argument.
-#
-###############################################################################
-sub remove_notify {
-    my ($self, $fh) = @_;
-    $self->{'notify'}->remove($fh);
-    return $fh;
 }
 
 ###############################################################################
@@ -351,7 +321,7 @@ sub is_my_network_s {
 sub set_pending {
     my ($self, $target_ip, $n) = @_;
     my $state = $self->set_state($target_ip, PENDING($n));
-    $self->print_log("pending: %s (state %d)", hex2ip($target_ip), $n);
+    log_notice("pending: %s (state %d)", hex2ip($target_ip), $n);
     return $state;
 }
 
@@ -377,8 +347,8 @@ sub incr_pending {
 sub send_probe {
     my ($self, $target_ip) = @_;
 
-    if ($self->is_verbose >=2) {
-        $self->sverbose(2,
+    if (log_is_verbose >=2) {
+        sverbose(2,
             "Probing [dev=%s]: %s\n", $self->phys_device, hex2ip($target_ip)
         );
     }
@@ -400,8 +370,8 @@ sub send_probe {
 sub gratuitous_arp {
     my ($self, $ip) = @_;
 
-    if ($self->is_verbose) {
-        $self->sverbose(1, "%sgratuitous ARP [dev=%s]: %s\n",
+    if (log_is_verbose) {
+        sverbose(1, "%sgratuitous ARP [dev=%s]: %s\n",
                 ($self->is_dummy ? '[DUMMY] ' : ''),
                 $self->phys_device, hex2ip($ip));
     }
@@ -448,7 +418,7 @@ sub send_arp {
                 });
 
     if (Net::Pcap::sendpacket($pcap_h, $pkt) < 0) {
-        $self->print_log("ERROR sending ARP packet: %s", $!);
+        log_err("ERROR sending ARP packet: %s", $!);
     }
     return;
 }
@@ -464,12 +434,12 @@ sub send_arp_update {
 
     my $pcap_h = $self->pcap_handle;
 
-    if (!$pcap_h || $self->is_verbose) {
+    if (!$pcap_h || log_is_verbose) {
         my $dst_mac_s = hex2mac($args{tha});
         my $dst_ip_s  = hex2ip($args{tpa});
         my $src_mac_s = hex2mac($args{sha});
         my $src_ip_s  = hex2ip($args{spa});
-        $self->sverbose(1, "%sarp inform %s\@%s about %s\@%s\n",
+        sverbose(1, "%sarp inform %s\@%s about %s\@%s\n",
                         (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
                          $dst_ip_s, $dst_mac_s,
                          $src_ip_s, $src_mac_s,
@@ -525,15 +495,15 @@ sub send_reply {
         my $dst_mac_s = hex2mac($arp_obj->{sha});
         my $dst_ip_s  = hex2ip($arp_obj->{spa});
         my $src_ip_s  = hex2ip($src_ip);
-        $self->sverbose(1, "%s: DUMMY sponge reply to %s\@%s\n",
+        sverbose(1, "%s: DUMMY sponge reply to %s\@%s\n",
                            $src_ip_s, $dst_ip_s, $dst_mac_s);
         return;
     }
-    elsif ($self->is_verbose) {
+    elsif (log_is_verbose) {
         my $dst_mac_s = hex2mac($arp_obj->{sha});
         my $dst_ip_s  = hex2ip($arp_obj->{spa});
         my $src_ip_s  = hex2ip($src_ip);
-        $self->sverbose(1, "%s: sponge reply to %s\@%s\n",
+        sverbose(1, "%s: sponge reply to %s\@%s\n",
                            $src_ip_s, $dst_ip_s, $dst_mac_s);
     }
 
@@ -554,7 +524,7 @@ sub set_dead {
     my ($self, $ip) = @_;
     my $rate = $self->queue->rate($ip) // 0.0;
 
-    $self->print_log("sponging: %s (%0.1f q/min)", hex2ip($ip), $rate);
+    log_notice("sponging: %s (%0.1f q/min)", hex2ip($ip), $rate);
 
     $self->gratuitous_arp($ip) if $self->gratuitous;
     $self->set_state($ip, DEAD);
@@ -579,127 +549,30 @@ sub set_alive {
     $mac //= $arp[0] // $ETH_ADDR_NONE;
 
     if ($self->get_state($ip) == DEAD) {
-        $self->print_log("unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+        log_notice("unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
     }
     elsif ($self->get_state($ip) >= PENDING(0)) {
-        $self->print_log("clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+        log_notice("clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
     }
-    elsif ($self->is_verbose && $self->queue->depth($ip) > 0) {
-        $self->sverbose(1,
+    elsif (log_is_verbose && $self->queue->depth($ip) > 0) {
+        sverbose(1,
                 "clearing: ip=%s mac=%s\n", hex2ip($ip), hex2mac($mac));
     }
 
     $self->queue->clear($ip);
     $self->set_state($ip, ALIVE);
 
-    if ($self->is_verbose) {
+    if (log_is_verbose) {
         if (!@arp) {
-            $self->sverbose(1, "learned: ip=%s mac=%s old=none\n",
+            sverbose(1, "learned: ip=%s mac=%s old=none\n",
                                hex2ip($ip), hex2mac($mac));
         }
         elsif ($arp[0] ne $mac) {
-            $self->sverbose(1, "learned: ip=%s mac=%s old=%s\n",
+            sverbose(1, "learned: ip=%s mac=%s old=%s\n",
                               hex2ip($ip), hex2mac($mac), hex2mac($arp[0]));
         }
     }
     $self->arp_table($ip, $mac, time);
-}
-
-###############################################################################
-# $sponge->verbose($level, $arg, ...);
-# verbose($level, $arg, ...);
-#
-#   Print the arguments to STDOUT if verbosity is at least $level.
-#
-###############################################################################
-sub verbose {
-    my ($self, $level, @args)  = @_;
-
-    if ($self->is_verbose >= $level) {
-        print STDOUT strftime("%Y-%m-%d %H:%M:%S ", localtime(time)), @args;
-    }
-}
-
-###############################################################################
-# $sponge->sverbose($level, $fmt, $arg, ...);
-#
-#   Print the arguments to STDOUT if verbosity is at least $level.
-#   Functions like sprintf();
-#
-###############################################################################
-sub sverbose {
-    my ($self, $level, $fmt, @args) = @_;
-    if ($self->is_verbose >= $level) {
-        print STDOUT strftime("%Y-%m-%d %H:%M:%S ", localtime(time)),
-                     sprintf($fmt, @args);
-    }
-}
-
-###############################################################################
-# $sponge->print_log_level($level, $format, ...);
-###############################################################################
-sub print_log_level {
-    my ($self, $level, $format, @args) = @_;
-
-    # Add message to circular log buffer.
-    my $log_buffer = $self->log_buffer;
-    foreach (split(/\n/, sprintf($format, @args))) {
-        push @$log_buffer, [ time, $_ ];
-        if (int(@$log_buffer) > $self->log_buffer_size) {
-            shift @$log_buffer;
-        }
-    }
-
-    if ($self->is_dummy || $self->is_verbose > 0) {
-        my $syslog = $self->syslog_ident;
-        my $head = strftime("%Y-%m-%d %H:%M:%S ", localtime(time))
-                 . $syslog . "[$$]:";
-        print STDOUT map { "$head $_\n" } split(/\n/, sprintf($format, @args));
-    }
-    else {
-        syslog($level, $format, @args);
-    }
-    $self->print_notify($format, @args);
-}
-
-###############################################################################
-# $sponge->print_log($format, ...);
-#
-#   Log $format, ... to syslog. Syntax is identical to that of printf().
-#   Prints to STDOUT if verbose or dummy.
-###############################################################################
-sub print_log {
-    my ($self, $format, @args) = @_;
-    $self->print_log_level($self->loglevel, $format, @args);
-}
-
-###############################################################################
-# $sponge->log_fatal($format, ...);
-#
-#   Log $format, ... to syslog and dies() with the same message. Syntax is
-#   identical to that of printf().  Prints to STDOUT if verbose or dummy,
-#   so you may see duplicate messages in that case.
-###############################################################################
-sub log_fatal {
-    my ($self, $format, @args) = @_;
-    chomp(my $msg = sprintf($format, @args));
-    $self->print_log('%s', $msg);
-    die "$msg\n";
-}
-
-###############################################################################
-# $sponge->print_notify($format, ...);
-#
-#   Notify of sponge actions on the notify handles.
-###############################################################################
-sub print_notify {
-    my $self = shift;
-    my $format = shift;
-
-    my $msg = sprintf($format, @_);
-    for my $fh ($self->{'notify'}->can_write(0)) {
-        $fh->send_log($msg);
-    }
 }
 
 1;

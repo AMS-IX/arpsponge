@@ -10,13 +10,15 @@ include $(TOPDIR)/config.mk
 INSTALLDIR	=	$(INSTLIB)/M6/ARP
 
 INSTALLFILES		=	\
-				$(INSTALLDIR)/Base.pm		\
-				$(INSTALLDIR)/Queue.pm		\
-				$(INSTALLDIR)/Sponge.pm		\
-				$(INSTALLDIR)/Table.pm		\
-				$(INSTALLDIR)/Control.pm	\
-				$(INSTALLDIR)/NetPacket.pm	\
-				$(INSTALLDIR)/Util.pm
+		$(INSTALLDIR)/Base.pm \
+		$(INSTALLDIR)/Const.pm \
+		$(INSTALLDIR)/Control.pm \
+		$(INSTALLDIR)/Log.pm \
+		$(INSTALLDIR)/NetPacket.pm \
+		$(INSTALLDIR)/Queue.pm \
+		$(INSTALLDIR)/Sponge.pm \
+		$(INSTALLDIR)/Table.pm \
+		$(INSTALLDIR)/Util.pm
 
 include $(TOPDIR)/rules.mk
 
