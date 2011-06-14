@@ -461,10 +461,10 @@ sub _cmd_set_queuedepth {
 sub _cmd_set_log_level {
     my ($self, $sponge, $cmd, @args) = @_;
 
-    my $level = is_valid_int($args[0], -min=>LOG_DEBUG, -max=>LOG_EMERG);
+    my $level = is_valid_int($args[0], -min=>LOG_EMERG, -max=>LOG_DEBUG);
     if (!defined $level) {
         return $self->send_error(sprintf("%s {%d-%d}", $cmd,
-                                    LOG_DEBUG, LOG_EMERG));
+                                    LOG_EMERG, LOG_DEBUG));
     }
     log_notice("[client %d] %s %d", $self->fileno, $cmd, $level);
     my $old = log_level($level);
