@@ -112,8 +112,8 @@ my %Syntax = (
         '$dst_ip' => { type=>'ip-address' },
         '$src_ip' => { type=>'ip-address' } },
     'set arp_update_flags $flags' => {
-        '?'       => 'Set the methods (comma-separated list) by which the'
-                    .' sponge is to update its neighbor caches',
+        '?'       => q{Set the methods (comma-separated list) by which the}
+                    .q{ sponge is to update its neighbors' ARP caches},
         '$flags'  => { type=>'arp-update-flags' },
         },
     'set ip $ip dead'   => {
@@ -1087,24 +1087,24 @@ sub do_set_log_level {
                    -type    => 'log-level');
 }
 
-# cmd: set max-pending
+# cmd: set max_pending
 sub do_set_max_pending {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
-                   -name    => 'max-pending',
+                   -name    => 'max_pending',
                    -val     => $args->{'num'},
                    -options => $args->{-options},
                    -unit    => ' secs',
                    -type    => 'integer');
 }
 
-# cmd: set max-rate
+# cmd: set max_rate
 sub do_set_max_rate {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
-                   -name    => 'max-rate',
+                   -name    => 'max_rate',
                    -val     => $args->{'rate'},
                    -options => $args->{-options},
                    -unit    => ' q/min',
@@ -1123,12 +1123,12 @@ sub do_set_learning {
                    -type    => 'int');
 }
 
-# cmd: set flood-protection
+# cmd: set flood_protection
 sub do_set_flood_protection {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
-                   -name    => 'flood-protection',
+                   -name    => 'flood_protection',
                    -val     => $args->{'rate'},
                    -options => $args->{-options},
                    -unit    => ' q/sec',
@@ -1367,7 +1367,7 @@ sub do_param {
     }
     my $info = $output->[0];
     print_output(
-        sprintf("$tag= %d\n", 'queue_depth', $$info{queue_depth}),
+        sprintf("$tag= %d\n", 'queuedepth', $$info{queue_depth}),
         sprintf("$tag= %0.2f q/min\n", 'max_rate', $$info{max_rate}),
         sprintf("$tag= %0.2f q/sec\n", 'flood_protection',
                 $$info{flood_protection}),
@@ -1633,7 +1633,7 @@ disconnect and quit
 =item X<arp_update_flags>B<set> B<arp_update_flags> I<flag>[,I<flag>,...]
 
 Set the methods (comma-separated list) by which the sponge is to update
-its neighbor caches.
+its neighbors' ARP caches.
 
 Assuming we want to update I<stanley> about I<livingston>, the possible
 values for I<flag> are:
@@ -1765,11 +1765,11 @@ When the C<log_level> is set to I<level>, all messages of level I<level> and
 higher importance are logged, so C<notice> will log C<warning>, C<err>, etc.
 but not C<info> or C<debug>.
 
-=item B<set> {B<max-pending>|B<queuedepth>} I<num>
+=item B<set> {B<max_pending>|B<queuedepth>} I<num>
 
 Set queue parameters
 
-=item B<set> {B<max-rate>|B<flood-protection>|B<proberate>} I<rate>
+=item B<set> {B<max_rate>|B<flood_protection>|B<proberate>} I<rate>
 
 Set rate parameters
 
