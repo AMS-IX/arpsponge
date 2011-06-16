@@ -1773,7 +1773,8 @@ Set queue parameters
 
 Set rate parameters
 
-=item B<set sweep> {B<age>|B<period>} I<secs>
+=item B<set sweep_age> I<secs>
+=item B<set sweep_probe> I<secs>
 
 Set sweep/probe parameters
 
