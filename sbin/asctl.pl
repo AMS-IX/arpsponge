@@ -113,7 +113,7 @@ my %Syntax = (
         '$src_ip' => { type=>'ip-address' } },
     'set arp_update_flags $flags' => {
         '?'       => 'Set the methods (comma-separated list) by which the'
-                    .'sponge is to update its neighbor caches',
+                    .' sponge is to update its neighbor caches',
         '$flags'  => { type=>'arp-update-flags' },
         },
     'set ip $ip dead'   => {
@@ -1598,25 +1598,27 @@ In the list below, the following constructions are used:
 
 =item B<clear arp> I<ip-range>
 
-clear ARP table for given IP(s)
+Clear ARP table for given IP(s)
 
 =item B<clear ip> I<ip-range>
 
-clear state table for given IP(s)
+Clear state table for given IP(s)
 
 =item B<help>
 
-show command summary
+Show command summary
 
 =item B<inform> I<dst_ip> B<about> I<src_ip>
 
-force I<dst_ip> to update its ARP entry for I<src_ip>
+Force I<dst_ip> to update its ARP entry for I<src_ip>. See also
+"L<set arp_update_flags|/arp_update_flags>" below.
 
-=item B<ping> I<count> I<delay>
+=item B<ping> [[I<count> [I<delay>]]
 
-"ping" the daemon, display response RTT; continues until stopped
-by an interrupt (C<Ctrl-C>) unless I<count> is given; I<delay>
-specifies the time (in seconds) to wait between "ping"s.
+Send I<count> "ping" probes to the daemon, waiting I<delay>
+seconds between probes, display response RTT per probe and
+a summary at the end. Can be stopped by an interrupt signal
+(C<Ctrl-C>).
 
 =item B<probe> [B<--delay>=I<sec> | B<--rate>=I<rate>] I<ip-range> 
 
@@ -1628,65 +1630,174 @@ but this can be changed with the C<--delay> or C<--rate> options.
 
 disconnect and quit
 
+=item X<arp_update_flags>B<set> B<arp_update_flags> I<flag>[,I<flag>,...]
+
+Set the methods (comma-separated list) by which the sponge is to update
+its neighbor caches.
+
+Assuming we want to update I<stanley> about I<livingston>, the possible
+values for I<flag> are:
+
+=over
+
+=item C<reply>
+
+Spoof an unsollicited ARP reply on behalf of I<livingston>, hoping that
+I<stanley> will pick it up:
+
+  SRC = my-MAC
+  DST = stanley-MAC
+  PKT = ARP livingston-IP IS AT livingston-MAC
+
+=item C<request>
+
+Spoof an ARP request for I<stanley> on behalf of I<livingston>. This should
+update I<stanley>'s ARP cache as well, but will result in a response to
+I<livingston>, where it will be treated as an unsollicited response (most
+likely will be dropped):
+
+  SRC = my-MAC
+  DST = stanley-MAC
+  PKT = ARP WHO HAS stanley-IP TELL livingston-IP @ livingston-MAC
+
+=item C<gratuitous>
+
+Spoof a gratuitous ARP, effectively sending a "unicast proxy gratuitous ARP
+request":
+
+  SRC = my-MAC
+  DST = stanley-MAC
+  PKT = ARP WHO HAS livingston-IP TELL livingston-IP @ livingston-MAC
+
+This should result in no extra traffic, while hopefully still updating the ARP
+cache at I<stanley>.
+
+=item C<all>
+
+All of the above.
+
+=item C<none>
+
+None of the above.
+
+=back
+
+It is possible to combine these flags and negate them, so the following are
+equivalent:
+
+  all
+  !none
+  gratuitous,reply,request
+
+As are these:
+
+  all,!request
+  !none,!request
+  gratuitous,reply
+
 =item B<set dummy> I<bool>
 
-enable/disable DUMMY mode; I<bool> can be any of:
+Enable/disable DUMMY mode; I<bool> can be any of:
 C<yes>, C<true>, C<on>, C<1>,
 C<no>, C<false>, C<off>, C<0>.
 
 =item B<set ip> I<ip-range> B<alive> [I<mac>]
 
-unsponge given IP(s) (associate them with I<mac>)
+Unsponge given IP(s) (associate them with I<mac>)
 
 =item B<set ip> I<ip-range> B<dead>
 
-sponge given IP(s)
+Sponge given IP(s)
 
 =item B<set ip> I<ip-range> B<mac> I<mac>
 
-statically store <ip> -> <mac> in the ARP table
+Statically store <ip> -> <mac> in the ARP table
 
 =item B<set ip> I<ip-range> pending [I<pending>]
 
-set given IP(s) to pending state I<pending> (default 0)
+Set given IP(s) to pending state I<pending> (default 0)
 
 =item B<set learning> I<secs>
 
-switch in to/out of learning mode
+Switch in to/out of learning mode
+
+=item B<set log_level> I<level>
+
+Set the level of logging for the daemon. Values are the same as
+L<syslog(3)|syslog> levels. In decreasing importance:
+
+=over
+
+=item C<emerg>
+
+=item C<alert>
+
+Currently not used.
+
+=item C<crit>
+
+Log critical errors. These are typically fatal errors.
+
+=item C<err>
+
+Log errors.
+
+=item C<warning>
+
+Logs warnings of misplaced ARP requests (for the wrong IP range), possible ARP
+spoofing, etc.
+
+=item C<notice>
+
+Default level. Logs sponge actions.
+
+=item C<info>
+
+Log the comings and goings of control clients.
+
+=item C<debug>
+
+Currently not used.
+
+=back
+
+When the C<log_level> is set to I<level>, all messages of level I<level> and
+higher importance are logged, so C<notice> will log C<warning>, C<err>, etc.
+but not C<info> or C<debug>.
 
 =item B<set> {B<max-pending>|B<queuedepth>} I<num>
 
-set queue parameters
+Set queue parameters
 
 =item B<set> {B<max-rate>|B<flood-protection>|B<proberate>} I<rate>
 
-set rate parameters
+Set rate parameters
 
 =item B<set sweep> {B<age>|B<period>} I<secs>
 
-set sweep/probe parameters
+Set sweep/probe parameters
 
 =item B<show arp> [I<ip-any>]
 
-show ARP table for given IP(s)
+Show ARP table for given IP(s)
 
 =item B<show ip> [I<ip-filter>]
 
-show state table for given IP(s)
+Show state table for given IP(s)
 
 =item B<show log> [I<nlines>]
 
-show daemon log (most recent <nlines>)
+Show daemon log (most recent <nlines>)
 
-=item B<show> {B<status>|B<version>|B<uptime>}
+=item B<show> {B<parameters>|B<status>|B<uptime>|B<version>}
 
-show general information
+Show general information
 
 =item B<sponge> I<ip-range>
 
 =item B<unsponge> I<ip-range>
 
-sponge/unsponge given IP(s); see also C<set ip alive> and C<set ip dead>.
+Sponge/unsponge given IP(s); see also C<set ip alive> and C<set ip dead>.
 
 =back
 
