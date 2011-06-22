@@ -2,6 +2,11 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta9 - steven
+  asctl:
+    - Fixed POD and help.
+
+
 3.10 - beta7/beta8 - steven
 
   arpsponge, asctl:
