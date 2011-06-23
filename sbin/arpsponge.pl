@@ -893,9 +893,11 @@ sub process_pkt {
     if ( $arp_obj->{sha} ne $src_mac ) {
         # Interesting ...
         log_warning(
-            "ARP spoofing: src.mac=%s arp.sha=%s arp.spa=%s arp.tpa=%s",
+            "ARP spoofing: src.mac=%s arp.sha=%s arp.spa=%s"
+            ." arp.tpa=%s dst.mac=%s",
             hex2mac($src_mac), hex2mac($arp_obj->{sha}),
             hex2ip($src_ip),   hex2ip($dst_ip),
+            hex2mac($eth_obj->{dst_mac})
         );
     }
 
