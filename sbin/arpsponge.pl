@@ -874,7 +874,7 @@ sub process_pkt {
             ." arp.tpa=%s dst.mac=%s",
             hex2mac($src_mac), hex2mac($arp_obj->{sha}),
             hex2ip($src_ip),   hex2ip($dst_ip),
-            hex2mac($eth_obj->{dst_mac})
+            hex2mac($eth_obj->{dest_mac})
         );
     }
 
