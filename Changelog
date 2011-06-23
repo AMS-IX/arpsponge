@@ -2,6 +2,17 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta10 - steven
+
+  lib/M6/ARP/Const.pm:
+    - Added is_valid_state to the exportable functions list.
+
+  debian/control:
+    - Added extra dependencies.
+
+  arpsponge:
+    - Added extra info for arp spoofing log messages (dst mac).
+
 3.10 - beta9 - steven
   asctl:
     - Fixed POD and help.
