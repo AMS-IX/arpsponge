@@ -1,3 +1,9 @@
+arpsponge (3.10-0.15) unstable; urgency=low
+
+  *  3.10-beta11
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 23 Jun 2011 12:28:15 +0200
+
 arpsponge (3.10-0.14) unstable; urgency=low
 
   *  Minor fix for dummy mode.

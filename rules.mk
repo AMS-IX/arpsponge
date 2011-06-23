@@ -10,7 +10,7 @@ default : all
 RM            =  /bin/rm -f
 MV            =  /bin/mv
 
-RELEASE       =  3.10-beta10
+RELEASE       =  3.10-beta11
 NAME          =  arpsponge
 PACKAGE       =  $(NAME)-$(RELEASE)
 TOOLDIR       =  $(TOPDIR)/tools

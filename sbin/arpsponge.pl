@@ -1025,9 +1025,8 @@ sub start_daemon($$) {
     close STDERR;
     close STDIN;
 
-    # Verbosity and dummyness have no place in a daemon.
+    # Verbosity has no place in a daemon.
     log_is_verbose(0);
-    $sponge->is_dummy(0);
     return undef;
 }
 
