@@ -18,9 +18,9 @@ use strict;
 use base qw( Exporter );
 
 BEGIN {
-    our $VERSION = 1.01;
+    our $VERSION = 1.02;
 
-    my @func   = qw( parse_update_flags update_flags_to_str state_to_string );
+    my @func   = qw( parse_update_flags update_flags_to_str is_valid_state state_to_string );
     my @states = qw( STATIC DEAD ALIVE PENDING NONE );
     my @update_flags = qw(
                 ARP_UPDATE_REPLY
