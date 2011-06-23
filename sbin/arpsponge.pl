@@ -219,7 +219,7 @@ sub Main {
 
     my $sponge = new M6::ARP::Sponge(
             verbose          => $verbose,
-            dummy            => $dummy,
+            is_dummy         => $dummy,
             queuedepth       => $queuedepth,
             device           => $device,
             loglevel         => $loglevel,
@@ -232,14 +232,6 @@ sub Main {
             gratuitous       => $gratuitous,
             flood_protection => $flood_protection,
         );
-
-    if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
-        my $init = is_valid_state($init_arg, -err => \(my $err));
-        if (defined $err) {
-            log_fatal("bad --init argument \"$init\": $err\n");
-        }
-        init_state($sponge, $init);
-    }
 
     $sponge->is_dummy($dummy);
 
@@ -258,34 +250,19 @@ sub Main {
         $sponge->user('sweep_age', $sweep_threshold);
     }
 
+    if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
+        my $init = is_valid_state($init_arg, -err => \(my $err));
+        if (defined $err) {
+            log_fatal("bad --init argument \"$init\": $err\n");
+        }
+        init_state($sponge, $init);
+    }
+
     if ($arp_update_methods) {
-        my $flags = ARP_UPDATE_NONE;
-        my %flags = (
-                'request'    => ARP_UPDATE_REQUEST,
-                'reply'      => ARP_UPDATE_REPLY,
-                'gratuitous' => ARP_UPDATE_GRATUITOUS,
-                'all'        => ARP_UPDATE_ALL,
-            );
-        for my $method (split(/\s*,\s*/, lc $arp_update_methods)) {
-            my $negate = 0;
-            if ($method =~ s/^\!//) {
-                $negate = 1;
-            }
-            if ($method eq 'none') {
-                $method = 'all';
-                $negate = !$negate;
-            }
-            if ($flags{$method}) {
-                if ($negate) {
-                    $flags &= ~ $flags{$method};
-                }
-                else {
-                    $flags |= $flags{$method};
-                }
-            }
-            else {
-                log_fatal qq{Bad --arp-update-methods parameter "$method"};
-            }
+        my $flags = parse_update_flags($arp_update_methods, -err => \(my $err));
+        if (defined $err) {
+            log_fatal(qq{bad --arp-update-methods argument "%s": %s},
+                      $arp_update_methods, $err);
         }
         $sponge->arp_update_flags($flags);
     }
