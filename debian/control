@@ -8,7 +8,9 @@ Build-Depends: debhelper (>= 4.0.0),
  libnet-pcap-perl (>= 0.16),
  libterm-readline-gnu-perl (>= 1.17),
  libnetaddr-ip-perl (>= 4.033),
- libreadonly-perl (>= 1.02)
+ libreadonly-perl (>= 1.02),
+ libio-string-perl (>= 1.08),
+ libnet-arp-perl (>= 1.0)
 Standards-Version: 3.6.1
 
 Package: arpsponge
@@ -20,7 +22,9 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  libterm-readline-gnu-perl (>= 1.17),
  libnetaddr-ip-perl (>= 4.033),
  libreadonly-perl (>= 1.02),
- libreadonly-xs-perl (>= 1.04)
+ libreadonly-xs-perl (>= 1.04),
+ libio-string-perl (>= 1.08),
+ libnet-arp-perl (>= 1.0)
 Description: Nifty ARP sponge.
  Nifty ARP sponge featuring gratuitous ARP, sweeping, reporting, etc.
  Also keeps an internal ARP table which can be dumped to a file. The
