@@ -702,10 +702,6 @@ sub init_state {
     my $sponge = shift;
     my $state  = shift;
 
-    return if $state eq 'NONE';
-
-    $state = { DEAD=>DEAD, ALIVE=>ALIVE, PENDING=>PENDING(0) }->{$state};
-
     my $lo = $sponge->user('net_lo');
     my $hi = $sponge->user('net_hi');
     for (my $num = $lo; $num <= $hi; $num++) {
