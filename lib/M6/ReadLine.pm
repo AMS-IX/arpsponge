@@ -98,6 +98,10 @@ our %TYPES = (
             'verify'   => sub { return clear_error($_[1]) },
             'complete' => []
         },
+        'filename' => {
+            'verify'   => sub { return clear_error($_[1]) },
+            'complete' => \&complete_filename,
+        },
     );
 
 # $word = match_prefix($input, \@words [, $silent]);
@@ -231,6 +235,18 @@ sub complete_ip_address_arg {
     else {
         return ("$fixed.", "$fixed.x");
     }
+}
+
+sub complete_filename {
+    my $partial = shift;
+    my $attribs = $TERM->Attribs;
+    my @list;
+    my $state = 0;
+    while (my $f = $attribs->{filename_completion_function}->($partial, $state)) {
+        push @list, $f;
+        $state = 1;
+    }
+    return @list;
 }
 
 # $ok = parse_line($line, \@parsed, \%args);
