@@ -25,8 +25,10 @@ package M6::ReadLine;
 
 use strict;
 use warnings;
+use feature ':5.10';
 use base qw( Exporter );
 use Term::ReadLine;
+use Term::ReadKey;
 use NetAddr::IP;
 use M6::ARP::Util qw( :all );
 use Data::Dumper;
@@ -48,7 +50,7 @@ BEGIN {
                              parse_line
                              print_error_cond print_error
                              last_error set_error clear_error
-                             print_output );
+                             yesno print_output );
 	my  @functions   = (@check_func, @gen_functions);
     my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER
                            $HISTORY_FILE $IP_NETWORK );
@@ -660,6 +662,31 @@ sub print_output {
     $TERM && $TERM->on_new_line();
 }
 
+sub yesno {
+    my ($question, $answers) = @_;
+    my ($default) = $answers =~ /([A-Z])/;
+    $default = 'N' if !defined $default;
+    ReadMode 4;
+    print "$question ($answers)? $default\b";
+    my $answer = undef;
+    my $key = '?';
+    while (defined ($key = ReadKey(0))) {
+        given ($key) {
+            when ("\c[")     { $key = 'n' }
+            when (/[\r\n ]/) { $key = $default }
+        }
+        next if index(lc $answers, lc $key) < 0;
+        given (lc $key) {
+            when ("y") { $answer = 1  }
+            when ("n") { $answer = 0  }
+            when ("q") { $answer = -1 }
+        }
+        last if defined $answer;
+    }
+    ReadMode 0;
+    print "$key\n";
+    return $answer;
+}
 
 1;
 
@@ -776,8 +803,16 @@ AMS-IX extensions on top of Term::ReadLine.
 
 =back
 
+=head2 Miscellaneous
+
+=over
+
+=item X<yesno>B<yesno>
+
+=back
 =head1 SEE ALSO
 
+L<Term::ReadKey|Term::ReadKey>(3pm),
 L<Term::ReadLine|Term::ReadLine>(3pm),
 L<Term::ReadLine::Gnu|Term::ReadLine::Gnu>(3pm),
 L<perl(1)|perl>.
