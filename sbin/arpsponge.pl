@@ -1498,6 +1498,9 @@ in your network.
 Write status to I<file> when receiving the C<HUP> or C<USR1> signal.
 Default is "I<rundir>/B<status>".
 
+Note that the daemon has no way of reloading this data, other than through the
+L<asctl|asctl>(8) utility.
+
 =item X<--sweep>B<--sweep>=I<interval>/I<threshold>
 
 Every I<interval> seconds, sweep the IP range for IP addresses who we
@@ -1660,7 +1663,7 @@ I<rundir> to the sponge ("B<--rundir>=I<$SPONGE_VAR>/I<$INTERFACE>").
 
 =item I<DUMMY_MODE> (boolean)
 
-Use C<--dummy> on the sponge. Note that L<asctl(1)|asctl> clients can
+Use C<--dummy> on the sponge. Note that L<asctl(8)|asctl> clients can
 (re-)set this value on the fly.
 
 =item I<INIT_MODE>
@@ -1742,7 +1745,7 @@ This is set up by the sponge's L<init(1)|init> script.
 
 =item F<@SPONGE_VAR@/ethX/control>
 
-Control socket for L<asctl>(1).
+Control socket for L<asctl>(8).
 This is set up by the sponge's L<init(1)|init> script.
 
 =item F<@SPONGE_VAR@/ethX/pid>
@@ -1754,8 +1757,8 @@ This is set up by the sponge's L<init(1)|init> script.
 
 =head1 SEE ALSO
 
-L<asctl(1)|asctl>,
-L<aslogtail(1)|aslogtail>,
+L<asctl(8)|asctl>,
+L<aslogtail(8)|aslogtail>,
 L<perl(1)|perl>, L<arp(8)|arp>.
 
 =head1 BUGS AND LIMITATIONS

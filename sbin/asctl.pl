@@ -38,6 +38,7 @@ use M6::ARP::Util qw( :all );
 use M6::ReadLine qw( :all );
 use NetAddr::IP;
 use Term::ReadLine;
+use IO::File;
 use M6::ARP::Const qw( :all );
 
 my $SPONGE_VAR      = '@SPONGE_VAR@';
@@ -85,6 +86,12 @@ my %Syntax = (
     'clear arp $ip'  => {
         '?'       => 'Clear ARP table for given IP(s).',
         '$ip'     => { type=>'ip-range'  } },
+    'load status $file' => {
+        '?'        => 'Load IP/ARP state from dump file.',
+        '$file'   => { type=>'filename' }, },
+    'dump status' => {
+        '?'        => 'Signal the daemon to dump its status '
+                      .'to the standard file.', },
     'probe $ip'   => {
         '?'       => 'Send ARP requests for given IP(s).',
         '$ip'     => { type=>'ip-range'  } },
@@ -207,7 +214,7 @@ sub Main {
                 }
                 else {
                     $err++;
-                    print STDERR "** connection closed unexpectedly\n";
+                    print_error("** connection closed unexpectedly");
                 }
                 last;
             }
@@ -695,7 +702,6 @@ sub do_show_arp {
     }
     else {
         for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$output) {
-            print STDERR "tagfmt: $tag_fmt\n";
             push @output, join('',
                 sprintf("$tag_fmt%s\n", 'ip:', $$info{ip}),
                 sprintf("$tag_fmt%s\n", 'mac:', $$info{mac}),
@@ -1228,6 +1234,7 @@ sub do_set_ip_generic {
     print_output(sprintf("%s: %s changed from $fmt to $fmt%s",
                          $output->[0]->{ip},
                          $name, $old, $new, $unit));
+    return 1;
 }
 
 # cmd: set ip pending
@@ -1235,20 +1242,24 @@ sub do_set_ip_pending {
     my ($conn, $parsed, $args) = @_;
 
     DEBUG "set ip pending";
-    do_set_ip_generic(-conn    => $conn,
+    return expand_ip_run($args->{'ip'}, 
+        sub {
+            do_set_ip_generic(-conn    => $conn,
                       -command => 'set_pending',
                       -name    => 'state',
                       -val     => $args->{'pending'} // 0,
-                      -ip      => $args->{'ip'},
+                      -ip      => hex2ip($_[0]),
                       -options => $args->{-options},
                       -type    => 'string');
+        }
+    );
 }
 
 # cmd: set ip dead
 sub do_set_ip_dead {
     my ($conn, $parsed, $args) = @_;
 
-    expand_ip_run($args->{'ip'}, 
+    return expand_ip_run($args->{'ip'}, 
         sub {
             do_set_ip_generic(-conn    => $conn,
                       -command => 'set_dead',
@@ -1257,6 +1268,143 @@ sub do_set_ip_dead {
                       -options => $args->{-options});
         }
     );
+}
+
+sub do_dump_status {
+    my ($conn, $parsed, $args) = @_;
+
+    ($STATUS) = get_status($conn, {raw=>0, format=>1});
+    if (my $pid = $STATUS->{'pid'}) {
+        verbose("sending USR1 signal to $pid: ");
+        if (kill 'USR1', $STATUS->{'pid'}) {
+            verbose("ok\n");
+            print_output("process $pid signalled");
+        }
+        else {
+            verbose("ERROR\n");
+            print_error("** cannot signal $pid: $!");
+        }
+    }
+}
+
+# cmd: load status $file
+sub do_load_status {
+    my ($conn, $parsed, $args) = @_;
+
+    my %opts = ( force => 0 );
+
+    GetOptionsFromArray($args->{-options},
+            'force!'   => \$opts{force},
+        ) or return;
+
+    my $fname = $args->{'file'};
+    my $fh = IO::File->new("<$fname");
+    if (!$fh) {
+        print_error("cannot read $fname: $!");
+        return;
+    }
+    my $mtime = ($fh->stat)[9];
+
+    if ($mtime + 60 < time) {
+        print_error("** status file $fname\n",
+                    "** timestamp [", format_time($mtime), "]",
+                    " older than 60 seconds");
+
+        my $load = 0;
+        if ($opts{force}) {
+            $load++;
+            verbose("--force specified\n");
+        }
+        elsif ($INTERACTIVE) {
+            verbose("(contents are probably stale)\n");
+            $load += yesno("load anyway", 'yN');
+        }
+
+        if ($load <= 0) {
+            print_error("** status loading aborted");
+            return;
+        }
+        else {
+            print_output("continue loading...");
+        }
+    }
+
+    verbose("getting current state table...");
+
+    my %curr_state_table;
+    {
+        my $reply = check_send_command($conn, 'get_ip');
+        my ($d_opts, $output, $d_tag) = parse_server_reply($reply, {});
+        %curr_state_table = map { ($_->{'hex_ip'} => $_->{'state'}) } @$output;
+    }
+    verbose(" ok\n");
+
+    my $parse_state = 'none';
+    my %state_table = ();
+    my %arp_table   = ();
+
+    verbose("reading state tables...");
+    local($_);
+    while ($_ = $fh->getline) {
+        given ($_) {
+            when (/^<STATE>$/)       { $parse_state = 'state' }
+            when (/^<ARP-TABLE>$/)   { $parse_state = 'arp'   }
+            when (/^<\/[\w-]+>$/)    { $parse_state = 'none'  }
+
+            when ($parse_state eq 'state' &&
+                  /^([\d\.]+) \s+ ([A-Z]+) \s+ \d+ \s+ \d+\.\d+ \s+ \S+\@\S+$/x) {
+                my $ip = ip2hex($1);
+                $state_table{$ip} = $2;
+            }
+
+            when ($parse_state eq 'arp' &&
+                    /^([a-f\d\:]+) \s+ ([\d\.]+) \s+ \d+ \s+ \S+\@\S+$/x) {
+                my ($mac, $ip) = (mac2hex($1), ip2hex($2));
+                if ($state_table{$ip} eq 'ALIVE') {
+                    $arp_table{$ip} = $mac;
+                }
+            }
+        }
+    }
+    $fh->close;
+    verbose(" ok\n");
+    
+    verbose("checking and setting states\n");
+
+    my %ip_stats   = (ALIVE=>0, DEAD=>0, TOTAL=>0, CHANGED=>0);
+    for my $ip (sort { $a cmp $b } keys %state_table) {
+        $ip_stats{'TOTAL'}++;
+        $ip_stats{$state_table{$ip}}++;
+        $curr_state_table{$ip} //= 'DEAD';
+        if ($curr_state_table{$ip} eq $state_table{$ip}) {
+            #verbose "no change ", hex2ip($ip), "\n";
+            next;
+        }
+        given ($state_table{$ip}) {
+            when ('ALIVE') {
+                $ip_stats{'CHANGED'}++;
+                do_set_ip_generic(
+                    -conn    => $conn,
+                    -command => 'set_alive',
+                    -name    => 'state',
+                    -val     => $arp_table{$ip},
+                    -ip      => hex2ip($ip),
+                    -options => [],
+                )
+            }
+            when ('DEAD') {
+                $ip_stats{'CHANGED'}++;
+                check_send_command($conn, "clear_ip $ip");
+            }
+        }
+    }
+    verbose("done\n");
+
+    print_output("total=$ip_stats{TOTAL}",
+                 " static=$ip_stats{STATIC}",
+                 " alive=$ip_stats{ALIVE}",
+                 " dead=$ip_stats{DEAD}",
+                 " changed=$ip_stats{CHANGED}");
 }
 
 # cmd: sponge
@@ -1274,7 +1422,7 @@ sub do_set_ip_alive {
 
     my $mac = $args->{'mac'} ? mac2hex($args->{'mac'}) : undef;
 
-    expand_ip_run($args->{'ip'}, 
+    return expand_ip_run($args->{'ip'}, 
         sub {
             do_set_ip_generic(
                 -conn    => $conn,
@@ -1604,6 +1752,11 @@ Clear ARP table for given IP(s)
 
 Clear state table for given IP(s)
 
+=item B<dump status>
+
+Signal the daemon to dump its status to the dump file. The dump file is
+fixed at daemon startup. See also L<arpsponge|arpsponge>(8).
+
 =item B<help>
 
 Show command summary
@@ -1612,6 +1765,62 @@ Show command summary
 
 Force I<dst_ip> to update its ARP entry for I<src_ip>. See also
 "L<set arp_update_flags|/arp_update_flags>" below.
+
+=item B<load status> [B<--force>] I<file>
+
+Load IP/ARP state from I<file>. The I<file> should be a dump file previously
+created by the daemon's dump facility (see also "L<dump status|/dump status>"
+above).
+
+By default, a dump file that's older than 60 seconds is ignored, since it is
+likely to contain stale information, unless B<--force> is given.
+
+The states in the dump file are interpreted as follows:
+
+=over
+
+=item B<ALIVE>
+
+If we have:
+
+  <STATE>
+  # IP              State          Queue Rate (q/min) Updated
+  91.200.17.2       ALIVE              0    0.000     2011-07-05@17:15:33
+  </STATE>
+
+  <ARP-TABLE>
+  # MAC             IP                Epoch       Time
+  00:0c:db:02:64:1c 91.200.17.2       1309878933  2011-07-05@17:15:33
+  </ARP-TABLE>
+
+Execute:
+
+  set ip 91.200.17.2 alive 00:0c:db:02:64:1c
+
+That is, the daemon is told set the address to C<ALIVE> and update the
+corresponding MAC (if present in the dump file).
+
+=item B<DEAD>
+
+If we have:
+
+  <STATE>
+  # IP              State          Queue Rate (q/min) Updated
+  91.200.17.3       DEAD               0    0.000     2011-07-05@17:15:45
+  </STATE>
+
+Execute:
+
+  clear ip 91.200.17.3
+
+That is, the daemon is told to clear the state information, so the next
+ARP for that address will put it in a C<PENDING> state.
+    
+=back
+
+The handling of C<DEAD> state information in the dump file allows us to load
+relatively old data, without resulting in sponging of active addresses, while
+still allowing quick discovery of the still-dead addresses.
 
 =item B<ping> [[I<count> [I<delay>]]
 
