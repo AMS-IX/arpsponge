@@ -168,6 +168,7 @@ status() {
     local cruft
     local pidfiles
     local pf
+    local retval=0
 
     if [ "X$1" = "Xre-init" ]
     then
@@ -185,9 +186,17 @@ status() {
             read pid cruft <"${pf}"
             iface=$(basename $(dirname "${pf}"))
             printf "  interface=%-10s pid=%-6s " "${iface}" "${pid}"
-            kill -USR1 "${pid}" 2>/dev/null && echo "[Ok]" || echo "[FAILED]"
+            if kill -USR1 "${pid}" 2>/dev/null
+            then
+                sleep 1
+                echo "[Ok]"
+            else
+                retval=1
+                echo "[FAILED]"
+            fi
         fi
     done
+    return $retval
 }
 
 case "$1" in
@@ -212,6 +221,7 @@ case "$1" in
         status
         ;;
     stop)
+        status re-init
         stop
         ;;
     *)
