@@ -830,7 +830,7 @@ sub process_pkt {
         #
         # So, what we are looking for here is a packet with a destination
         # mac set to us, but an IP address that has nothing to do with us.
-        # If we see it, we send a unicast ARP reply with the correct info
+        # If we see it, we send a unicast ARP update with the correct info
         # to the packet's source.
         if ($eth_obj->{dest_mac} eq $sponge->my_mac) {
             my $dst_ip = $ip_obj->{dest_ip};

@@ -891,7 +891,7 @@ sub parse_server_reply {
     my @output;
     my $taglen  = 0;
     for my $record (split(/\n\n/, $reply)) {
-        my %info = map { split(/=/, $_) } split("\n", $record);
+        my %info = map { /(.*?)=(.*)/; ($1=>$2) } split("\n", $record);
 
         if (my $ip = $info{'network'}) {
             $info{'hex_network'} = ip2hex($ip);
@@ -1561,7 +1561,7 @@ sub get_status {
         return ($reply, '%s ');
     }
 
-    my %info = map { split(/=/, $_) } split("\n", $reply);
+    my %info = map { /(.*?)=(.*)/; ($1=>$2) } split("\n", $reply);
     my $taglen = 0;
     foreach (keys %info) {
         $taglen = length($_) if length($_) > $taglen;
