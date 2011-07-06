@@ -1784,13 +1784,13 @@ The states in the dump file are interpreted as follows:
 If we have:
 
   <STATE>
-  # IP              State          Queue Rate (q/min) Updated
-  91.200.17.2       ALIVE              0    0.000     2011-07-05@17:15:33
+  # IP          State  Queue Rate (q/min) Updated
+  91.200.17.2   ALIVE      0    0.000     2011-07-05@17:15:33
   </STATE>
 
   <ARP-TABLE>
-  # MAC             IP                Epoch       Time
-  00:0c:db:02:64:1c 91.200.17.2       1309878933  2011-07-05@17:15:33
+  # MAC             IP          Epoch      Time
+  00:0c:db:02:64:1c 91.200.17.2 1309878933 2011-07-05@17:15:33
   </ARP-TABLE>
 
 Execute:
@@ -1805,8 +1805,8 @@ corresponding MAC (if present in the dump file).
 If we have:
 
   <STATE>
-  # IP              State          Queue Rate (q/min) Updated
-  91.200.17.3       DEAD               0    0.000     2011-07-05@17:15:45
+  # IP          State  Queue Rate (q/min) Updated
+  91.200.17.3   DEAD       0    0.000     2011-07-05@17:15:45
   </STATE>
 
 Execute:
