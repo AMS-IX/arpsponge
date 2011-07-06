@@ -22,6 +22,8 @@ BEGIN {
 
 our $DFL_DEPTH = 1000;
 
+use M6::ARP::Log;
+
 =pod
 
 =head1 NAME
@@ -97,10 +99,11 @@ Returns a reference to the newly created object.
 
 sub new {
 	my $type = shift;
+
 	my $max_depth = @_ ? shift : $DFL_DEPTH;
 
 	if (ref $type) { $type = ref $type }
-	bless {'max_depth' => $max_depth}, $type;
+	bless {'max_depth' => $max_depth, q=>{}}, $type;
 }
 
 =back
@@ -115,7 +118,7 @@ Clear all queues.
 
 =cut
 
-sub clear_all { %{$_[0]} = () }
+sub clear_all { %{$_[0]->{'q'}} = () }
 
 =item X<clear>B<clear> ( I<IP> )
 
@@ -123,7 +126,7 @@ Clear the queue for I<IP>.
 
 =cut
 
-sub clear     { delete $_[0]->{$_[1]} }
+sub clear     { delete $_[0]->{'q'}->{$_[1]} }
 
 =item X<depth>B<depth> ( I<IP> )
 
@@ -131,7 +134,10 @@ Return the depth of the queue for I<IP>.
 
 =cut
 
-sub depth     { $_[0]->{$_[1]} ?  int(@{$_[0]->{$_[1]}}) : 0 }
+sub depth {
+	my $q = $_[0]->get_queue($_[1]);
+    return $q ? int(@$q) : 0
+}
 
 =item X<rate>B<rate> ( I<IP> )
 
@@ -178,7 +184,7 @@ per minute.
 # [Statistics: comment/code > 4]
 #
 sub rate {
-	my $q = $_[0]->{$_[1]};
+	my $q = $_[0]->get_queue($_[1]);
 	return undef unless defined($q) && @$q > 1;
 	my $first = $q->[0]->[1];
 	my $last  = $q->[$#$q]->[1];
@@ -213,11 +219,16 @@ queue depth.
 
 sub add {
 	my ($self, $ip, $src_ip, $val) = @_;
-	if ($self->depth($ip) >= $self->max_depth) {
-		shift @{$self->{$ip}};
+
+    # Oooh, very h4xx||
+    my $q = $self->{'q'}->{$ip} //
+           ($self->{'q'}->{$ip} = []);
+
+	if (int(@$q) >= $self->max_depth) {
+		shift @$q;
 	}
-	push @{$self->{$ip}}, [ $src_ip, $val ];
-	return int(@{$self->{$ip}});
+	push @$q, [ $src_ip, $val ];
+	return int(@$q);
 }
 
 
@@ -243,12 +254,13 @@ Also:
 sub get_entry {
 	my ($self, $ip, $index) = @_;
 
+    my $q = $self->get_queue($ip);
 	$index = 0 unless defined($index);
 	if ($index < 0) {
-		$index = int(@{$self->{$ip}}) + $index;
+		$index = int(@$q) + $index;
 		$index = 0 if $index < 0;
 	}
-	return $self->{$ip}->[$index];
+	return $q->[$index];
 }
 
 =item X<get_timestamp>B<get> ( I<IP> [, I<INDEX>] )
@@ -257,7 +269,7 @@ sub get_entry {
 
 Return the I<TIMESTAMP> at position I<INDEX>
 in the queue for I<IP>. The value of I<INDEX> has the same meaning
-as for C<get()|/get> above.
+as for C<get_entry()|/get_entry> above.
 
 =cut
 
@@ -287,7 +299,7 @@ that you don't inadvertently modify it.
 
 =cut
 
-sub get_queue { return $_[0]->{$_[1]} }
+sub get_queue { return $_[0]->{'q'}->{$_[1]} }
 
 =item X<reduce>B<reduce> ( I<IP>, I<MAX_RATE> )
 
@@ -305,7 +317,8 @@ Returns the new queue depth after reducing.
 sub reduce {
 	my ($self, $ip, $max_rate) = @_;
 
-    my $q = $self->{$ip};
+    my $q = $self->get_queue($ip);
+
     if (!$q || @{$q} == 0) {
         return 0;
     }
