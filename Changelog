@@ -2,6 +2,20 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta13 - steven
+
+  init.d/arpsponge:
+    - Dump status before stopping as well.
+
+  asctl:
+    - Fix reply mapping/splitting in asctl. Fix typo in comments in
+      arpsponge.
+
+  M6::ARP::Queue:
+    - Added level of indirection in Queue data. Object hash was
+      storing max_depth parameter and ip queues at the same level,
+      causing problems when clear_all was called.
+
 3.10 - beta12 - steven
 
   arpsponge:
