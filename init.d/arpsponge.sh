@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ### BEGIN INIT INFO
 # Provides:          arpsponge
 # Required-Start:    $network
@@ -61,8 +61,10 @@ fatal() {
 }
 
 start_sponge() {
-    file=$1
+    mode="$1"
+    file="$2"
     export file
+    export mode
     (
         DEVICE=$(basename $file)
         unset NETWORK
@@ -98,7 +100,7 @@ start_sponge() {
             echo ${BINDIR}/${PROG} ${opts} ${NETWORK} dev "${DEVICE}"
             echo "----"
             echo "** DEBUG MODE: not executing"
-            exit 0
+            return 0
         fi
 
         mkdir -p "${SPONGE_VAR}/${DEVICE}"
@@ -108,17 +110,23 @@ start_sponge() {
         ${BINDIR}/${PROG} ${opts} ${NETWORK} dev "${DEVICE}" 2>/dev/null
     
         [ $? -eq 0 ] && echo "[Ok]" || echo "[FAILED]"
+
+        if [ "$mode" = "re-init" ] && [ -f "${rundir}/status" ]
+        then
+            ${BINDIR}/asctl -c load status "${rundir}/status"
+        fi
     )
 }
 
 start() {
-    SPONGES=`/bin/ls -1 /etc/default/${PROG}/eth* 2>/dev/null`
+    SPONGES=$(find "/etc/default/${PROG}" \
+                -maxdepth 1 -type f -name 'eth*' 2>/dev/null)
     if [ -n "${SPONGES}" ]
     then
         echo "Starting ${PROG}(s):"
         for file in ${SPONGES}
         do
-            start_sponge ${file}
+            start_sponge "$1" ${file}
         done
     fi
 }
@@ -158,6 +166,8 @@ stop() {
 status() {
     local pid
     local cruft
+    local pidfiles
+    local pf
 
     if [ "X$1" = "Xre-init" ]
     then
@@ -165,8 +175,10 @@ status() {
     else
         echo "Dumping status:"
     fi
-    pidfiles=`ls ${SPONGE_VAR}/*/pid 2>/dev/null`
-    for pf in ${SPONGE_VAR}/*/pid
+
+    pidfiles=$(find ${SPONGE_VAR} -mindepth 2 -maxdepth 2 \
+                -type f -name pid 2>/dev/null)
+    for pf in $pidfiles
     do
         if [ -f "$pf" ]
         then
@@ -186,7 +198,12 @@ case "$1" in
     start)
         start
         ;;
-    restart|reload|force-reload)
+    restart)
+        status re-init
+        stop
+        start
+        ;;
+    reload|force-reload)
         status re-init
         stop
         start re-init
