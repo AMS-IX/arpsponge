@@ -2,6 +2,29 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta12 - steven
+
+  arpsponge:
+    - Don't clear is_dummy() when running as a daemon.
+    - It's $eth_obj->{dest_mac} instead of "dst_mac"...
+    - The init_state() function is now called with an integer
+      argument (i.e. already translated state), but was still trying
+      to look up the state in a hash, resulting in state "undef" for
+      all IPs (i.e. equivalent to state NONE).
+    - Added note about status loading in POD.
+
+  asctl:
+    - Added "load status" and "dump status" to asctl.
+
+  lib/M6/ReadLine.pm:
+    - Add argument type "filename" and filename completion.
+    - Added a "yesno" prompting interface:
+        if (yesno("question", "yN")) { ... }
+
+  init.d/arpsponge:
+    - (Force-)reload now causes the state to be re-read.
+    - Fixed use of "ls" to find files.
+
 3.10 - beta10 - steven
 
   lib/M6/ARP/Const.pm:
