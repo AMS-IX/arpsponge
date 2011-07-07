@@ -1774,6 +1774,7 @@ asctl - Arp Sponge ConTroL utility
 [B<--rundir>=I<dir>]
 [B<--interface>=I<ifname>]
 [B<--socket>=I<sock>]
+[B<--quiet>]
 [[B<--command>] I<command> ...]
 
 =back
