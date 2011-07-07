@@ -2,6 +2,16 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta15 - steven
+
+  asctl:
+    - Parse a little more loosely on the status file. Initialize
+      counters for STATIC as well.
+
+  M6::ReadLine.pm:
+    - print_output should not append a newline if the text is
+      all empty.
+
 3.10 - beta14 - steven
 
     M6::ReadLine:
