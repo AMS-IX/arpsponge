@@ -284,7 +284,7 @@ sub parse_words {
     # Command line options (--something, -s), are stored
     # in the '-options' array in %$args. They'll be parsed
     # later on.
-    while (@$words && $$words[0] =~ /^-{1,2}/) {
+    while (@$words && $$words[0] =~ /^-{1,2}./) {
         push @{$args->{-options}}, shift @$words;
     }
 
@@ -651,15 +651,16 @@ sub print_output {
     my $out = join('', @_);
        $out .= "\n" if $out !~ /\n\Z/;
 
-    if ($TERM) {
+    my $curr_fh = select;
+    if ($TERM && -t $curr_fh) {
         open(MORE, "|$PAGER");
         print MORE $out;
         close MORE;
+        $TERM->on_new_line();
     }
     else {
         print $out;
     }
-    $TERM && $TERM->on_new_line();
 }
 
 sub yesno {
