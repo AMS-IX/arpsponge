@@ -50,7 +50,8 @@ BEGIN {
                              parse_line
                              print_error_cond print_error
                              last_error set_error clear_error
-                             yesno print_output );
+                             yesno print_output
+                             term_width fmt_text );
 	my  @functions   = (@check_func, @gen_functions);
     my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER
                            $HISTORY_FILE $IP_NETWORK );
@@ -289,16 +290,16 @@ sub parse_words {
     }
 
     if (my $word_list = $syntax->{words}) {
-        my $words_str = join(q{}, 
-                            map { "  $_\n" } 
-                                sort grep { length $_ } keys %$word_list
-                        );
+        my $words_str = join(q{ }, sort grep { length $_ } keys %$word_list);
+
         if (!@$words) {
             if (exists $word_list->{''}) {
                 return 1;
             }
             else {
-                return print_error("@$parsed: expected one of:\n$words_str");
+                return print_error("@$parsed: expected one of:\n",
+                                   fmt_text('', $words_str, undef, 4));
+                #return print_error("@$parsed: expected one of:\n$words_str");
             }
         }
         my $w = $words->[0];
@@ -312,14 +313,14 @@ sub parse_words {
         }
         elsif (@match > 1) {
             return print_error(
-                        qq{ambibuous input "$$words[0]"; },
-                        qq{matches: }, join(', ', sort @match), "\n"
+                        qq{ambibuous input "$$words[0]"; matches:\n},
+                        fmt_text('', join(" ", sort @match), undef, 4),
                     );
         }
         else {
             return print_error(
-                        qq{invalid input "$$words[0]"; },
-                        qq{expected one of:\n$words_str}
+                        qq{invalid input "$$words[0]"; expected one of:\n},
+                        fmt_text('', $words_str, undef, 4)
                     );
         }
     }
@@ -467,6 +468,38 @@ sub complete_line {
     return @$literal;
 }
 
+# $cols = term_width()
+sub term_width {
+    my $term = @_ ? shift : $TERM;
+    my ($rows, $cols) = $term ? $term->get_screen_size() : (25, 80);
+    return $cols;
+}
+
+# $fmt = fmt_text($prefix, $text, $maxlen, $indent);
+sub fmt_text {
+    my ($prefix, $text, $maxlen, $indent) = @_;
+    $maxlen //= term_width() - 4;
+    $indent //= 0;
+
+    if ($indent > length($prefix) && $prefix !~ /\n$/) {
+        $prefix .= ' ' x ($indent - length($prefix));
+    }
+
+    my $indent_text = ' ' x $indent;
+    my @words = split(' ', $text);
+    my $pos = length($prefix);
+    my $out = $prefix;
+    for my $w (@words) {
+        if ($pos + length($w) + 1 > $maxlen) {
+            $out .= "\n$indent_text";
+            $pos = $indent;
+        }
+        if ($pos>$indent) { $out .= ' '; $pos++ }
+        $out .= $w;
+        $pos += length($w);
+    }
+    $out .= "\n";
+}
 sub exit_readline {
     return if !$TERM;
 

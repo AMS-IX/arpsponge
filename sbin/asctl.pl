@@ -46,6 +46,7 @@ use M6::ARP::Const  qw( :all );
 
 my $SPONGE_VAR      = '@SPONGE_VAR@';
 my $CONN            = undef;
+my $ERR             = 0;
 my $STATUS          = {};
 
 my $DFL_PROBE_DELAY = 0.1;
@@ -54,10 +55,12 @@ my $DFL_PROBE_RATE  = 1/$DFL_PROBE_DELAY;
 my $MAX_PROBE_RATE  = 1/$MIN_PROBE_DELAY;
 
 # Values set on the Command Line.
+my $opt_quiet     = 0;
 my $opt_verbose   = 0;
 my $opt_debug     = 0;
 my $opt_test      = 0;
 my $rundir        = $SPONGE_VAR;
+
 my $INTERACTIVE   = 1;
 my $MAX_HISTORY   = 1000;
 my $HISTFILE      = "$::ENV{HOME}/.$0_history";
@@ -191,10 +194,14 @@ sub Main {
     }
     ($STATUS) = get_status($CONN, {raw=>0, format=>1});
     verbose "$$STATUS{id}, v$$STATUS{version} (pid #$$STATUS{pid})\n";
-    my $err = 0;
 
+    my $exit = 0;
     if (@$args) {
-        my $command = do_command(join(' ', @$args), $CONN);
+        if ($opt_quiet) {
+            open STDOUT, ">/dev/null";
+        }
+        do_command(join(' ', @$args), $CONN);
+        $exit = $ERR != 0;
     }
     else {
         $M6::ReadLine::IP_NETWORK =
@@ -220,15 +227,18 @@ sub Main {
                     verbose "connection closed\n";
                 }
                 else {
-                    $err++;
+                    $exit++;
                     print_error("** connection closed unexpectedly");
                 }
                 last;
             }
         }
+        if (!$INTERACTIVE) {
+            $exit ||= ($ERR != 0);
+        }
     }
     $CONN && $CONN->close;
-    exit $err;
+    exit $exit;
 }
 
 END {
@@ -246,12 +256,16 @@ sub do_command {
         DEBUG "func_name: $func_name";
         my $func; eval '$func = \&'.$func_name;
         if (!defined $func) {
+            $ERR++;
             return print_error(qq{@parsed: NOT IMPLEMENTED});
         }
         else {
-            $func->($conn, \@parsed, \%args);
+            $ERR++ if ! $func->($conn, \@parsed, \%args);
             return "@parsed";
         }
+    }
+    else {
+        $ERR++;
     }
     return "@parsed";
 }
@@ -352,8 +366,7 @@ sub check_log_level {
     my ($spec, $arg, $silent) = @_;
     DEBUG "check_log_level $arg";
     if (defined $arg && length($arg)) {
-        my $err;
-        my $level = is_valid_log_level($arg, -err => \$err);
+        my $level = is_valid_log_level($arg, -err => \(my $err));
         if (!defined $level) {
             $silent or print_error($err);
             return;
@@ -465,7 +478,7 @@ sub do_quit {
     my ($conn, $parsed, $args) = @_;
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
     my $reply = check_send_command($conn, 'quit') or return;
-    print_output($reply);
+    return print_output($reply);
 }
 
 sub do_help_pod {
@@ -490,7 +503,7 @@ sub do_help_pod {
               ;
     }
     $out .= "\n=back\n";
-    print_output($out);
+    return print_output($out);
 }
 
 sub do_help {
@@ -499,12 +512,10 @@ sub do_help {
     Wrap_GetOptionsFromArray($$args{-options}, {}, 'pod' => \$pod) or return;
 
     if ($pod) {
-        do_help_pod();
-        return;
+        return do_help_pod();
     }
 
-    my ($rows, $cols) = $TERM ? $TERM->get_screen_size() : (25, 80);
-    my $maxlen = $cols - 4;
+    my $maxlen = term_width() - 4;
     my $out = "=" x $maxlen;
     my $head = uc " $0 command summary ";
     substr($out, (length($out)-length($head))/2, length($head)) = $head;
@@ -525,26 +536,7 @@ sub do_help {
     for my $cmd (sort keys %help) {
         $out .= fmt_text($cmd, $help{$cmd}, $maxlen, $indent);
     }
-    print_output($out);
-}
-
-sub fmt_text {
-    my ($prefix, $text, $maxlen, $indent) = @_;
-    $prefix .= ' ' x ($indent - length($prefix));
-    my $indent_text = ' ' x $indent;
-    my @words = split(' ', $text);
-    my $pos = length($prefix);
-    my $out = $prefix;
-    for my $w (@words) {
-        if ($pos + length($w) + 1 > $maxlen) {
-            $out .= "\n$indent_text";
-            $pos = $indent;
-        }
-        if ($pos>$indent) { $out .= ' '; $pos++ }
-        $out .= $w;
-        $pos += length($w);
-    }
-    $out .= "\n";
+    return print_output($out);
 }
 
 sub do_ping {
@@ -607,6 +599,7 @@ sub do_ping {
                     $min_rtt, $avg_rtt, $max_rtt, $mdev_rtt)
         );
     }
+    return 1;
 }
 
 sub do_inform_about {
@@ -616,7 +609,7 @@ sub do_inform_about {
     my ($src, $dst) = (ip2hex($$args{'src_ip'}), ip2hex($$args{'dst_ip'}));
     my $raw = check_send_command($conn, 'inform', $dst, $src) or return;
     my ($opts, $reply, $output, $tag) = parse_server_reply($raw);
-    print_output($reply);
+    return print_output($reply);
 }
 
 ###############################################################################
@@ -655,14 +648,14 @@ sub do_show_log {
     if ($reverse) {
         $log = join("\n", reverse split(/\n/, $log));
     }
-    print_output($log);
+    return print_output($log);
 }
 
 # cmd: show version
 sub do_show_version {
     my ($conn, $parsed, $args) = @_;
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
-    print_output($STATUS->{'version'}."\n");
+    return print_output($STATUS->{'version'}."\n");
 }
 
 # cmd: show uptime
@@ -670,17 +663,16 @@ sub do_show_uptime {
     my ($conn, $parsed, $args) = @_;
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
 
-    ($STATUS) = get_status($conn, {raw=>0, format=>1});
-
-    return if !$STATUS;
-
-    print_output(
-        sprintf("%s up %s (started: %s)\n",
-            strftime("%H:%M:%S", localtime(time)),
-            relative_time($STATUS->{'started'}, 0),
-            format_time($STATUS->{'started'}),
-        )
-    );
+    if (($STATUS) = get_status($conn, {raw=>0, format=>1})) {
+        print_output(
+            sprintf("%s up %s (started: %s)\n",
+                strftime("%H:%M:%S", localtime(time)),
+                relative_time($STATUS->{'started'}, 0),
+                format_time($STATUS->{'started'}),
+            )
+        );
+    }
+    return;
 }
 
 # cmd: show arp
@@ -963,12 +955,11 @@ sub do_clear_ip {
         return check_send_command($conn, 'clear_ip_all') or return;
     }
 
-    expand_ip_run($ip,
+    return expand_ip_run($ip,
                   sub {
                       return check_send_command($conn, "clear_ip $_[0]");
                   }
                 );
-    return;
 }
 
 # cmd: clear arp
@@ -979,12 +970,11 @@ sub do_clear_arp {
 
     Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
 
-    expand_ip_run($ip, 
+    return expand_ip_run($ip, 
                   sub {
                       return check_send_command($conn, "clear_arp $_[0]");
                   }
                 );
-    return;
 }
 
 ###############################################################################
@@ -1041,8 +1031,7 @@ sub do_probe {
     );
     my $elapsed = time - $start;
 
-    print_output(sprintf("%d probe(s) sent in %0.2fs", $n, $elapsed));
-    return;
+    return print_output(sprintf("%d probe(s) sent in %0.2fs", $n, $elapsed));
 }
 
 ###############################################################################
@@ -1092,8 +1081,8 @@ sub do_set_generic {
             $fmt = '%0.2f';
         }
     }
-    print_output(sprintf("%s changed from $fmt to $fmt%s",
-                         $name, $old, $new, $unit));
+    return print_output(sprintf("%s changed from $fmt to $fmt%s",
+                                $name, $old, $new, $unit));
 }
 
 # cmd: set queuedepth
@@ -1267,10 +1256,9 @@ sub do_set_ip_generic {
             $fmt = '%0.2f';
         }
     }
-    print_output(sprintf("%s: %s changed from $fmt to $fmt%s",
-                         $output->[0]->{ip},
-                         $name, $old, $new, $unit));
-    return 1;
+    return print_output(sprintf("%s: %s changed from $fmt to $fmt%s",
+                                $output->[0]->{ip},
+                                $name, $old, $new, $unit));
 }
 
 # cmd: set ip pending
@@ -1306,6 +1294,170 @@ sub do_set_ip_dead {
     );
 }
 
+# cmd: sponge
+sub do_sponge { &do_set_ip_dead }
+
+# cmd: unsponge
+sub do_unsponge { &do_set_ip_alive }
+
+# cmd: set ip alive
+sub do_set_ip_alive {
+    my ($conn, $parsed, $args) = @_;
+
+    DEBUG "set ip alive $$args{ip} mac="
+         .($args->{'mac'}?$args->{'mac'} : 'none');
+
+    my $mac = $args->{'mac'} ? mac2hex($args->{'mac'}) : undef;
+
+    return expand_ip_run($args->{'ip'}, 
+        sub {
+            do_set_ip_generic(
+                -conn    => $conn,
+                -command => 'set_alive',
+                -name    => 'state',
+                -val     => $mac,
+                -ip      => hex2ip($_[0]),
+                -options => $args->{-options});
+        }
+    );
+}
+
+# cmd: set ip mac
+#
+#   Alias for "set ip alive" with a mandatory MAC argument.
+sub do_set_ip_mac {
+    my ($conn, $parsed, $args) = @_;
+
+    print "set ip $$args{ip} mac $$args{mac}\n";
+    return do_set_ip_alive($conn, $parsed, $args);
+}
+
+###############################################################################
+# STATUS command
+###############################################################################
+
+# cmd: status
+sub do_status {
+    my ($conn, $parsed, $args) = @_;
+    my $format = 1;
+
+    my $opts = { raw => 0, format => 1 };
+
+    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
+            'raw!'     => \$opts->{raw},
+            'format!'  => \$opts->{format},
+            'nf'       => sub { $opts->{format} = 0 },
+        ) or return;
+
+    $opts->{format} &&= !$opts->{raw};
+
+    my $raw = check_send_command($conn, 'get_status') or return;
+
+    ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
+
+    if (!$opts->{format}) {
+        return print_output($reply);
+    }
+    my $info = $output->[0];
+    return print_output(
+        sprintf("$tag%s\n", 'id:', $$info{id}),
+        sprintf("$tag%d\n", 'pid:', $$info{pid}),
+        sprintf("$tag%s\n", 'version:', $$info{version}),
+        sprintf("$tag%s [%d]\n", 'date:',
+                format_time($$info{date}), $$info{date}),
+        sprintf("$tag%s [%d]\n", 'started:',
+                format_time($$info{started}), $$info{started}),
+        sprintf("$tag%s/%d\n", 'network:',
+                $$info{network}, $$info{prefixlen}),
+        sprintf("$tag%s\n", 'interface:', $$info{interface}),
+        sprintf("$tag%s\n", 'IP:', $$info{ip}),
+        sprintf("$tag%s\n", 'MAC:', $$info{mac}),
+        sprintf("$tag%s (in %d secs) [%d]\n", 'next sweep:',
+                format_time($$info{next_sweep}),
+                $$info{next_sweep}-$$info{date},
+                $$info{next_sweep}),
+    );
+}
+
+sub do_param {
+    my ($conn, $parsed, $args) = @_;
+    my $format = 1;
+
+    my $opts = { raw => 0, format => 1 };
+
+    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
+            'raw!'     => \$opts->{raw},
+            'format!'  => \$opts->{format},
+            'nf'       => sub { $opts->{format} = 0 },
+        ) or return;
+
+    $opts->{format} &&= !$opts->{raw};
+
+    my $raw = check_send_command($conn, 'get_param') or return;
+
+    ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
+
+    if (!$opts->{format}) {
+        return print_output($reply);
+    }
+    my $info = $output->[0];
+    return print_output(
+        sprintf("$tag= %d\n", 'queuedepth', $$info{queue_depth}),
+        sprintf("$tag= %0.2f q/min\n", 'max_rate', $$info{max_rate}),
+        sprintf("$tag= %0.2f q/sec\n", 'flood_protection',
+                $$info{flood_protection}),
+        sprintf("$tag= %d\n", 'max_pending', $$info{max_pending}),
+        sprintf("$tag= %d secs\n", 'sweep_period', $$info{sweep_period}),
+        sprintf("$tag= %d secs\n", 'sweep_age', $$info{sweep_age}),
+        sprintf("$tag= %d pkts/sec\n", 'proberate', $$info{proberate}),
+        sprintf("$tag= %s\n", 'learning', 
+                    $$info{learning}?"yes ($$info{learning} secs)":'no'),
+        sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
+        sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
+        sprintf("$tag= %s\n", 'log_level', $$info{log_level}),
+    );
+}
+
+# ($output, $tag_fmt) = get_status($conn, \%opts);
+#
+#   Helper function for status. Similar to the ip/arp thing.
+#
+sub get_status {
+    my ($conn, $opts) = @_;
+
+    my $reply;
+    
+    if ($conn) {
+        $reply = check_send_command($conn, 'get_status') or return;
+    }
+    else {
+        $reply = qq{id=arpsponge-test\n}
+               . qq{version=0.0\n}
+               . qq{pid=0\n}
+               . qq{network=}.ip2hex('192.168.1.0').qq{\n}
+               . qq{prefixlen=24\n}
+               ;
+    }
+
+    if (!$$opts{raw}) {
+        $reply =~ s/^(network|ip)=([\da-f]+)$/"$1=".hex2ip($2)/gme;
+        $reply =~ s/^(mac)=([\da-f]+)$/"$1=".hex2mac($2)/gme;
+    }
+
+    if (!$$opts{format}) {
+        return ($reply, '%s ');
+    }
+
+    my %info = map { /(.*?)=(.*)/; ($1=>$2) } split("\n", $reply);
+    my $taglen = 0;
+    foreach (keys %info) {
+        $taglen = length($_) if length($_) > $taglen;
+    }
+    $taglen++;
+    return (\%info, "%-${taglen}s ");
+}
+
+# cmd: dump status [$file]
 sub do_dump_status {
     my ($conn, $parsed, $args) = @_;
 
@@ -1331,11 +1483,9 @@ sub do_dump_status {
 
         $args->{-options} = $opts;
 
-        my $out_fh = new IO::File(">$fname");
-        if (!$out_fh) {
-            print_error("cannot write to $fname: $!");
-            return;
-        }
+        my $out_fh = IO::File->new(">$fname")
+                        or return print_error("cannot write to $fname: $!");
+
         my $io = IO::String->new();
         my $oldhandle = select $io;
         print_output("<STATUS>");
@@ -1361,10 +1511,10 @@ sub do_dump_status {
         select $oldhandle;
         $out_fh->autoflush(1);
         my $size = ($out_fh->stat)[7];
-        if (! -t $out_fh) {
+        if (-f $out_fh) {
             print_output("$size bytes written to $fname");
         }
-        $out_fh->close;
+        return $out_fh->close;
     }
     else {
         Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
@@ -1373,11 +1523,11 @@ sub do_dump_status {
             verbose("sending USR1 signal to $pid: ");
             if (kill 'USR1', $STATUS->{'pid'}) {
                 verbose("ok\n");
-                print_output("process $pid signalled");
+                return print_output("process $pid signalled");
             }
             else {
                 verbose("ERROR\n");
-                print_error("** cannot signal $pid: $!");
+                return print_error("** cannot signal $pid: $!");
             }
         }
     }
@@ -1394,11 +1544,9 @@ sub do_load_status {
         ) or return;
 
     my $fname = $args->{'file'};
-    my $fh = IO::File->new("<$fname");
-    if (!$fh) {
-        print_error("cannot read $fname: $!");
-        return;
-    }
+    my $fh = IO::File->new("<$fname")
+                or return print_error("cannot read $fname: $!");
+
     my $mtime = ($fh->stat)[9];
 
     if ($mtime + 60 < time) {
@@ -1417,8 +1565,7 @@ sub do_load_status {
         }
 
         if ($load <= 0) {
-            print_error("** status loading aborted");
-            return;
+            return print_error("** status loading aborted");
         }
         else {
             print_output("continue loading...");
@@ -1504,7 +1651,7 @@ sub do_load_status {
     }
     verbose("done\n");
 
-    print_output(
+    return print_output(
             "old:",
                  " total=$curr_stats{TOTAL}",
                  " static=$curr_stats{STATIC}",
@@ -1522,176 +1669,13 @@ sub do_load_status {
         );
 }
 
-# cmd: sponge
-sub do_sponge { &do_set_ip_dead }
-
-# cmd: unsponge
-sub do_unsponge { &do_set_ip_alive }
-
-# cmd: set ip alive
-sub do_set_ip_alive {
-    my ($conn, $parsed, $args) = @_;
-
-    DEBUG "set ip alive $$args{ip} mac="
-         .($args->{'mac'}?$args->{'mac'} : 'none');
-
-    my $mac = $args->{'mac'} ? mac2hex($args->{'mac'}) : undef;
-
-    return expand_ip_run($args->{'ip'}, 
-        sub {
-            do_set_ip_generic(
-                -conn    => $conn,
-                -command => 'set_alive',
-                -name    => 'state',
-                -val     => $mac,
-                -ip      => hex2ip($_[0]),
-                -options => $args->{-options});
-        }
-    );
-}
-
-# cmd: set ip mac
-#
-#   Alias for "set ip alive" with a mandatory MAC argument.
-sub do_set_ip_mac {
-    my ($conn, $parsed, $args) = @_;
-
-    print "set ip $$args{ip} mac $$args{mac}\n";
-    return do_set_ip_alive($conn, $parsed, $args);
-}
-
-###############################################################################
-# STATUS command
-###############################################################################
-
-# cmd: status
-sub do_status {
-    my ($conn, $parsed, $args) = @_;
-    my $format = 1;
-
-    my $opts = { raw => 0, format => 1 };
-
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-            'raw!'     => \$opts->{raw},
-            'format!'  => \$opts->{format},
-            'nf'       => sub { $opts->{format} = 0 },
-        ) or return;
-
-    $opts->{format} &&= !$opts->{raw};
-
-    my $raw = check_send_command($conn, 'get_status') or return;
-
-    ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
-
-    if (!$opts->{format}) {
-        return print_output($reply);
-    }
-    my $info = $output->[0];
-    print_output(
-        sprintf("$tag%s\n", 'id:', $$info{id}),
-        sprintf("$tag%d\n", 'pid:', $$info{pid}),
-        sprintf("$tag%s\n", 'version:', $$info{version}),
-        sprintf("$tag%s [%d]\n", 'date:',
-                format_time($$info{date}), $$info{date}),
-        sprintf("$tag%s [%d]\n", 'started:',
-                format_time($$info{started}), $$info{started}),
-        sprintf("$tag%s/%d\n", 'network:',
-                $$info{network}, $$info{prefixlen}),
-        sprintf("$tag%s\n", 'interface:', $$info{interface}),
-        sprintf("$tag%s\n", 'IP:', $$info{ip}),
-        sprintf("$tag%s\n", 'MAC:', $$info{mac}),
-        sprintf("$tag%s (in %d secs) [%d]\n", 'next sweep:',
-                format_time($$info{next_sweep}),
-                $$info{next_sweep}-$$info{date},
-                $$info{next_sweep}),
-    );
-}
-
-sub do_param {
-    my ($conn, $parsed, $args) = @_;
-    my $format = 1;
-
-    my $opts = { raw => 0, format => 1 };
-
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-            'raw!'     => \$opts->{raw},
-            'format!'  => \$opts->{format},
-            'nf'       => sub { $opts->{format} = 0 },
-        ) or return;
-
-    $opts->{format} &&= !$opts->{raw};
-
-    my $raw = check_send_command($conn, 'get_param') or return;
-
-    ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
-
-    if (!$opts->{format}) {
-        return print_output($reply);
-    }
-    my $info = $output->[0];
-    print_output(
-        sprintf("$tag= %d\n", 'queuedepth', $$info{queue_depth}),
-        sprintf("$tag= %0.2f q/min\n", 'max_rate', $$info{max_rate}),
-        sprintf("$tag= %0.2f q/sec\n", 'flood_protection',
-                $$info{flood_protection}),
-        sprintf("$tag= %d\n", 'max_pending', $$info{max_pending}),
-        sprintf("$tag= %d secs\n", 'sweep_period', $$info{sweep_period}),
-        sprintf("$tag= %d secs\n", 'sweep_age', $$info{sweep_age}),
-        sprintf("$tag= %d pkts/sec\n", 'proberate', $$info{proberate}),
-        sprintf("$tag= %s\n", 'learning', 
-                    $$info{learning}?"yes ($$info{learning} secs)":'no'),
-        sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
-        sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
-        sprintf("$tag= %s\n", 'log_level', $$info{log_level}),
-    );
-}
-
-# ($output, $tag_fmt) = get_status($conn, \%opts);
-#
-#   Helper function for status. Similar to the ip/arp thing.
-#
-sub get_status {
-    my ($conn, $opts) = @_;
-
-    my $reply;
-    
-    if ($conn) {
-        $reply = check_send_command($conn, 'get_status') or return;
-    }
-    else {
-        $reply = qq{id=arpsponge-test\n}
-               . qq{version=0.0\n}
-               . qq{pid=0\n}
-               . qq{network=}.ip2hex('192.168.1.0').qq{\n}
-               . qq{prefixlen=24\n}
-               ;
-    }
-
-    if (!$$opts{raw}) {
-        $reply =~ s/^(network|ip)=([\da-f]+)$/"$1=".hex2ip($2)/gme;
-        $reply =~ s/^(mac)=([\da-f]+)$/"$1=".hex2mac($2)/gme;
-    }
-
-    if (!$$opts{format}) {
-        return ($reply, '%s ');
-    }
-
-    my %info = map { /(.*?)=(.*)/; ($1=>$2) } split("\n", $reply);
-    my $taglen = 0;
-    foreach (keys %info) {
-        $taglen = length($_) if length($_) > $taglen;
-    }
-    $taglen++;
-    return (\%info, "%-${taglen}s ");
-}
-
 ###############################################################################
 # Initialisation
 ###############################################################################
 
 sub initialise {
     my ($sockname, $interface);
-    my $opt_c = undef;
+    my $opt_c     = undef;
 
     GetOptions(
         'command|c=s' => sub {
@@ -1706,6 +1690,7 @@ sub initialise {
         'rundir=s'    => \$rundir,
         'socket=s'    => \$sockname,
         'test!'       => \$opt_test,
+        'quiet'       => \$opt_quiet,
         'manual'      => sub { pod2usage(-exitval=>0, -verbose=>2) },
     ) or pod2usage(-exitval=>2);
 
@@ -1845,6 +1830,11 @@ used during development to check command parsing, etc.
 =item X<--verbose>B<--verbose>
 
 The C<--verbose> flag causes the program to be a little more talkative.
+
+=item X<--quiet>B<--quiet>
+
+Only has effect when executing commands from the command line.
+Causes all non-error output to be suppressed.
 
 =back
 
