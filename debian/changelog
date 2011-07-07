@@ -1,3 +1,15 @@
+arpsponge (3.10-0.19) unstable; urgency=low
+
+  * Added dependency on libterm-readkey-perl
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu,  7 Jul 2011 17:22:14 +0200
+
+arpsponge (3.10-0.18) unstable; urgency=low
+
+  * 3.10-beta14
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 07 Jul 2011 16:39:31 +0200
+
 arpsponge (3.10-0.17) unstable; urgency=low
 
   * 3.10-beta13

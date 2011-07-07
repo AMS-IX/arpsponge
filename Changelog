@@ -2,6 +2,25 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.10 - beta14 - steven
+
+    M6::ReadLine:
+      - Use of $PAGER only if output is a terminal and we are
+        using ReadLine.
+      - Make sure print_output returns sensible values.
+
+    asctl:
+      - Dump status command can now also dump to arbitrary file; the
+        client will take care of parsing and writing.
+
+      - More appropriate exit status (in case of non-interactive run,
+        exits with 0 only if the command was successful).
+
+      - Better error formatting. Moved fmt_text from asctl to
+        M6::ReadLine.
+
+      - Added --quiet option.
+
 3.10 - beta13 - steven
 
   init.d/arpsponge:
