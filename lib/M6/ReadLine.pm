@@ -651,16 +651,19 @@ sub print_output {
     my $out = join('', @_);
        $out .= "\n" if $out !~ /\n\Z/;
 
+    my $ret = 1;
     my $curr_fh = select;
     if ($TERM && -t $curr_fh) {
         open(MORE, "|$PAGER");
         print MORE $out;
         close MORE;
+        $ret = $? == 0;
         $TERM->on_new_line();
     }
     else {
-        print $out;
+        $ret = print $out;
     }
+    return $ret;
 }
 
 sub yesno {
