@@ -682,7 +682,7 @@ sub last_error {
 #
 sub print_output {
     my $out = join('', @_);
-       $out .= "\n" if $out !~ /\n\Z/;
+       $out .= "\n" if $out !~ /\n\Z/ && length($out);
 
     my $ret = 1;
     my $curr_fh = select;
