@@ -1575,7 +1575,7 @@ sub do_load_status {
     verbose("getting current state table...");
 
     my %curr_state_table;
-    my %curr_stats = (ALIVE=>0,DEAD=>0,PENDING=>0,TOTAL=>0);
+    my %curr_stats = (ALIVE=>0,STATIC=>0,DEAD=>0,PENDING=>0,TOTAL=>0);
     {
         my $raw = check_send_command($conn, 'get_ip');
         my ($d_opts, $reply, $output, $d_tag) = parse_server_reply($raw);
@@ -1603,13 +1603,13 @@ sub do_load_status {
             when (/^<\/[\w-]+>$/)    { $parse_state = 'none'  }
 
             when ($parse_state eq 'state' &&
-                  /^([\d\.]+) \s+ ([A-Z]+) \s+ \d+ \s+ \d+\.\d+ \s+ \S+\@\S+$/x) {
+                  /^([\d\.]+) \s+ ([A-Z]+) \s+ \d+ \s+ \d+\.\d+ \s+ \S+[\@\s]\S+$/x) {
                 my $ip = ip2hex($1);
                 $state_table{$ip} = $2;
             }
 
             when ($parse_state eq 'arp' &&
-                    /^([a-f\d\:]+) \s+ ([\d\.]+) \s+ \d+ \s+ \S+\@\S+$/x) {
+                    /^([a-f\d\:]+) \s+ ([\d\.]+) \s+ \d+ \s+ \S+[\@\s]\S+$/x) {
                 my ($mac, $ip) = (mac2hex($1), ip2hex($2));
                 if ($state_table{$ip} eq 'ALIVE') {
                     $arp_table{$ip} = $mac;
@@ -1622,7 +1622,7 @@ sub do_load_status {
     
     verbose("checking and setting states\n");
 
-    my %ip_stats   = (ALIVE=>0, DEAD=>0, TOTAL=>0, PENDING=>0, CHANGED=>0);
+    my %ip_stats   = (ALIVE=>0, STATIC=>0, DEAD=>0, TOTAL=>0, PENDING=>0, CHANGED=>0);
     for my $ip (sort { $a cmp $b } keys %state_table) {
         $ip_stats{'TOTAL'}++;
         $ip_stats{$state_table{$ip}}++;
