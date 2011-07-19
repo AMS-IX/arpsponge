@@ -140,6 +140,8 @@ sub start_daemon($$);
 sub Main {
     init_log(SYSLOG_IDENT);
 
+    Getopt::Long::Configure('no_ignore_case');
+
     GetOptions(
       'age=i'               => \(my $age              = $DFL_ARP_AGE),
       'arp-update-method=s' => \(my $arp_update_methods),
@@ -163,7 +165,8 @@ sub Main {
       'sponge-network'      => \(my $sponge_net),
       'statusfile=s'        => \(my $statusfile),
       'sweep=s'             => \(my $sweep_sec),
-      'verbose+'            => \(my $verbose),
+      'verbose|v+'          => \(my $verbose),
+      'version|V'           => sub { print "$0 $VERSION\n"; exit 0 },
     ) or pod2usage(2);
 
     pod2usage(-exitstatus => 0, -verbose => 2) if $man;
