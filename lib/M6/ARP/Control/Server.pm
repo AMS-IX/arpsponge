@@ -623,10 +623,19 @@ sub _cmd_inform {
         $self->send_error(hex2ip($ip1), ": no MAC address available");
         return 1;
     }
-    my ($mac2, $time2) = $sponge->arp_table($ip2);
-    if (!defined $mac2 || $mac2 eq $ETH_ADDR_NONE) {
-        $self->send_error(hex2ip($ip2), ": no MAC address available");
-        return 1;
+
+    my ($mac2, $time2);
+    my $state = $sponge->get_state($ip2);
+    if (defined $state && $state == DEAD()) {
+        # IP address is DEAD, so update the neighbor's cache to point to us.
+        $mac2 = $sponge->my_mac; # Try _our_ address..
+    }
+    else {
+        ($mac2, my $time2) = $sponge->arp_table($ip2);
+        if (!defined $mac2 || $mac2 eq $ETH_ADDR_NONE) {
+            $self->send_error(hex2ip($ip2), ": no MAC address available");
+            return 1;
+        }
     }
 
     $sponge->send_arp_update(
@@ -634,7 +643,7 @@ sub _cmd_inform {
                         tha => $mac1, tpa => $ip1,
                     );
     return $self->send_ok(
-            "[sha=$mac2,spa=$ip2]\n[tha=$mac1,tpa=$ip1]\nupdate sent"
+            "sha=$mac2\nspa=$ip2\ntha=$mac1\ntpa=$ip1\nmsg=update sent"
         );
 }
 
