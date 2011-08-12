@@ -4,7 +4,6 @@ Priority: optional
 Maintainer: Steven Bakker <steven.bakker@ams-ix.net>
 Build-Depends: debhelper (>= 4.0.0),
  perl (>= 5.10.0), perl-modules (>= 5.10.0),
- libsys-syslog-perl (>= 0.26),
  libnet-pcap-perl (>= 0.16),
  libterm-readline-gnu-perl (>= 1.17),
  libterm-readkey-perl (>= 2.30),
@@ -18,7 +17,6 @@ Package: arpsponge
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends},
  perl (>= 5.10.0), perl-modules (>= 5.10.0),
- libsys-syslog-perl (>= 0.26),
  libnet-pcap-perl (>= 0.16),
  libterm-readline-gnu-perl (>= 1.17),
  libterm-readkey-perl (>= 2.30),
