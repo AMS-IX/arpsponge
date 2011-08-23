@@ -39,7 +39,7 @@ SPONGE_VAR           = /var/run/$(NAME)
 OWNER                = root
 GROUP                = root
 MODE                 = 644
-BINMODE              = 750
+BINMODE              = 755
 
 # ----------------------------------------------------------------------------
 #				END MANDATORY SECTION
