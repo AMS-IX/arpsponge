@@ -311,7 +311,7 @@ sub is_my_network_s {
 sub set_pending {
     my ($self, $target_ip, $n) = @_;
     my $state = $self->set_state($target_ip, PENDING($n));
-    log_notice("pending: %s (state %d)", hex2ip($target_ip), $n);
+    log_notice("pending: ip=%s state=%d", hex2ip($target_ip), $n);
     return $state;
 }
 
