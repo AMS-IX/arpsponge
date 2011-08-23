@@ -2,6 +2,37 @@
 
 *-* vim:sw=2:ts=4:et:filetype=text
 
+3.11 - steven
+
+  arpsponge:
+    - Tiny, but significant bug in the code for sending ARP updates:
+      we checked whether we had a MAC address in our ARP table for
+      the target IP, but we didn't check whether it was actually ALIVE.
+
+    - Added an early check for non-nullness of arp_update_flags(),
+      to short-circuit the nested if()s in the code for sending ARP
+      updates.
+
+    - The "inform" command will send updates for DEAD addresses using the
+      sponge's own MAC address, so we can issue "inform all about dead".
+
+  asctl:
+    - Improved feedback format of "inform" command.
+    - Better time estimation for "inform".
+    - Added possibility for "inform" command to take IP filters,
+      rather than just IP ranges (e.g. "inform alive about dead").
+    - Check for and avoid adjacent duplicates in history list. Fixed
+      filtering for "show ip pending".
+
+  M6::ARP::Sponge:
+    - Log string for "sponging" consistent with "clearing" and
+        "unsponging" now.
+
+  Packaging:
+    - Fixed binmode for utilities.
+    - Remove dependency on libsys-syslog-perl, in preparation
+      for debian-squeeze.
+
 3.10 - steven
 
   Production release.
@@ -12,7 +43,7 @@
     - Parse a little more loosely on the status file. Initialize
       counters for STATIC as well.
 
-  M6::ReadLine.pm:
+  M6::ReadLine:
     - print_output should not append a newline if the text is
       all empty.
 
