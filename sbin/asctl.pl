@@ -39,10 +39,11 @@ use IO::File;
 use Scalar::Util    qw( reftype );
 
 use M6::ARP::Control::Client;
-use M6::ARP::Log    qw( :standard :macros );
-use M6::ARP::Util   qw( :all );
-use M6::ReadLine    qw( :all );
-use M6::ARP::Const  qw( :all );
+use M6::ARP::Log       qw( :standard :macros );
+use M6::ARP::Util      qw( :all );
+use M6::ReadLine       qw( :all );
+use M6::ARP::Const     qw( :all );
+use M6::ARP::NetPacket qw( :vars );
 
 my $SPONGE_VAR      = '@SPONGE_VAR@';
 my $CONN            = undef;
@@ -126,8 +127,8 @@ my %Syntax = (
         '$ip'     => { type=>'ip-range' } },
     'inform $dst_ip about $src_ip' => {
         '?'       => 'Force <dst_ip> to update its ARP entry for <src_ip>.',
-        '$dst_ip' => { type=>'ip-address' },
-        '$src_ip' => { type=>'ip-address' } },
+        '$dst_ip' => { type=>'ip-filter' },
+        '$src_ip' => { type=>'ip-filter' } },
     'set arp_update_flags $flags' => {
         '?'       => q{Set the methods (comma-separated list) by which the}
                     .q{ sponge is to update its neighbors' ARP caches},
@@ -305,6 +306,39 @@ sub expand_ip_range {
     return \@list;
 }
 
+sub expand_ip_filter {
+    my ($arg_str, $name, $silent) = @_;
+
+    DEBUG "filter <$arg_str>";
+    if (grep { lc $arg_str eq $_ } @IP_STATES) {
+        my $state_table = get_state_table($CONN);
+        my $state = uc $arg_str;
+        my @list;
+        if ($state eq 'ALL') {
+            @list = sort { $a cmp $b } keys %$state_table;
+        }
+        else {
+            while (my ($k, $v) = each %$state_table) {
+                push @list, $k if $v eq $state;
+            }
+        }
+        if ($state ne 'DEAD') {
+            # Make sure the addresses all have valid MACs.
+            my ($opts, $reply, $arp_table, $tag_fmt) =
+                shared_show_arp_ip($CONN, 'get_arp', [], {});
+            my %mac = map { ($_->{'hex_ip'}, $_->{'mac'}) } @$arp_table;
+            @list = grep { exists $mac{$_} && $mac{$_} ne $ETH_ADDR_NONE }
+                         @list;
+
+        }
+        return [ map { [ hex($_), hex($_), hex2ip($_), hex2ip($_) ] } @list ];
+    }
+    elsif (defined last_error()) {
+        return;
+    }
+    return expand_ip_range($arg_str, $name, $silent);
+}
+
 sub check_ip_range_arg {
     my ($spec, $arg, $silent) = @_;
     DEBUG sprintf("check_ip_range_arg: <%s> <%d>", $arg, $silent ? $silent : 0);
@@ -438,15 +472,12 @@ sub check_send_command {
     }
 }
 
-sub expand_ip_run {
-    my $arg_str = shift;
+sub do_ip_run {
+    my $list    = shift;
     my $code    = shift;
     my $delay   = shift;
 
-    my @args = split(' ', $arg_str);
-
     my @reply;
-    my $list = expand_ip_range($arg_str, 'ip') or return;
 
     for my $elt (@$list) {
         my ($lo, $hi, $lo_s, $hi_s) = @$elt;
@@ -458,6 +489,20 @@ sub expand_ip_run {
         }
     }
     return join("\n", @reply);
+}
+
+sub expand_ip_run {
+    my $arg_str = shift;
+    my $list    = expand_ip_range($arg_str, 'ip') or return;
+
+    return do_ip_run($list, @_);
+}
+
+sub expand_filter_run {
+    my $arg_str = shift;
+    my $list    = expand_ip_filter($arg_str, 'ip') or return;
+
+    return do_ip_run($list, @_);
 }
 
 sub Wrap_GetOptionsFromArray {
@@ -605,11 +650,109 @@ sub do_ping {
 sub do_inform_about {
     my ($conn, $parsed, $args) = @_;
 
-    Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
-    my ($src, $dst) = (ip2hex($$args{'src_ip'}), ip2hex($$args{'dst_ip'}));
-    my $raw = check_send_command($conn, 'inform', $dst, $src) or return;
+    my $opts = {};
+    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
+            'delay=f'  => \$opts->{'delay'},
+            'rate=f'   => \$opts->{'rate'},
+        ) or return;
+
+    my $delay = $$opts{'delay'};
+    my $rate  = $$opts{'rate'};
+
+    my $dfl_probe_delay = $DFL_PROBE_DELAY / 10;
+    my $dfl_probe_rate  = 1/$dfl_probe_delay;
+
+    my $interrupt = 0;
+    local ($::SIG{INT}) = sub { $interrupt++ };
+
+    if (defined $delay) {
+        if (defined $rate) {
+            print_error("** warning: --rate ignored in favour of --delay");
+        }
+        if ($delay <= 0) {
+            print_error("** warning: delay of $delay ignored;",
+                        " using $dfl_probe_delay");
+            $delay = $dfl_probe_delay;
+        }
+    }
+    elsif (defined $rate) {
+        if ($rate > $MAX_PROBE_RATE) {
+            my $dfl_rate = sprintf("%0.2f", $dfl_probe_rate);
+            print_error("** warning: rate of $rate ignored;",
+                        " using $dfl_rate");
+            $delay = $dfl_probe_delay;
+        }
+    }
+    else {
+        $delay = $dfl_probe_delay;
+    }
+
+    my $src_list = expand_ip_filter($$args{'src_ip'}, 'source-ip') or return;
+    my $dst_list = expand_ip_filter($$args{'dst_ip'}, 'dest-ip') or return;
+
+    my $pairs = int(@$src_list) * int(@$dst_list);
+    my $time_estimate = $pairs * $delay;
+
+    my $count = 0;
+    my $start = time;
+    my $fmt = "%d probes in %0.2f secs (%d/%0.2f probes/secs left)";
+    if ($INTERACTIVE) {
+        printf("$fmt\r", $count, time-$start, $pairs, $time_estimate);
+    }
+    my $print_freq = 0.5/($delay?$delay:0.01);
+    $print_freq |= 1;
+
+    # Lovely, nested anonymous subs...
+    my $reply = do_ip_run($dst_list,
+        sub {
+            return undef if $interrupt;
+            my $dst = shift;
+            return do_ip_run($src_list,
+                sub { 
+                    return undef if $interrupt;
+                    if ($INTERACTIVE && $count % $print_freq == 0) {
+                        $time_estimate = $pairs * ($delay?$delay:0.01);
+                        printf("$fmt   \r", $count, time-$start,
+                                $pairs, $time_estimate);
+                    }
+                    $pairs--;
+                    $count++;
+                    return '' if $dst eq $_[0];
+                    send_single_inform($conn, $d, $_[0]);
+                    sleep($delay);
+                    return '';
+                },
+            )
+        }
+    );
+
+    if ($count > 1 || $INTERACTIVE) {
+        $time_estimate = $pairs * ($delay?$delay:0.01);
+        print_output(
+            sprintf($fmt, $count, time-$start, $pairs, $time_estimate),
+        );
+    }
+    return 1;
+}
+
+sub send_single_inform {
+    my ($conn, $dst, $src) = @_;
+
+    my $raw = check_send_command($conn, 'inform', $dst, $src) or return '';
+
+    return '';
     my ($opts, $reply, $output, $tag) = parse_server_reply($raw);
-    return print_output($reply);
+    my $info = $output->[0];
+    if (defined $info && defined $info->{'tpa'}) {
+        return print_output(sprintf(
+                "update sent: [tpa=%s,tha=%s] [spa=%s,sha=%s]",
+                $$info{'tpa'}, $$info{'tha'},
+                $$info{'spa'}, $$info{'sha'},
+            ));
+    }
+    else {
+        return print_output($reply);
+    }
 }
 
 ###############################################################################
@@ -915,7 +1058,12 @@ sub parse_server_reply {
     my @output;
     my $taglen  = 0;
     for my $record (split(/\n\n/, $reply)) {
-        my %info = map { /(.*?)=(.*)/; ($1=>$2) } split("\n", $record);
+        my %info;
+        for my $line (split("\n", $record)) {
+            if ($line =~ /(.*?)=(.*)$/g) {
+                $info{$1} = $2;
+            }
+        }
 
         if (my $ip = $info{'network'}) {
             $info{'hex_network'} = ip2hex($ip);
@@ -1533,6 +1681,27 @@ sub do_dump_status {
     }
 }
 
+# helper: get state table
+sub get_state_table {
+    my $conn = shift;
+
+    my %curr_state_table;
+    my %curr_stats = (ALIVE=>0,STATIC=>0,DEAD=>0,PENDING=>0,TOTAL=>0);
+    {
+        my $raw = check_send_command($conn, 'get_ip');
+        my ($d_opts, $reply, $output, $d_tag) = parse_server_reply($raw);
+        for my $entry (@$output) {
+            # Strip "(x)" from "PENDING(x)"
+            my ($state) = $entry->{'state'} =~ /^(\w+)/;
+
+            $curr_state_table{$entry->{'hex_ip'}} = $state;
+            $curr_stats{TOTAL}++;
+            $curr_stats{$state}++;
+        }
+    }
+    return wantarray ? (\%curr_state_table, \%curr_stats) : \%curr_state_table;
+}
+
 # cmd: load status $file
 sub do_load_status {
     my ($conn, $parsed, $args) = @_;
@@ -1574,20 +1743,8 @@ sub do_load_status {
 
     verbose("getting current state table...");
 
-    my %curr_state_table;
-    my %curr_stats = (ALIVE=>0,STATIC=>0,DEAD=>0,PENDING=>0,TOTAL=>0);
-    {
-        my $raw = check_send_command($conn, 'get_ip');
-        my ($d_opts, $reply, $output, $d_tag) = parse_server_reply($raw);
-        for my $entry (@$output) {
-            # Strip "(x)" from "PENDING(x)"
-            my ($state) = $entry->{'state'} =~ /^(\w+)/;
+    my ($curr_state_table, $curr_stats) = get_state_table($conn);
 
-            $curr_state_table{$entry->{'hex_ip'}} = $state;
-            $curr_stats{TOTAL}++;
-            $curr_stats{$state}++;
-        }
-    }
     verbose(" ok\n");
 
     my $parse_state = 'none';
@@ -1626,8 +1783,8 @@ sub do_load_status {
     for my $ip (sort { $a cmp $b } keys %state_table) {
         $ip_stats{'TOTAL'}++;
         $ip_stats{$state_table{$ip}}++;
-        $curr_state_table{$ip} //= 'DEAD';
-        if ($curr_state_table{$ip} eq $state_table{$ip}) {
+        $$curr_state_table{$ip} //= 'DEAD';
+        if ($$curr_state_table{$ip} eq $state_table{$ip}) {
             #verbose "no change ", hex2ip($ip), "\n";
             next;
         }
@@ -1653,18 +1810,18 @@ sub do_load_status {
 
     return print_output(
             "old:",
-                 " total=$curr_stats{TOTAL}",
-                 " static=$curr_stats{STATIC}",
-                 " alive=$curr_stats{ALIVE}",
-                 " dead=$curr_stats{DEAD}",
-                 " pending=$curr_stats{PENDING}",
+                 " total=$$curr_stats{TOTAL}",
+                 " static=$$curr_stats{STATIC}",
+                 " alive=$$curr_stats{ALIVE}",
+                 " dead=$$curr_stats{DEAD}",
+                 " pending=$$curr_stats{PENDING}",
                  "\n",
             "new:",
                  " total=$ip_stats{TOTAL}",
                  " static=$ip_stats{STATIC}",
                  " alive=$ip_stats{ALIVE}",
                  " dead=$ip_stats{DEAD}",
-                 " pending=$curr_stats{PENDING}",
+                 " pending=$$curr_stats{PENDING}",
                  " changed=$ip_stats{CHANGED}",
         );
 }
@@ -1888,6 +2045,8 @@ Show command summary
 
 Force I<dst_ip> to update its ARP entry for I<src_ip>. See also
 "L<set arp_update_flags|/arp_update_flags>" below.
+
+Both I<dst_ip> and I<src_ip> can be I<$ip-filter> arguments.
 
 =item B<load status> [B<--force>] I<file>
 
