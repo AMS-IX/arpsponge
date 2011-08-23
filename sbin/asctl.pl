@@ -509,7 +509,7 @@ sub expand_ip_run {
 }
 
 sub expand_filter_run {
-    my $arg_str = shift;
+    my $arg_str       = shift;
     my $list    = expand_ip_filter($arg_str, 'ip') or return;
 
     return do_ip_run($list, @_);
@@ -700,17 +700,24 @@ sub do_inform_about {
     my $src_list = expand_ip_filter($$args{'src_ip'}, 'source-ip') or return;
     my $dst_list = expand_ip_filter($$args{'dst_ip'}, 'dest-ip') or return;
 
-    my $pairs = int(@$src_list) * int(@$dst_list);
-    my $time_estimate = $pairs * $delay;
+    my $pairs               = int(@$src_list) * int(@$dst_list);
+    my $estimate_per_update = $delay ? $delay : 0.05;
+    my $time_estimate       = $pairs * $estimate_per_update;
 
     my $count = 0;
     my $start = time;
-    my $fmt = "%d probes in %0.2f secs (%d/%0.2f probes/secs left)";
+    my $intlen = length($pairs);
+    my $timelen = length(sprintf("%d", $time_estimate+0.5)) + 1;
+    my $fmt = "%${intlen}d/%${intlen}d updates,"
+            . " %${timelen}d secs left"
+            ;
+    my $total_pairs = $pairs;
+
     if ($INTERACTIVE) {
-        printf("$fmt\r", $count, time-$start, $pairs, $time_estimate);
+        printf("$fmt\r", $count, $total_pairs, $time_estimate);
     }
-    my $print_freq = 0.5/($delay?$delay:0.01);
-    $print_freq |= 1;
+    my $print_freq = int(0.5/$estimate_per_update);
+    $print_freq |= 1; # Make it an odd number;
 
     # Lovely, nested anonymous subs...
     my $reply = do_ip_run($dst_list,
@@ -721,15 +728,15 @@ sub do_inform_about {
                 sub { 
                     return undef if $interrupt;
                     if ($INTERACTIVE && $count % $print_freq == 0) {
-                        $time_estimate = $pairs * ($delay?$delay:0.01);
-                        printf("$fmt   \r", $count, time-$start,
-                                $pairs, $time_estimate);
+                        $time_estimate = $pairs * $estimate_per_update + 0.5;
+                        printf("$fmt\r", $count, $total_pairs, $time_estimate);
                     }
                     $pairs--;
                     $count++;
                     return '' if $dst eq $_[0];
                     send_single_inform($conn, $dst, $_[0]);
                     sleep($delay);
+                    $estimate_per_update = (time-$start) / $count;
                     return '';
                 },
             )
@@ -737,9 +744,11 @@ sub do_inform_about {
     );
 
     if ($count > 1 || $INTERACTIVE) {
-        $time_estimate = $pairs * ($delay?$delay:0.01);
+        $time_estimate = $pairs * $estimate_per_update + 0.5;
+        my $fmt = "%${intlen}d/%${intlen}d updates in %${timelen}d secs";
+        $fmt .= "   " if $INTERACTIVE; # Padding.
         print_output(
-            sprintf($fmt, $count, time-$start, $pairs, $time_estimate),
+            sprintf($fmt, $count, $total_pairs, time-$start)
         );
     }
     return 1;
