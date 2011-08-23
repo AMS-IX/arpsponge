@@ -317,7 +317,11 @@ sub expand_ip_range {
 }
 
 sub expand_ip_filter {
-    my ($arg_str, $name, $silent) = @_;
+    my %args     = (name => 'ip', @_);
+    my $arg_str  = $args{'arg'};
+    my $name     = $args{'name'};
+    my $silent   = $args{'silent'};
+    my $have_mac = $args{'have_mac'};
 
     DEBUG "filter <$arg_str>";
     if (grep { lc $arg_str eq $_ } @IP_STATES) {
@@ -332,7 +336,7 @@ sub expand_ip_filter {
                 push @list, $k if $v eq $state;
             }
         }
-        if ($state ne 'DEAD') {
+        if ($have_mac || ($state eq 'ALL' && $state ne 'DEAD')) {
             # Make sure the addresses all have valid MACs.
             my ($opts, $reply, $arp_table, $tag_fmt) =
                 shared_show_arp_ip($CONN, 'get_arp', [], {});
@@ -504,13 +508,6 @@ sub do_ip_run {
 sub expand_ip_run {
     my $arg_str = shift;
     my $list    = expand_ip_range($arg_str, 'ip') or return;
-
-    return do_ip_run($list, @_);
-}
-
-sub expand_filter_run {
-    my $arg_str       = shift;
-    my $list    = expand_ip_filter($arg_str, 'ip') or return;
 
     return do_ip_run($list, @_);
 }
@@ -697,8 +694,12 @@ sub do_inform_about {
         $delay = $dfl_probe_delay;
     }
 
-    my $src_list = expand_ip_filter($$args{'src_ip'}, 'source-ip') or return;
-    my $dst_list = expand_ip_filter($$args{'dst_ip'}, 'dest-ip') or return;
+    my $src_list = expand_ip_filter(arg => $$args{'src_ip'}, 
+                                    name => 'source-ip') or return;
+
+    my $dst_list = expand_ip_filter(arg => $$args{'dst_ip'},
+                                    name => 'dest-ip',
+                                    have_mac => 1) or return;
 
     my $pairs               = int(@$src_list) * int(@$dst_list);
     my $estimate_per_update = $delay ? $delay : 0.05;
@@ -707,10 +708,11 @@ sub do_inform_about {
     my $count = 0;
     my $start = time;
     my $intlen = length($pairs);
-    my $timelen = length(sprintf("%d", $time_estimate+0.5)) + 1;
+    my $timelen = length(sprintf("%d", $time_estimate+0.5));
     my $fmt = "%${intlen}d/%${intlen}d updates,"
             . " %${timelen}d secs left"
             ;
+    $fmt .= clr_to_eol() if $INTERACTIVE; # Padding.
     my $total_pairs = $pairs;
 
     if ($INTERACTIVE) {
@@ -745,8 +747,8 @@ sub do_inform_about {
 
     if ($count > 1 || $INTERACTIVE) {
         $time_estimate = $pairs * $estimate_per_update + 0.5;
+        print clr_to_eol() if $INTERACTIVE;
         my $fmt = "%${intlen}d/%${intlen}d updates in %${timelen}d secs";
-        $fmt .= "   " if $INTERACTIVE; # Padding.
         print_output(
             sprintf($fmt, $count, $total_pairs, time-$start)
         );

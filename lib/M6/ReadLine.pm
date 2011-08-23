@@ -51,7 +51,7 @@ BEGIN {
                              print_error_cond print_error
                              last_error set_error clear_error
                              yesno print_output
-                             term_width fmt_text );
+                             clr_to_eol term_width fmt_text );
 	my  @functions   = (@check_func, @gen_functions);
     my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER
                            $HISTORY_FILE $IP_NETWORK );
@@ -74,7 +74,8 @@ our $PAGER        = join(' ', qw(
                              --quit-if-one-screen
                     ));
 
-my $ERROR  = undef;
+my $CLR_TO_EOL    = undef;
+my $ERROR         = undef;
 
 our %TYPES = (
         'int' => {
@@ -475,6 +476,11 @@ sub term_width {
     return $cols;
 }
 
+sub clr_to_eol {
+    $CLR_TO_EOL //= readpipe('tput el 2>/dev/null');
+    return $CLR_TO_EOL;
+}
+
 # $fmt = fmt_text($prefix, $text, $maxlen, $indent);
 sub fmt_text {
     my ($prefix, $text, $maxlen, $indent) = @_;
@@ -837,6 +843,8 @@ AMS-IX extensions on top of Term::ReadLine.
 =item X<print_output>B<print_output>
 
 =item X<set_error>B<set_error>
+
+=item X<clr_to_eol>B<clr_to_eol>
 
 =back
 
