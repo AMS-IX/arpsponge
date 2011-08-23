@@ -514,7 +514,7 @@ sub set_dead {
     my ($self, $ip) = @_;
     my $rate = $self->queue->rate($ip) // 0.0;
 
-    log_notice("sponging: %s (%0.1f q/min)", hex2ip($ip), $rate);
+    log_notice("sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
 
     $self->gratuitous_arp($ip) if $self->gratuitous;
     $self->set_state($ip, DEAD);
