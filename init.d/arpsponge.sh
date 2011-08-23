@@ -22,7 +22,6 @@ PATH=/sbin:/bin:/usr/bin:${BINDIR}
 
 PROG=arpsponge
 SPONGE_VAR=@SPONGE_VAR@
-SPONGE_OPTIONS="@SPONGE_OPTIONS@"
 
 # Program defaults
 export  AGE \
@@ -36,6 +35,7 @@ export  AGE \
         QUEUE_DEPTH \
         RATE \
         SPONGE_NETWORK \
+        ARP_UPDATE_METHOD \
         SWEEP
 
 # Defaults for all sponges.
@@ -77,9 +77,11 @@ start_sponge() {
         pidfile="${rundir}/pid"
 
         opts="--daemon --rundir=${rundir} --pidfile=${pidfile}"
+
         eval_bool ${SPONGE_NETWORK} && opts="$opts --sponge-network"
         eval_bool ${GRATUITOUS}     && opts="$opts --gratuitous"
         eval_bool ${DUMMY_MODE}     && opts="$opts --dummy"
+
         [ -n "${INIT_MODE}" ]       && opts="$opts --init=${INIT_MODE}"
         [ -n "${LEARNING}" ]        && opts="$opts --learning=${LEARNING}"
         [ -n "${QUEUE_DEPTH}" ]     && opts="$opts --queuedepth=${QUEUE_DEPTH}"
@@ -88,6 +90,11 @@ start_sponge() {
         [ -n "${SWEEP}" ]           && opts="$opts --sweep=${SWEEP}"
         [ -n "${PROBERATE}" ]       && opts="$opts --proberate=${PROBERATE}"
         [ -n "${AGE}" ]             && opts="$opts --age=${AGE}"
+
+        if [ -n "${ARP_UPDATE_METHOD}" ]; then
+            opts="$opts --arp-update-method=${ARP_UPDATE_METHOD}"
+        fi
+
 		if [ -n "${FLOOD_PROTECTION}" ]; then
             opts="$opts --flood-protection=${FLOOD_PROTECTION}"
         fi
