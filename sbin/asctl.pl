@@ -210,13 +210,23 @@ sub Main {
 
         init_readline() if $INTERACTIVE;
 
+        # Don't add stuff to history list automatically.
+        $TERM->MinLine(undef);
+        # Keep track of last command in the history, so
+        # we avoid adding duplicates.
+        my ($prev_command) = reverse $TERM->GetHistory;
+        $prev_command = 'quit' if !defined $prev_command;
         while (1) {
             my $input = $TERM ? $TERM->readline($PROMPT) : <>;
             last if !defined $input;
 
-            next if $input =~ /^\s*(?:#.*)?$/;
+            next if $input =~ /^\s*(?:#.*)?$/; # Skip empty lines and comments.
             my $command = do_command($input, $CONN);
-
+            if ($input ne $prev_command) {
+                # Only add input to history if it's not a duplicate.
+                $TERM->AddHistory($input);
+                $prev_command = $input;
+            }
             if (!$CONN) {
                 if ($command eq 'quit') {
                     verbose "connection closed\n";
@@ -718,7 +728,7 @@ sub do_inform_about {
                     $pairs--;
                     $count++;
                     return '' if $dst eq $_[0];
-                    send_single_inform($conn, $d, $_[0]);
+                    send_single_inform($conn, $dst, $_[0]);
                     sleep($delay);
                     return '';
                 },
@@ -921,7 +931,14 @@ sub do_show_ip {
             $count{$$info{state}}++;
         }
         $count{TOTAL}++;
-        next if defined $filter_state && lc $$info{state} ne $filter_state;
+        if (defined $filter_state) {
+            if ($filter_state eq 'pending') {
+                next if $$info{state} !~ /^PENDING/;
+            }
+            else {
+                next if lc $$info{state} ne $filter_state;
+            }
+        }
         if ($$opts{summary}) {
             push @output,
                     sprintf("%-17s %-12s %7d %8.3f     %s",
