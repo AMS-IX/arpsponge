@@ -28,7 +28,6 @@ DFL_INIT             = ALIVE
 DFL_LEARN            = 5
 DFL_LOGLEVEL         = info
 
-SPONGE_OPTIONS       = --age=$(DFL_ARP_AGE)
 DFL_SOCK_PERMS       = root:noc:0660
 SPONGE_VAR           = /var/run/$(NAME)
 
