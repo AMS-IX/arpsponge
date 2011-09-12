@@ -251,7 +251,7 @@ dpkg:
 	mkdir -p $(_debtemp)
 	cp -rp . $(_debtemp)/$(NAME)-$(RELEASE)
 	cd $(_debtemp)/$(NAME)-$(RELEASE); \
-	    (fakeroot /usr/bin/make -f debian/rules binary || true)
+		(fakeroot dpkg-buildpackage -b -uc -us || true)
 	ls $(_debtemp)/$(NAME)_*.deb >/dev/null 2>&1; \
 		[ $$? = 0 ] && mv $(_debtemp)/$(NAME)_*.deb .
 	$(RM) -rf $(_debtemp)
