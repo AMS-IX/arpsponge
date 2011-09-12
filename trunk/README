@@ -1,0 +1,72 @@
+@(#)$Id$
+
+Primary site is:
+	http://www.ams-ix.net/
+
+About ARPSPONGE (a.k.a. "Bob")
+------------------------------
+
+ARPSPONGE is a tool that sweeps up stray ARP queries from a LAN. It
+listens on an ethernet interface and if the ARP rate for a particular
+IP address goes over the threshold, it starts faking responses.
+
+This is especially useful on large peering LANs where a router hang can
+result in large ARP (broadcast) storms.
+
+Requirements
+------------
+
+	* GNU make
+	* Perl (>= 5.10)
+	* Perl modules:
+		- Net::Pcap
+		- NetPacket (::Ethernet, ::ARP, ::IP)
+		- Net::ARP
+		- Net::IPvAddr
+		- Sys::Syslog
+
+Installation
+------------
+
+DEBIAN:
+
+1. Copy config.mk.dist to config.mk
+2. Optionally edit config.mk (see below)
+3. Run "make dpkg"
+4. "dpkg --install *.deb"
+
+OTHER SYSTEMS:
+
+1. Copy config.mk.dist to config.mk
+
+2. Look at the start of "config.mk" and set correct values for:
+
+ (MUST be set correctly)
+
+	PERL         (/usr/bin/perl)
+	IFCONFIG     (/sbin/ifconfig)
+	SPONGE_VAR   (/var/run/arpsponge)
+
+ (MAY be changed)
+
+	DIRPREFIX
+	BINPREFIX
+	DOCPREFIX
+	BINDIR
+	LIBROOT
+	INSTLIB
+	MANDIR
+	DOCDIR
+
+	SECTION
+	FILESECTION
+
+3. run "make"
+
+4. run "make install"
+
+
+Documentation
+-------------
+
+See the "arpsponge" man page, or "perldoc arpsponge".

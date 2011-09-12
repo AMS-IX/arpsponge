@@ -1,0 +1,75 @@
+#!/bin/sh
+#
+# $Id$
+#
+# rminstalldirs --- remove directory hierarchy
+#
+# Works (almost) similar to "rmdir -ps", except that the whole path
+# needn't exist.  For example,
+#
+#   rminstalldirs /dir1/dir2/dir3/file1
+#
+# - will still remove the whole tree if "file1" does not exist.  Of course
+# it will not remove any directory that is not empty.
+#
+# Author: Steven Bakker <steven@monkey-mind.net>
+# Created: 1998-06-24
+
+PATH=/sbin:/bin:/usr/bin:/usr/sbin
+OLDIFS="$IFS"
+
+do_rmdir() {
+	if [ `echo "$1" | sed -e 's:^/::g'` = "$1" ]
+	then
+		dir="`pwd`/$1"
+	else
+		dir=$1
+	fi
+	shift
+
+	cd /
+	path=''
+
+	IFS=/
+	set - $dir
+	IFS="$OLDIFS"
+
+	# Go down the path as far as possible, keeping track of
+	# the reverse path back up ($path).
+	for i in $*
+	do
+		[ -d $i ] || break
+		cd $i
+		path="$i $path"
+	done
+
+	# Go up one directory, so we can "rmdir" it...
+	cd ..
+
+	# Now travel back up the tree, removing subdirs as we go...
+	set - $path
+	goon=true
+	while $goon && [ $# -gt 0 ]
+	do
+		d=$1; shift
+		if [ $d = . -o $d = .. ]
+		then
+			# "." and ".." references in the path act as sentinels.
+			goon=false
+		else
+			if rmdir $d >/dev/null 2>&1
+			then
+				echo rmdir `pwd`/$d
+				cd ..
+			else
+				# Failed "rmdir"; give up.
+				goon=false
+			fi
+		fi
+	done
+}
+
+for dir in "$@"
+do
+    do_rmdir $dir
+done

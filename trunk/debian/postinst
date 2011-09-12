@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# @(#)$Id$
+#
+
+update-rc.d arpsponge defaults
+
+if which invoke-rc.d >/dev/null 2>&1; then
+    invoke-rc.d arpsponge start
+else
+    /etc/init.d/arpsponge start
+fi

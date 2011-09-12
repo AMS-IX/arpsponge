@@ -1,0 +1,504 @@
+@(#)$Id$
+
+*-* vim:sw=2:ts=4:et:filetype=text
+
+3.11 - steven
+
+  arpsponge:
+    - Tiny, but significant bug in the code for sending ARP updates:
+      we checked whether we had a MAC address in our ARP table for
+      the target IP, but we didn't check whether it was actually ALIVE.
+
+    - Added an early check for non-nullness of arp_update_flags(),
+      to short-circuit the nested if()s in the code for sending ARP
+      updates.
+
+    - The "inform" command will send updates for DEAD addresses using the
+      sponge's own MAC address, so we can issue "inform all about dead".
+
+  asctl:
+    - Improved feedback format of "inform" command.
+    - Better time estimation for "inform".
+    - Added possibility for "inform" command to take IP filters,
+      rather than just IP ranges (e.g. "inform alive about dead").
+    - Check for and avoid adjacent duplicates in history list. Fixed
+      filtering for "show ip pending".
+
+  M6::ARP::Sponge:
+    - Log string for "sponging" consistent with "clearing" and
+        "unsponging" now.
+
+  Packaging:
+    - Fixed binmode for utilities.
+    - Remove dependency on libsys-syslog-perl, in preparation
+      for debian-squeeze.
+
+3.10 - steven
+
+  Production release.
+
+3.10 - beta15 - steven
+
+  asctl:
+    - Parse a little more loosely on the status file. Initialize
+      counters for STATIC as well.
+
+  M6::ReadLine:
+    - print_output should not append a newline if the text is
+      all empty.
+
+3.10 - beta14 - steven
+
+    M6::ReadLine:
+      - Use of $PAGER only if output is a terminal and we are
+        using ReadLine.
+      - Make sure print_output returns sensible values.
+
+    asctl:
+      - Dump status command can now also dump to arbitrary file; the
+        client will take care of parsing and writing.
+
+      - More appropriate exit status (in case of non-interactive run,
+        exits with 0 only if the command was successful).
+
+      - Better error formatting. Moved fmt_text from asctl to
+        M6::ReadLine.
+
+      - Added --quiet option.
+
+3.10 - beta13 - steven
+
+  init.d/arpsponge:
+    - Dump status before stopping as well.
+
+  asctl:
+    - Fix reply mapping/splitting in asctl. Fix typo in comments in
+      arpsponge.
+
+  M6::ARP::Queue:
+    - Added level of indirection in Queue data. Object hash was
+      storing max_depth parameter and ip queues at the same level,
+      causing problems when clear_all was called.
+
+3.10 - beta12 - steven
+
+  arpsponge:
+    - Don't clear is_dummy() when running as a daemon.
+    - It's $eth_obj->{dest_mac} instead of "dst_mac"...
+    - The init_state() function is now called with an integer
+      argument (i.e. already translated state), but was still trying
+      to look up the state in a hash, resulting in state "undef" for
+      all IPs (i.e. equivalent to state NONE).
+    - Added note about status loading in POD.
+
+  asctl:
+    - Added "load status" and "dump status" to asctl.
+
+  lib/M6/ReadLine.pm:
+    - Add argument type "filename" and filename completion.
+    - Added a "yesno" prompting interface:
+        if (yesno("question", "yN")) { ... }
+
+  init.d/arpsponge:
+    - (Force-)reload now causes the state to be re-read.
+    - Fixed use of "ls" to find files.
+
+3.10 - beta10 - steven
+
+  lib/M6/ARP/Const.pm:
+    - Added is_valid_state to the exportable functions list.
+
+  debian/control:
+    - Added extra dependencies.
+
+  arpsponge:
+    - Added extra info for arp spoofing log messages (dst mac).
+
+3.10 - beta9 - steven
+  asctl:
+    - Fixed POD and help.
+
+
+3.10 - beta7/beta8 - steven
+
+  arpsponge, asctl:
+    - Added arp_update_flags to specify how to force neighbor
+      cache updates.
+    - Added log_level to specify the minimum log level.
+    - Split off some of the output from "show status" to new
+      "show parameters".
+    - Added "set log_level".
+
+  asctl:
+    - Parameter names for "set" now use underscores
+      instead of hyphens.
+
+  general:
+    - Logging split off into separate module (M6::ARP::Log).
+        - Rename verbose/sverbose to log_verbose, log_sverbose.
+    - State and update flag definitions defined in separate module
+      (M6::ARP::Const), making it easier for server and client
+      to share these values.
+
+3.10 - beta6 - steven
+
+    arpsponge:
+      * The actual select/dispatch bit has been split off
+        from packet_capture_loop() into handle_input().
+      * Instead of calling sleep() between sending packets,
+        the probe/sweep loops use handle_input() so they can
+        still process packets/commands during their idle moments.
+        This hopefully reduces the chances of missing ARP replies
+        and keeps the sponge responsive during probe/sweep runs,
+        even if the proberate is set low.
+
+3.10 - beta5 - steven
+
+    asctl:
+      * Small fix in asctl for "ping" command arguments.
+
+3.10 - beta3 - steven
+
+    general:
+      * Added dependency on Term::ReadLine::Gnu.
+
+    asctl:
+      * Always use STDIN and STDOUT as in/output in Term::ReadLine.
+      * Fix verbosity in the face of interactiveness.
+      * Non-interactivity implies no ReadLine.
+      * Make sure history is read and written.
+      * Match prefixes for commands and arguments.
+      * Output/Error messages more consistent.
+
+    arpsponge:
+      * Control socket permissions.
+
+3.10 - beta2 - steven
+
+  Code cleanups all around.
+
+  Major changes:
+
+    * AV Feature request implemented.
+    
+      Some routers do not update their ARP cache when an
+      IP gets unsponged. There are two cases in which this
+      can happen:
+      
+        1.  A and B have a direct peering. A goes down, address gets
+            sponged. B ARPs for A, gets the sponge's MAC and starts
+            trying to set up BGP sessions to it (port 179 SYN). When
+            A comes back, B for some reason does not update its ARP
+            cache and continues to think A is behind the sponge's MAC.
+
+            We're not sure why this happens. Normally, A would try to
+            re-establish its peerings as well (often also sending out
+            a gratuitous ARP), and B should quickly find out A's new address,
+            since it's getting BGP SYNs from it. Perhaps A has its peerings
+            configured in passive mode and doesn't send gratuitous ARPs, but
+            then, most routers ARP for their peer before attempting to
+            connect. In this case, B apparently doesn't ARP for A (or it would
+            find out A's real address), but rather it seems to hold on to
+            the cached (sponged) ARP entry until it times out.
+
+        2.  There is no direct BGP session between A and B, but they exchange
+            prefixes over a routeserver instead, AND the data flow is only in
+            one direction (i.e. asymmetric routing):
+
+                           ->-> [C] >->-
+                          /             \
+                         |               |
+                  (data) | -<-<-<-<-<-<- |
+                         |/             \|
+                        [A]             [B]
+                          \             /
+                  (BGP)    -<-> [RS] <->
+
+            If A gets sponged, RS loses the peering with A, and
+            will withdraw A's routes, so B will stop sending
+            traffic to A.
+
+            Now, when A gets back, it will re-establish its direct
+            peering sessions, updating its peers' ARP caches appropriately
+            (including that of RS).
+
+            If, however, for some reason, B got hold of the sponged
+            mapping while A was down, it will start sending traffic
+            to the sponge thinking it is using A as next-hop. It will
+            continue doing so until its ARP entry for A times out.
+
+            AFAICS, this can happen only for two reasons:
+
+              * B's ARP entry for A timed out and it was somehow
+                attempting to send traffic to A. This would indicate
+                a (probably very) slow withdrawal of A's prefixes by
+                RS, or (more likely), someone trying to ping A from
+                behind B.
+
+              * B picked up the gratuitous ARP from the sponge. When A
+                came back it (A) did _not_ send a gratuitous ARP, so
+                B still thinks A is at the sponge's HW address.
+
+            Given the usual configuration of a 4 hour ARP timeout,
+            the first scenario is not so likely.
+
+      In any case: in order to fix this, we need to update B's ARP cache.
+      In order to do that, we need to know A's IP address. Unfortunately,
+      in case "2" we cannot know that, since there is no BGP traffic
+      between the two, so the destination IP is that of the final
+      destination.
+      
+      In case "1" however, it's easy: the destination IP is that of A.
+
+      Now, how do we update B's ARP cache?  One way is by sending a
+      gratuitous arp on behalf of A.  However, this is yet another
+      broadcast, which is exactly what we're trying to avoid.
+
+      Therefore, we fake two unicast ARP packets from A. When
+      misdirected IP traffic ends up at the sponge, it will
+      send two ARP packets back to the source: a unicast reply
+      followed by a unicast request in the hopes that one of these
+      will trigger an update of the ARP entry at the other side:
+
+        ARP <IP-A> IS AT <MAC-A>
+        ARP WHO HAS <B> TELL <IP-A>@<MAC-A>
+
+      Testing suggests that Linux's ARP cache responds to the unicast
+      request, but not the reply. Still, the request above would result
+      in a reply from B back to A (who actually didn't initiate the
+      request). We could try:
+
+        ARP WHO HAS <A> TELL <IP-A>@<MAC-A>
+
+      I.e., a unicast proxy gratuitous ARP request :-)
+
+    * UNIX control socket for the daemon.
+        * asctl and aslogtail "clients" for the control socket.
+
+    * Speed improvements:
+        * IP and MAC addresses are kept as hexstrings internally.
+        * Packet decoding now done using self-written code to prevent
+          binary -> dotted-quat -> hex translations.
+
+  arpsponge:
+
+    * Signals are now masked with sigprocmask().
+    * Reworked event loop for more accurate timing.
+    * Fixed set_pending/incr_pending so it will log per
+      pending update.
+    * The "notify" socket has been removed. There is now a UNIX control
+      socket that can be used to send commands and receive log events.
+    * Default "rundir" (--rundir) used to set default values for
+      statusfile, pidfile and control socket.
+    * --daemon=pidfile replaced by --[no]daemon and --pidfile=file
+    * Restored --verbose and --dummy functionality.
+
+  asctl, aslogtail:
+
+    * new
+    
+3.10 - alpha - steven
+
+  * 17.nov.2010 - steven
+
+    Backported fixes from mon-eun-014 for the signal handling.
+
+    Notify FIFO no longer default on init startup.
+
+    More robust init script. Don't execute the daemon if
+    SPONGE_DEBUG or SPONGE_DUMMY is set.
+
+  * 07.oct.2010 - steven
+
+    Added flood protection by limiting the significance of
+    ARP queries if they all come from the same source.
+
+    Add src_ip to the queue as well, and when the queue is full, collapse
+    entries of the same source if they are timed too closely together 
+    (less than 1/$flood_protection_rate).
+
+        * Take list:
+            [t0, s1], [t1, s2], [t2, s2], [t3, s1], [t4, s2], [t5, s2]
+
+        * Sort by SRC, then TIMESTAMP:
+            [t0, s1], [t3, s1], [t1, s2], [t2, s2], [t4, s2], [t5, s2]
+
+        * Reduce closely spaced entries from the same SRC:
+            [t0, s1], [t3, s1], [t1, s2], [t4, s2]
+
+        * Sort by TIMESTAMP again:
+            [t0, s1], [t1, s2], [t3, s1], [t4, s2]
+
+    Advantage: works even if multiple sources are spamming us with
+    ARP queries. Flood protection overhead only kicks in when queue
+    is full and apparent rate (i.e. pre-reduce) > max-rate.
+
+    Disadvantage: more state to keep, more processing when queue is
+    full.
+
+3.9.5 - 10.aug.2010 - steven
+
+  * 10.aug.2010 - steven
+    - Added LSB headers for init script.
+    - Added post/pre scripts to make initscript handling smooth.
+
+3.9.4 - 12.apr.2010 - steven
+
+  * 12.apr.2010 - steven
+    Remove useless reference to Net::PcapUtils from Sponge.pm.
+
+3.9.3 - 08.apr.2010 - steven
+
+  * 26.jan.2008 - steven
+    Add doc dir.
+
+  * 08.apr.2010 - steven
+    Fixed event loop by using select() + Net::Pcap,
+    getting rid of the PcapUtils dependency in the process.
+
+3.9.2 - 26.jan.2008 - arien
+  * Signals set flags. These flags get evaluated before a packet is
+    processed. This might solve the crashes since Debian Etch. 
+    This change was made after a hint from dvorak.
+
+3.9.1 - 26.oct.2005 - steven
+  * Pretty stupid bug in init.d script. Called the sponge with:
+
+        --queuedepth=${QUEUE_DEPTH}
+        --queuedepth=${RATE}
+
+    Obviously, the second option should have been "--rate"; this
+    caused the production install to run with a queue depth of 50,
+    which works miraculously well. ;-)
+
+  * Added the PROBERATE variable.
+
+  * Added defaults.sample file.
+
+  * Added some more info in do_status.
+
+  * Fine-tuned logging information. For instance, a log entry is
+    printed when we clear a pending entry.
+
+3.9 - 19.oct.2005 - steven
+  * Something (syslog?) is causing clone() calls, which exit using
+    EXIT{} block which tends to unlink() the PID file :-(
+	Traces seem to indicate that the clone()-d process is connected
+	to syslog, since it opens "/dev/console" which is typically a
+	last resort for failed syslog() connections.
+
+	As a first fix, I modified the EXIT{} block to only unlink()
+	the pid file if the pid of the current process ($$) matches
+	that of the master ($wrote_pid).
+
+	Second, I modified the code a bit to also log when dumping
+	status (if no filename is set, it will use /dev/null), and
+	to log a summary of the status.
+
+	Finally, the "probed 0 IP addresses" messages should have
+	gone from the log now...
+
+3.8 - 19.oct.2005 - steven
+  * Updated init script to move away from $SPONGE_OPTS and have a
+    more flexible set-up using separate variables which can be
+	overridden in the individual interface files.
+
+    This breaks the old syntax! Instead of a single string
+	in /etc/default/arpsponge/ethX (namely the network/prefix),
+	we need to define "NETWORK=network/prefix". It is also possible
+	to override the device "ethX" by setting "DEVICE".
+
+  * Added POD documentation for the new init set-up.
+
+3.7 - 30.sep.2005 - steven
+  * Fixed the f*cking call to f*cking Net::ARP::get_mac($dev, $mac).
+    It never wanted a reference as the second parameter, which
+	is bad enough in itself, but newer versions don't like an
+	undef or empty value for $mac either :-(
+
+3.6.4 - 28.jul.2005 - steven
+  * Fixed POD section for --init. In the OPTIONS section, it was
+    missing the "NONE".
+
+3.6.3 - 20.jul.2005 - steven
+  * Fixed POD comments regarding LEARN state. Added check for
+	--dummy and --daemon (mutually exclusive). Added comment
+	about this in POD.
+  * Added some verbosity in M6::ARP::Sponge::set_alive().
+
+  * Fixed verbosity in do_learn.
+
+3.6.2 - 11.jul.2005 - steven
+
+  * Fixed POD comments regarding proberate.
+
+3.6.1 - 27.jun.2005 - steven
+
+  * Fixed "rate" calculation. Off-by-one error spoiled the calculation :-(
+
+3.6 - 19.jun.2005 - steven
+
+  * Four ways to initialise the program:
+  	* --init=DEAD
+  	* --init=ALIVE
+  	* --init=PENDING
+  	* --init=NONE
+
+  * LEARN state does not probe, only listen.
+
+3.5 - 12.may.2005 - steven
+
+  * Incorporated Arien's ideas:
+  
+  	* Start in LEARN state, where we probe every second or so, for
+	  "--learn" times. During this period, we do not sponge addresses,
+	  we only probe and learn.
+	* Rewrote the handling of pending addresses. Pending addresses are
+	  now probed once per second for max_pending times. The previous
+	  behaviour was to probe a pending IP whenever an ARP query for it
+	  came in. If the incoming rate is high enough, we exhaust our pending
+	  probes before the target IP has a chance to answer.
+
+  * Added ARP rating through the "--proberate" option. Throwing ARP
+    queries at the interface at full CPU speed causes many packets to
+	be dropped, whether it's at the interface, the LAN (switch), or
+	the receiving end. Besides, broadcast storms are the very thing
+	we are trying to avoid here.
+
+  * --dummy now sends probes, but never sponged answers. Previously
+    it was not sending probes either, making it difficult to test the
+	sweeping/probing code.
+
+3.4.1 - 10.may.2005 - steven
+
+  * Logging fixes. One log line for a sponge event.
+  * Also log/notify for "pending" states.
+  * Various POD fixes.
+
+3.4 - 09.may.2005 - steven
+
+  * Renamed to "arpsponge" to prevent lawsuits :-)
+  * Cleaned up a bunch of stub files in the debian directory.
+
+3.3.2 - 03.may.2005 - steven
+
+  * "misfit" ARPs now get their src MAC logged as well.
+
+3.3.1 - 03.may.2005 - steven
+
+  * Added check for "misfit" ARPs and logging of those.
+
+3.3 - 03.may.2005 - steven
+
+  * Added "HUP" signal to arpswiffer. Added README file.
+
+3.2 - 01.may.2005 - steven
+
+  * Sponge.pm "set_alive" needs to check for local IP, otherwise the
+    state table gets contaminated.
+
+3.1 - 30.apr.2005 - steven
+
+  * Properly Debianized.
+  * Added code to recognize the duplicate detection packets from
+    DHCP clients.
