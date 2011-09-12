@@ -52,7 +52,7 @@ dist:
 	    $(RM) -r ./junk; \
 	    $(RM) installed.log; \
 	    $(RM) tools/mkdist; \
-	    find . \( -name '*.src' -o -name '*.tar' \) -exec $(RM) '{}' ';' ;\
+	    find . \( -name '*.tar' \) -exec $(RM) '{}' ';' ;\
 	    find . \( -name '*.gz' -o -name '*.Z' \) -exec $(RM) '{}' ';' ;\
 	    find . -depth -type d -name CVS -exec $(RM) -r '{}' ';' ;\
 	    find . -depth -type d -name .svn -exec $(RM) -r '{}' ';' ;\
@@ -60,7 +60,7 @@ dist:
 	    $$DIR/tools/mkdist Makefile > Makefile.dist; \
 			mv Makefile.dist Makefile; \
 	    $$DIR/tools/mkdist config.mk > config.mk.dist; \
-			rm config.mk; \
+			cp config.mk.dist config.mk; \
 		$(perlit) sbin/arpsponge.pl > sbin/arpsponge; \
 			pod2text sbin/arpsponge > arpsponge.txt; \
 			$(RM) sbin/arpsponge; \
