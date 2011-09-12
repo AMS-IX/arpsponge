@@ -19,27 +19,42 @@ Requirements
 	* GNU make
 	* Perl (>= 5.10)
 	* Perl modules:
-		- Net::Pcap
-		- NetPacket (::Ethernet, ::ARP, ::IP)
-		- Net::ARP
-		- Net::IPvAddr
-		- Sys::Syslog
+        Carp
+        Data::Dumper
+        File::Path
+        Getopt::Long
+        IO::File
+        IO::Select
+        IO::Socket
+        IO::String
+        NetAddr::IP
+        Net::ARP
+        Net::IPv4Addr
+        NetPacket (::ARP, ::Ethernet, ::IP)
+        Net::Pcap
+        Pod::Usage
+        POSIX
+        Readonly
+        Sys::Syslog
+        Term::ReadKey
+        Term::ReadLine
+        Time::HiRes
+
+      Depending on your O/S distributaion and version of perl, some or
+      all of these may already be included in a base install of perl.
 
 Installation
 ------------
 
 DEBIAN:
 
-1. Copy config.mk.dist to config.mk
-2. Optionally edit config.mk (see below)
-3. Run "make dpkg"
-4. "dpkg --install *.deb"
+1. Optionally edit config.mk (see below)
+2. Run "make dpkg"
+3. "dpkg --install *.deb"
 
 OTHER SYSTEMS:
 
-1. Copy config.mk.dist to config.mk
-
-2. Look at the start of "config.mk" and set correct values for:
+1. Look at the start of "config.mk" and set correct values for:
 
  (MUST be set correctly)
 
@@ -61,9 +76,9 @@ OTHER SYSTEMS:
 	SECTION
 	FILESECTION
 
-3. run "make"
+2. run "make"
 
-4. run "make install"
+3. run "make install"
 
 
 Documentation
