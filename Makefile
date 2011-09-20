@@ -49,14 +49,26 @@ dist:
 	    echo "cleaning it up"; \
 	    make clean >/dev/null 2>&1; \
 	    chmod -R u+w,go-w .; \
-	    $(RM) -r ./junk; \
-	    $(RM) installed.log; \
-	    $(RM) tools/mkdist; \
-	    find . \( -name '*.tar' \) -exec $(RM) '{}' ';' ;\
-	    find . \( -name '*.gz' -o -name '*.Z' \) -exec $(RM) '{}' ';' ;\
-	    find . -depth -type d -name CVS -exec $(RM) -r '{}' ';' ;\
-	    find . -depth -type d -name .svn -exec $(RM) -r '{}' ';' ;\
-	    $(RM) -r ./old ;\
+		$(RM) -r $(PACKAGE); \
+	    $(RM) -r junk; \
+	    $(RM) -r tools/mkdist; \
+		$(RM) -r debian/files; \
+		$(RM) -r debian/$(NAME); \
+	    $(RM) -r old ; \
+	    find . \( -name '*.gz' \
+				  -o -name '*.Z' \
+				  -o -name '*.tar' \
+				  -o -name '*.orig' \
+				  -o -name '*-stamp' \
+				  -o -name '*.changes' \
+				  -o -name '*.log' \
+				  -o -name '*.deb' \
+				  -o -name 'errors' \
+				\) -exec $(RM) '{}' ';' ;\
+	    find . -depth \( -name CVS \
+				  -o -name RCS \
+				  -o -name .svn \
+				\) -exec $(RM) -r '{}' ';' ;\
 	    $$DIR/tools/mkdist Makefile > Makefile.dist; \
 			mv Makefile.dist Makefile; \
 	    $$DIR/tools/mkdist config.mk > config.mk.dist; \
