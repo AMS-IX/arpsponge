@@ -73,9 +73,10 @@ dist:
 			mv Makefile.dist Makefile; \
 	    $$DIR/tools/mkdist config.mk > config.mk.dist; \
 			cp config.mk.dist config.mk; \
-		$(perlit) sbin/arpsponge.pl > sbin/arpsponge; \
-			pod2text sbin/arpsponge > arpsponge.txt; \
-			$(RM) sbin/arpsponge; \
+		for script in arpsponge asctl; do \
+			$(perlit) sbin/$$script > sbin/$$script; \
+			pod2text sbin/$$script > $$script.txt; \
+		done; \
 	    \
 	    echo "tarring and zipping it up"; \
 	    cd ..; \
