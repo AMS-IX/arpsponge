@@ -1,8 +1,25 @@
-@(#)$Id$
+arpsponge (3.12) unstable; urgency=low
 
-*-* vim:sw=2:ts=4:et:filetype=text
+  Changelog, debian/changelog
+    - Replaced changelog with symlink to ../Changelog.
+    - Changelog is now in Debian format.
 
-3.11 - steven
+  M6::ARP::Sponge:
+    - Make the "pending:" log line the same as sponging/unsponging.
+
+  Makefile, rules.mk:
+    - Fixed "dist" target building.
+    - Fixed dpkg building for "make dpkg".
+    - Fixes for nroff targets. Automatic version determination.
+    - Pre-format the "asctl" man page as well for the "dist" target.
+
+  README:
+    - Updated Perl requirements.
+    - Re-tabbed.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 20 Sep 2011 13:32:36 +0200
+
+arpsponge (3.11) unstable; urgency=low
 
   arpsponge:
     - Tiny, but significant bug in the code for sending ARP updates:
@@ -33,11 +50,17 @@
     - Remove dependency on libsys-syslog-perl, in preparation
       for debian-squeeze.
 
-3.10 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 23 Aug 2011 15:27:01 +0200
 
-  Production release.
+arpsponge (3.10-1) unstable; urgency=low
 
-3.10 - beta15 - steven
+  * 3.10 production release.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 19 Jul 2011 10:36:24 +0200
+
+arpsponge (3.10-0.20) unstable; urgency=low
+
+  * 3.10-beta15
 
   asctl:
     - Parse a little more loosely on the status file. Initialize
@@ -47,7 +70,17 @@
     - print_output should not append a newline if the text is
       all empty.
 
-3.10 - beta14 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 07 Jul 2011 17:48:21 +0200
+
+arpsponge (3.10-0.19) unstable; urgency=low
+
+  * Added dependency on libterm-readkey-perl
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu,  7 Jul 2011 17:22:14 +0200
+
+arpsponge (3.10-0.18) unstable; urgency=low
+
+  * 3.10-beta14
 
     M6::ReadLine:
       - Use of $PAGER only if output is a terminal and we are
@@ -66,7 +99,11 @@
 
       - Added --quiet option.
 
-3.10 - beta13 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 07 Jul 2011 16:39:31 +0200
+
+arpsponge (3.10-0.17) unstable; urgency=low
+
+  * 3.10-beta13
 
   init.d/arpsponge:
     - Dump status before stopping as well.
@@ -80,7 +117,12 @@
       storing max_depth parameter and ip queues at the same level,
       causing problems when clear_all was called.
 
-3.10 - beta12 - steven
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed, 06 Jul 2011 17:00:32 +0200
+
+arpsponge (3.10-0.16) unstable; urgency=low
+
+  * 3.10-beta12
 
   arpsponge:
     - Don't clear is_dummy() when running as a daemon.
@@ -103,7 +145,23 @@
     - (Force-)reload now causes the state to be re-read.
     - Fixed use of "ls" to find files.
 
-3.10 - beta10 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed,  6 Jul 2011 11:31:39 +0200
+
+arpsponge (3.10-0.15) unstable; urgency=low
+
+  *  3.10-beta11
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 23 Jun 2011 12:28:15 +0200
+
+arpsponge (3.10-0.14) unstable; urgency=low
+
+  * Minor fix for dummy mode.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 23 Jun 2011 12:18:56 +0200
+
+arpsponge (3.10-0.13) unstable; urgency=low
+
+  * 3.10-beta10
 
   lib/M6/ARP/Const.pm:
     - Added is_valid_state to the exportable functions list.
@@ -114,12 +172,26 @@
   arpsponge:
     - Added extra info for arp spoofing log messages (dst mac).
 
-3.10 - beta9 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 23 Jun 2011 11:23:49 +0200
+
+arpsponge (3.10-0.12) unstable; urgency=low
+
+  * 3.10-beta9
+
   asctl:
     - Fixed POD and help.
 
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed, 22 Jun 2011 10:50:14 +0200
 
-3.10 - beta7/beta8 - steven
+arpsponge (3.10-0.11) unstable; urgency=low
+
+  * 3.10-beta8 (see entry below)
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 14 Jun 2011 15:49:27 +0200
+
+arpsponge (3.10-0.10) unstable; urgency=low
+
+  * 3.10-beta7/beta8
 
   arpsponge, asctl:
     - Added arp_update_flags to specify how to force neighbor
@@ -140,7 +212,11 @@
       (M6::ARP::Const), making it easier for server and client
       to share these values.
 
-3.10 - beta6 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 14 Jun 2011 12:10:10 +0200
+
+arpsponge (3.10-0.9) unstable; urgency=low
+
+  * 3.10-beta6
 
     arpsponge:
       * The actual select/dispatch bit has been split off
@@ -152,12 +228,26 @@
         and keeps the sponge responsive during probe/sweep runs,
         even if the proberate is set low.
 
-3.10 - beta5 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 09 Jun 2011 16:50:15 +0200
+
+arpsponge (3.10-0.8) unstable; urgency=low
+
+  * 3.10-beta5
 
     asctl:
       * Small fix in asctl for "ping" command arguments.
 
-3.10 - beta3 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed,  8 Jun 2011 16:16:13 +0200
+
+arpsponge (3.10-0.7) unstable; urgency=low
+
+  * 3.10-beta4
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Fri, 13 May 2011 15:20:37 +0200
+
+arpsponge (3.10-0.6) unstable; urgency=low
+
+  * 3.10-beta3
 
     general:
       * Added dependency on Term::ReadLine::Gnu.
@@ -173,7 +263,11 @@
     arpsponge:
       * Control socket permissions.
 
-3.10 - beta2 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 09 May 2011 15:19:15 +0200
+
+arpsponge (3.10-0.5) unstable; urgency=high
+
+  * 3.10-beta2
 
   Code cleanups all around.
 
@@ -296,8 +390,24 @@
   asctl, aslogtail:
 
     * new
-    
-3.10 - alpha - steven
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 26 Apr 2011 16:52:17 +0200
+
+arpsponge (3.10-0.4) unstable; urgency=high
+
+  * 3.10-beta
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Fri, 22 Apr 2011 17:43:08 +0200
+
+arpsponge (3.10-0.3) unstable; urgency=high
+
+  * 3.10-alpha2
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 10 Aug 2010 17:03:35 +0200
+
+arpsponge (3.10-0.2) unstable; urgency=high
+
+  * 3.10-alpha
 
   * 17.nov.2010 - steven
 
@@ -336,32 +446,45 @@
     Disadvantage: more state to keep, more processing when queue is
     full.
 
-3.9.5 - 10.aug.2010 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 10 Aug 2010 17:03:35 +0200
+
+arpsponge (3.9.5-3) unstable; urgency=high
 
   * 10.aug.2010 - steven
     - Added LSB headers for init script.
     - Added post/pre scripts to make initscript handling smooth.
 
-3.9.4 - 12.apr.2010 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 10 Aug 2010 17:03:35 +0200
+
+arpsponge (3.9.4-1) unstable; urgency=high
 
   * 12.apr.2010 - steven
     Remove useless reference to Net::PcapUtils from Sponge.pm.
 
-3.9.3 - 08.apr.2010 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 12 Apr 2010 10:36:21 +0200
 
-  * 26.jan.2008 - steven
-    Add doc dir.
+arpsponge (3.9.3-1) unstable; urgency=high
 
-  * 08.apr.2010 - steven
-    Fixed event loop by using select() + Net::Pcap,
-    getting rid of the PcapUtils dependency in the process.
-
-3.9.2 - 26.jan.2008 - arien
   * Signals set flags. These flags get evaluated before a packet is
     processed. This might solve the crashes since Debian Etch. 
     This change was made after a hint from dvorak.
 
-3.9.1 - 26.oct.2005 - steven
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu,  8 Apr 2010 19:07:58 +0200
+
+arpsponge (3.9.2-2) unstable; urgency=high
+
+  * Changed architecture to "all" (instead of "any").
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed,  7 Apr 2010 22:52:35 +0200
+
+arpsponge (3.9.2) unstable; urgency=high
+
+  * See upstream Changelog.
+
+ -- Arien Vijn <arien.vijn@ams-ix.net>  Sat, 26 Jan 2007 22:00:00 +0100
+
+arpsponge (3.9.1) unstable; urgency=low
+
   * Pretty stupid bug in init.d script. Called the sponge with:
 
         --queuedepth=${QUEUE_DEPTH}
@@ -380,125 +503,169 @@
   * Fine-tuned logging information. For instance, a log entry is
     printed when we clear a pending entry.
 
-3.9 - 19.oct.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Wed, 26 Oct 2005 12:07:00 +0200
+
+arpsponge (3.9) unstable; urgency=low
+
   * Something (syslog?) is causing clone() calls, which exit using
     EXIT{} block which tends to unlink() the PID file :-(
-	Traces seem to indicate that the clone()-d process is connected
-	to syslog, since it opens "/dev/console" which is typically a
-	last resort for failed syslog() connections.
+    Traces seem to indicate that the clone()-d process is connected
+    to syslog, since it opens "/dev/console" which is typically a
+    last resort for failed syslog() connections.
 
-	As a first fix, I modified the EXIT{} block to only unlink()
-	the pid file if the pid of the current process ($$) matches
-	that of the master ($wrote_pid).
+    As a first fix, I modified the EXIT{} block to only unlink()
+    the pid file if the pid of the current process ($$) matches
+    that of the master ($wrote_pid).
 
-	Second, I modified the code a bit to also log when dumping
-	status (if no filename is set, it will use /dev/null), and
-	to log a summary of the status.
+    Second, I modified the code a bit to also log when dumping
+    status (if no filename is set, it will use /dev/null), and
+    to log a summary of the status.
 
-	Finally, the "probed 0 IP addresses" messages should have
-	gone from the log now...
+    Finally, the "probed 0 IP addresses" messages should have
+    gone from the log now...
 
-3.8 - 19.oct.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 24 Oct 2005 15:23:00 +0200
+
+arpsponge (3.8) unstable; urgency=low
+
   * Updated init script to move away from $SPONGE_OPTS and have a
     more flexible set-up using separate variables which can be
-	overridden in the individual interface files.
+    overridden in the individual interface files.
 
     This breaks the old syntax! Instead of a single string
-	in /etc/default/arpsponge/ethX (namely the network/prefix),
-	we need to define "NETWORK=network/prefix". It is also possible
-	to override the device "ethX" by setting "DEVICE".
+    in /etc/default/arpsponge/ethX (namely the network/prefix),
+    we need to define "NETWORK=network/prefix". It is also possible
+    to override the device "ethX" by setting "DEVICE".
 
   * Added POD documentation for the new init set-up.
 
-3.7 - 30.sep.2005 - steven
+
+ -- Steven Bakker <sb@ams-ix.net>  Wed, 19 Oct 2005 23:25:00 +0200
+
+arpsponge (3.7) unstable; urgency=low
+
   * Fixed the f*cking call to f*cking Net::ARP::get_mac($dev, $mac).
     It never wanted a reference as the second parameter, which
-	is bad enough in itself, but newer versions don't like an
-	undef or empty value for $mac either :-(
+    is bad enough in itself, but newer versions don't like an
+    undef or empty value for $mac either :-(
 
-3.6.4 - 28.jul.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Fri, 30 Sep 2005 18:10:00 +0200
+
+arpsponge (3.6.4-1) unstable; urgency=low
+
+  * Dependency fixes.
+
+ -- Steven Bakker <sb@ams-ix.net>  Fri, 30 Sep 2005 17:49:00 +0200
+
+arpsponge (3.6.4) unstable; urgency=low
+
   * Fixed POD section for --init. In the OPTIONS section, it was
     missing the "NONE".
 
-3.6.3 - 20.jul.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Thu, 28 Jul 2005 12:41:00 +0200
+
+arpsponge (3.6.3) unstable; urgency=low
+
+  * See upstream Changelog.
   * Fixed POD comments regarding LEARN state. Added check for
-	--dummy and --daemon (mutually exclusive). Added comment
-	about this in POD.
+    --dummy and --daemon (mutually exclusive). Added comment
+    about this in POD.
   * Added some verbosity in M6::ARP::Sponge::set_alive().
 
   * Fixed verbosity in do_learn.
 
-3.6.2 - 11.jul.2005 - steven
 
-  * Fixed POD comments regarding proberate.
+ -- Steven Bakker <sb@ams-ix.net>  Wed, 20 Jul 2005 13:11:00 +0200
 
-3.6.1 - 27.jun.2005 - steven
+arpsponge (3.6.2) unstable; urgency=low
 
   * Fixed "rate" calculation. Off-by-one error spoiled the calculation :-(
 
-3.6 - 19.jun.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 11 Jul 2005 13:11:00 +0200
+
+arpsponge (3.6.1) unstable; urgency=low
 
   * Four ways to initialise the program:
-  	* --init=DEAD
-  	* --init=ALIVE
-  	* --init=PENDING
-  	* --init=NONE
+    * --init=DEAD
+    * --init=ALIVE
+    * --init=PENDING
+    * --init=NONE
 
   * LEARN state does not probe, only listen.
 
-3.5 - 12.may.2005 - steven
+
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 27 Jun 2005 14:01:34 +0200
+
+arpsponge (3.5) unstable; urgency=low
 
   * Incorporated Arien's ideas:
   
-  	* Start in LEARN state, where we probe every second or so, for
-	  "--learn" times. During this period, we do not sponge addresses,
-	  we only probe and learn.
-	* Rewrote the handling of pending addresses. Pending addresses are
-	  now probed once per second for max_pending times. The previous
-	  behaviour was to probe a pending IP whenever an ARP query for it
-	  came in. If the incoming rate is high enough, we exhaust our pending
-	  probes before the target IP has a chance to answer.
+    * Start in LEARN state, where we probe every second or so, for
+      "--learn" times. During this period, we do not sponge addresses,
+      we only probe and learn.
+    * Rewrote the handling of pending addresses. Pending addresses are
+      now probed once per second for max_pending times. The previous
+      behaviour was to probe a pending IP whenever an ARP query for it
+      came in. If the incoming rate is high enough, we exhaust our pending
+      probes before the target IP has a chance to answer.
 
   * Added ARP rating through the "--proberate" option. Throwing ARP
     queries at the interface at full CPU speed causes many packets to
-	be dropped, whether it's at the interface, the LAN (switch), or
-	the receiving end. Besides, broadcast storms are the very thing
-	we are trying to avoid here.
+    be dropped, whether it's at the interface, the LAN (switch), or
+    the receiving end. Besides, broadcast storms are the very thing
+    we are trying to avoid here.
 
   * --dummy now sends probes, but never sponged answers. Previously
     it was not sending probes either, making it difficult to test the
-	sweeping/probing code.
+    sweeping/probing code.
 
-3.4.1 - 10.may.2005 - steven
+
+ -- Steven Bakker <sb@ams-ix.net>  Thu, 12 May 2005 16:35:00 +0200
+
+arpsponge (3.4.1-1) unstable; urgency=low
 
   * Logging fixes. One log line for a sponge event.
   * Also log/notify for "pending" states.
   * Various POD fixes.
 
-3.4 - 09.may.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 10 May 2005 14:25:00 +0200
+
+arpsponge (3.4-2) unstable; urgency=low
 
   * Renamed to "arpsponge" to prevent lawsuits :-)
   * Cleaned up a bunch of stub files in the debian directory.
 
-3.3.2 - 03.may.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Mon, 09 May 2005 18:03:00 +0200
+
+arpsponge (3.3.2-1) unstable; urgency=low
 
   * "misfit" ARPs now get their src MAC logged as well.
 
-3.3.1 - 03.may.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 13:15:00 +0200
+
+arpsponge (3.3.1-1) unstable; urgency=low
 
   * Added check for "misfit" ARPs and logging of those.
 
-3.3 - 03.may.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 13:15:00 +0200
+
+arpsponge (3.3-1) unstable; urgency=low
 
   * Added "HUP" signal to arpswiffer. Added README file.
 
-3.2 - 01.may.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Tue, 03 May 2005 11:48:00 +0200
+
+arpsponge (3.2-1) unstable; urgency=low
 
   * Sponge.pm "set_alive" needs to check for local IP, otherwise the
     state table gets contaminated.
 
-3.1 - 30.apr.2005 - steven
+ -- Steven Bakker <sb@ams-ix.net>  Sun, 01 May 2005 11:48:00 +0200
+
+arpsponge (3.1-1) unstable; urgency=low
 
   * Properly Debianized.
   * Added code to recognize the duplicate detection packets from
     DHCP clients.
+
+ -- Steven Bakker <sb@ams-ix.net>  Sat, 30 Apr 2005 22:43:05 +0200
