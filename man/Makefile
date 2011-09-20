@@ -28,11 +28,17 @@ INSTALLFILES	=	\
 include ../rules.mk
 
 $(NAME).pod: ../sbin/$(NAME)
-	$(RM) -f $(NAME).pod
-	ln -s ../sbin/$(NAME) $(NAME).pod
-
-%.pod: ../sbin/%
 	$(RM) -f $@
 	ln -s $? $@
+
+asctl.pod: ../sbin/asctl
+	$(RM) -f $@
+	ln -s $? $@
+
+aslogtail.pod: ../sbin/aslogtail
+	$(RM) -f $@
+	ln -s $? $@
+
+#	cd $(TOPDIR); $(MAKE) $@
 
 # E.O.F. Makefile
