@@ -1,7 +1,7 @@
 @(#)$Id$
 
 Primary site is:
-	http://www.ams-ix.net/
+    http://www.ams-ix.net/
 
 About ARPSPONGE (a.k.a. "Bob")
 ------------------------------
@@ -10,15 +10,18 @@ ARPSPONGE is a tool that sweeps up stray ARP queries from a LAN. It
 listens on an ethernet interface and if the ARP rate for a particular
 IP address goes over the threshold, it starts faking responses.
 
-This is especially useful on large peering LANs where a router hang can
-result in large ARP (broadcast) storms.
+This is especially useful on large peering LANs where a router crash
+can result in large ARP (broadcast) storms.
+
+The arpsponge package provides a daemon, a CLI control utility, and an init
+script (see the arpsponge and asctl man pages).
 
 Requirements
 ------------
 
-	* GNU make
-	* Perl (>= 5.10)
-	* Perl modules:
+    * GNU make
+    * Perl (>= 5.10)
+    * Perl modules:
         Carp
         Data::Dumper
         File::Path
@@ -58,23 +61,23 @@ OTHER SYSTEMS:
 
  (MUST be set correctly)
 
-	PERL         (/usr/bin/perl)
-	IFCONFIG     (/sbin/ifconfig)
-	SPONGE_VAR   (/var/run/arpsponge)
+    PERL         (/usr/bin/perl)
+    IFCONFIG     (/sbin/ifconfig)
+    SPONGE_VAR   (/var/run/arpsponge)
 
  (MAY be changed)
 
-	DIRPREFIX
-	BINPREFIX
-	DOCPREFIX
-	BINDIR
-	LIBROOT
-	INSTLIB
-	MANDIR
-	DOCDIR
+    DIRPREFIX
+    BINPREFIX
+    DOCPREFIX
+    BINDIR
+    LIBROOT
+    INSTLIB
+    MANDIR
+    DOCDIR
 
-	SECTION
-	FILESECTION
+    SECTION
+    FILESECTION
 
 2. run "make"
 
