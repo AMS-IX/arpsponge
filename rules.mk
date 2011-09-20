@@ -10,7 +10,7 @@ default : all
 RM            =  /bin/rm -f
 MV            =  /bin/mv
 
-RELEASE       =  3.11
+RELEASE         := $(shell head -1 $(TOPDIR)/Changelog | perl -p -e 's/.*\((.*?)\).*/$$1/')
 NAME          =  arpsponge
 PACKAGE       =  $(NAME)-$(RELEASE)
 TOOLDIR       =  $(TOPDIR)/tools
@@ -69,6 +69,9 @@ perlit= $(PERL) -p -e \
 		.txt .ps \
 		.$(SECTION) .pod .man .txt
 
+version:
+	@echo $(RELEASE)
+
 % : %.sh Makefile
 	@echo building $@ from $<
 	@$(perlit) $< > $@
@@ -110,11 +113,11 @@ perlit= $(PERL) -p -e \
 
 %.txt : %.$(SECTION)
 	@echo building $@ from $<
-	@$(perlit) $< | gnroff -mgan > $@
+	@$(perlit) $< | nroff -Tascii -man > $@
 
 %.ps : %.$(SECTION)
 	@echo building $@ from $<
-	@$(perlit) $< | groff -Tps -mgan > $@
+	@$(perlit) $< | groff -Tps -man > $@
 
 $(INITDIR)/% : %
 	@echo installing executable $< in $(INITDIR)
@@ -256,8 +259,6 @@ dpkg:
 		[ $$? = 0 ] && mv $(_debtemp)/$(NAME)_*.deb .
 	$(RM) -rf $(_debtemp)
 
-	#$(RM) -rf debian *.deb
-	    #dh_make --single; \
 #
 #  %: define.h %.c
 #	$@: target (wonkie)
