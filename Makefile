@@ -45,7 +45,7 @@ dist:
 	    mkdir -p /tmp/$(PACKAGE).$$PID/$(PACKAGE); \
 	    \
 	    echo "copying sources.."; \
-	    tar cf /tmp/$(PACKAGE).$$PID/$(PACKAGE)/dist.tar .; \
+	    tar -T MANIFEST -cf /tmp/$(PACKAGE).$$PID/$(PACKAGE)/dist.tar; \
 	    cd /tmp/$(PACKAGE).$$PID/$(PACKAGE); \
 	    tar xf dist.tar; \
 	    $(RM) dist.tar; \
@@ -54,25 +54,6 @@ dist:
 	    make clean >/dev/null 2>&1; \
 	    chmod -R u+w,go-w .; \
 		$(RM) -r $(PACKAGE); \
-	    $(RM) -r junk; \
-	    $(RM) -r tools/mkdist; \
-		$(RM) -r debian/files; \
-		$(RM) -r debian/$(NAME); \
-	    $(RM) -r old ; \
-	    find . \( -name '*.gz' \
-				  -o -name '*.Z' \
-				  -o -name '*.tar' \
-				  -o -name '*.orig' \
-				  -o -name '*-stamp' \
-				  -o -name '*.changes' \
-				  -o -name '*.log' \
-				  -o -name '*.deb' \
-				  -o -name 'errors' \
-				\) -exec $(RM) '{}' ';' ;\
-	    find . -depth \( -name CVS \
-				  -o -name RCS \
-				  -o -name .svn \
-				\) -exec $(RM) -r '{}' ';' ;\
 	    $$DIR/tools/mkdist Makefile > Makefile.dist; \
 			mv Makefile.dist Makefile; \
 	    $$DIR/tools/mkdist config.mk > config.mk.dist; \
@@ -84,9 +65,7 @@ dist:
 	    \
 	    echo "tarring and zipping it up"; \
 	    cd ..; \
-	    tar cf - ./$(PACKAGE) | \
-		gzip -9 > $$DIR/$(PACKAGE).tar.gz; \
-	    \
+	    tar czf $$DIR/$(PACKAGE).tar.gz ./$(PACKAGE); \
 	    echo "cleaning up temporaries"; \
 	    cd $$DIR; \
 	    $(RM) -r /tmp/$(PACKAGE).$$PID; \
