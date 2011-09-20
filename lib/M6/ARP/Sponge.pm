@@ -4,9 +4,17 @@
 #
 # ARP sponge
 #
-# (c) Copyright AMS-IX B.V. 2004-2005;
+#   Copyright (c) 2010-2011 AMS-IX B.V.; All rights reserved.
 #
-# See the LICENSE file that came with this package.
+#   This module is free software; you can redistribute it and/or
+#   modify it under the same terms as Perl itself. See perldoc
+#   perlartistic.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+#   See the "Copying" file that came with this package.
 #
 # A.Vijn,   2003-2004;
 # S.Bakker, 2004-2010;

@@ -238,6 +238,11 @@ L<perl(1)|perl>.
 
 =head1 AUTHOR
 
-Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011.
+Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>.
+
+=head1 COPYRIGHT
+
+Copyright 2004-2011, AMS-IX B.V.
+Distributed under GPL and the Artistic License 2.0.
 
 =cut

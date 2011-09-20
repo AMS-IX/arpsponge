@@ -1801,4 +1801,9 @@ not an exact figure.
 Arien Vijn at AMS-IX (arien.vijn@ams-ix.net),
 Steven Bakker at AMS-IX (steven.bakker@ams-ix.net).
 
+=head1 COPYRIGHT
+
+Copyright 2004-2011, AMS-IX B.V.
+Distributed under GPL and the Artistic License 2.0.
+
 =cut

@@ -2,9 +2,12 @@
 #
 # $Id$
 #
-#  (c) Copyright 2005 Steven Bakker, AMS-IX B.V.
+#  (c) Copyright 2005-2011 AMS-IX B.V.
 #
-#  See the LICENSE file that came with this package.
+#  This is free software. It can be distributed under
+#  your choice of the GPL or Artistic License 2.0.
+#
+#  See the Copying file that came with this package.
 #
 include ../config.mk
 

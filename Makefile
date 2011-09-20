@@ -1,8 +1,12 @@
 #!make
 # $Id$
 #
-# Copyright (c) 1999-2002 Steven Bakker
-# All rights reserved
+#  (c) Copyright 2005-2011 AMS-IX B.V.
+#
+#  This is free software. It can be distributed under
+#  your choice of the GPL or Artistic License 2.0.
+#
+#  See the Copying file that came with this package.
 #
 # Notes:
 #	All you'll probably ever need to edit is in `config.mk'

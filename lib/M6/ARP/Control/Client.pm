@@ -4,9 +4,17 @@
 #
 # ARP sponge control socket.
 #
-# (c) Copyright AMS-IX B.V. 2011;
+#   Copyright (c) 2010-2011 AMS-IX B.V.; All rights reserved.
 #
-# See the LICENSE file that came with this package.
+#   This module is free software; you can redistribute it and/or
+#   modify it under the same terms as Perl itself. See perldoc
+#   perlartistic.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+#   See the "Copying" file that came with this package.
 #
 # S.Bakker, 2011
 #
@@ -273,5 +281,10 @@ L<arpsponge|arpsponge>(8), L<asctl>(1).
 =head1 AUTHORS
 
 Steven Bakker at AMS-IX (steven.bakker@ams-ix.net).
+
+=head1 COPYRIGHT
+
+Copyright 2004-2011, AMS-IX B.V.
+Distributed under GPL and the Artistic License 2.0.
 
 =cut

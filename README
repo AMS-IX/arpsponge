@@ -1,7 +1,8 @@
 @(#)$Id$
 
 Primary site is:
-    http://www.ams-ix.net/
+
+    https://www.ams-ix.net/downloads/arpsponge/
 
 About ARPSPONGE (a.k.a. "Bob")
 ------------------------------
@@ -13,8 +14,11 @@ IP address goes over the threshold, it starts faking responses.
 This is especially useful on large peering LANs where a router crash
 can result in large ARP (broadcast) storms.
 
-The arpsponge package provides a daemon, a CLI control utility, and an init
-script (see the arpsponge and asctl man pages).
+The arpsponge package provides a daemon, a CLI control utility, and an
+init script (see the arpsponge and asctl man pages).
+
+This is released as free software, see the "Copying" file that came with
+this source).
 
 Requirements
 ------------

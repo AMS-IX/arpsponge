@@ -2,8 +2,17 @@
 #!make
 # $Id$
 #
-# Copyright (c) 2002 Steven Bakker
-# All rights reserved
+#   Copyright (c) 2010-2011 AMS-IX B.V.; All rights reserved.
+#
+#   This module is free software; you can redistribute it and/or
+#   modify it under the same terms as Perl itself. See perldoc
+#   perlartistic.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+#   See the "Copying" file that came with this package.
 
 default : all
 

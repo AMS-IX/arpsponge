@@ -4,9 +4,17 @@
 #
 # Logging for the ARP Sponge.
 #
-# (c) Copyright AMS-IX B.V. 2004-2011;
+#   Copyright (c) 2010-2011 AMS-IX B.V.; All rights reserved.
 #
-# See the LICENSE file that came with this package.
+#   This module is free software; you can redistribute it and/or
+#   modify it under the same terms as Perl itself. See perldoc
+#   perlartistic.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+#   See the "Copying" file that came with this package.
 #
 # S.Bakker, 2011;
 #
@@ -307,5 +315,12 @@ sub log_level_to_string {
     }
     return $LOGLEVEL_TO_STR{$level};
 }
+
+=head1 COPYRIGHT
+
+Copyright 2004-2011, AMS-IX B.V.
+Distributed under GPL and the Artistic License 2.0.
+
+=cut
 
 1;

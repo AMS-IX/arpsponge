@@ -1,6 +1,11 @@
 # $Id$
 #
-# Copyright (c) 2002 Steven Bakker.
+#  (c) Copyright 2005-2011 AMS-IX B.V.
+#
+#  This is free software. It can be distributed under
+#  your choice of the GPL or Artistic License 2.0.
+#
+#  See the Copying file that came with this package.
 #
 TOPDIR		=	../../..
 
