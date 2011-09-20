@@ -74,7 +74,7 @@ dist:
 	    $$DIR/tools/mkdist config.mk > config.mk.dist; \
 			cp config.mk.dist config.mk; \
 		for script in arpsponge asctl; do \
-			$(perlit) sbin/$$script > sbin/$$script; \
+			$(perlit) sbin/$$script.pl > sbin/$$script; \
 			pod2text sbin/$$script > $$script.txt; \
 		done; \
 	    \
