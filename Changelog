@@ -1,3 +1,10 @@
+arpsponge (3.12.1) unstable; urgency=low
+
+  man/Makefile:
+    - Fixed POD building.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 20 Sep 2011 13:59:00 +0200
+
 arpsponge (3.12) unstable; urgency=low
 
   Changelog, debian/changelog
