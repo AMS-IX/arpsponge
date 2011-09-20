@@ -2,7 +2,7 @@
 #!make
 # $Id$
 #
-#   Copyright (c) 2010-2011 AMS-IX B.V.; All rights reserved.
+#   Copyright (c) 2005-2011 AMS-IX B.V.; All rights reserved.
 #
 #   This module is free software; you can redistribute it and/or
 #   modify it under the same terms as Perl itself. See perldoc
