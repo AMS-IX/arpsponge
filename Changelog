@@ -1,3 +1,16 @@
+arpsponge (3.12.2) unstable; urgency=low
+
+  [2012-08-14] - steven (r285)
+    => sbin/arpsponge.pl:
+        * Don't give "-1" as a count argument in pcap_dispatch(). If the
+          box is hammered with traffic (like, 100Mb/s non-stop), it will
+          starve all other tasks on other file descriptors.
+
+          Chose a reasonable default, that will still allow for some
+          interactive response.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 14 Aug 2012 21:38:13 +0200
+
 arpsponge (3.12.1) unstable; urgency=low
 
   man/Makefile:
