@@ -67,6 +67,21 @@ my $DFL_FLOOD_PROTECTION = '@DFL_FLOOD_PROTECTION@';
 my $DFL_INIT             = '@DFL_INIT@';
 my $DFL_SOCK_PERMS       = '@DFL_SOCK_PERMS@';
 
+# Max. number of packets to handle in a pcap_dispatch() cycle.
+# This should be large enough to allow for some efficiency,
+# but low enough so other events (on other FDs) get handled.
+#
+# Assuming:
+#
+#   * A 100Mb/s interface
+#   * 64-byte frames/packets
+#   => 195 packets/sec
+#
+# So, if we cycle 100 packets, that would cost us about 0.5 seconds
+# on a saturated interface, leaving enough interactive response...
+#
+my $MAX_PKT_PER_CYCLE    = 100;
+
 $::USAGE=<<EOF;
 Usage: $0 [options] IPADDR/PREFIXLEN dev IFNAME
 
@@ -435,10 +450,8 @@ sub handle_input {
         for my $ready_fh (@ready) {
             my $ready_fd = $ready_fh->fileno;
             if ($ready_fd == $pcap_fd) { # [4]
-                # This should process all buffered packets, but
-                # it seems to only process one packet. *shrug*
                 sigprocmask(SIG_BLOCK, $block_sigset);
-                pcap_dispatch($pcap_h, -1, \&process_pkt, $sponge);
+                pcap_dispatch($pcap_h, $MAX_PKT_PER_CYCLE, \&process_pkt, $sponge);
                 sigprocmask(SIG_UNBLOCK, $block_sigset);
             }
             elsif ($ready_fd == $control_fd) {
