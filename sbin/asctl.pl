@@ -211,10 +211,10 @@ sub Main {
         init_readline() if $INTERACTIVE;
 
         # Don't add stuff to history list automatically.
-        $TERM->MinLine(undef);
+        $TERM->MinLine(undef) if $TERM;
         # Keep track of last command in the history, so
         # we avoid adding duplicates.
-        my ($prev_command) = reverse $TERM->GetHistory;
+        my ($prev_command) = $TERM ? reverse $TERM->GetHistory : ();
         $prev_command = 'quit' if !defined $prev_command;
         while (1) {
             my $input = $TERM ? $TERM->readline($PROMPT) : <>;
@@ -224,7 +224,7 @@ sub Main {
             my $command = do_command($input, $CONN);
             if ($input ne $prev_command) {
                 # Only add input to history if it's not a duplicate.
-                $TERM->AddHistory($input);
+                $TERM->AddHistory($input) if $TERM;
                 $prev_command = $input;
             }
             if (!$CONN) {
