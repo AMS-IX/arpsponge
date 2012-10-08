@@ -59,8 +59,7 @@ dist:
 	    $$DIR/tools/mkdist config.mk > config.mk.dist; \
 			cp config.mk.dist config.mk; \
 		for script in arpsponge asctl; do \
-			$(perlit) sbin/$$script.pl > sbin/$$script; \
-			pod2text sbin/$$script > $$script.txt; \
+			$(perlit) sbin/$$script.pl | pod2text - $$script.txt; \
 		done; \
 	    \
 	    echo "tarring and zipping it up"; \
