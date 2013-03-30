@@ -1316,11 +1316,13 @@ Default value is C<all>.
 Location of the UNIX control socket. Default is
 "I<rundir>/B<control>". See also L<--permissions|/--permissions> below.
 
-=item X<--daemon>B<--daemon>
+=item B<--daemon>
+X<--daemon>
 
-=item X<--no-daemon>B<--no-daemon>
+=item B<--no-daemon>
+X<--no-daemon>
 
-Put (don't put) process in background (run as a daemon).
+Run (don't run) as a daemon process in the background.
 
 If run as a daemon, leave the process identification (PID) in
 I<pidfile> (see L<--pidfile|/--pidfile>).
@@ -1333,10 +1335,6 @@ PID to I<pidfile>.
 
 This option turns off C<--verbose> and enables logging to
 L<syslogd(8)|syslogd>.
-
-=item X<--daemon>X<--no-daemon>B<--daemon>, B<no-daemon>
-
-Run (don't run) as a daemon in the background.
 
 =item X<--dummy>B<--dummy>
 
@@ -1440,7 +1438,8 @@ of delay before the sponge kicks in. If you increase this value significantly,
 you should consider decreasing the L<--queuedepth|/--queuedepth> parameter
 as well.
 
-=item X<--permissions>B<--permisions>=[I<owner>]:[I<group>]:[I<mode>]
+=item B<--permissions>=[I<owner>]:[I<group>]:[I<mode>]
+X<--permissions>
 
 Set the permissions on the L<control socket|/--control>. Default is
 C<@DFL_SOCK_PERMS@>.
@@ -1450,7 +1449,8 @@ C<@DFL_SOCK_PERMS@>.
 Write daemon PID to I<pidfile> instead of the default
 (I<rundir>/pid).
 
-=item X<--proberate>B<--proberate>=I<n>
+=item B<--proberate>=I<n>
+X<--proberate>
 
 The rate at which we send our ARP queries. Used when sweeping
 and probing pending addresses.
