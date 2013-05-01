@@ -114,6 +114,7 @@ Options:
   --statusfile=file       - where to write status information when receiving
                             HUP or USR1 signal (<rundir>/status)
   --sweep=sec/thr         - periodically sweep for "quiet" IP addresses
+  --sweep-skip-alive      - sweep avoids IP addresses in state ALIVE
   --verbose[=n]           - be verbose; print information on STDOUT;
                             turns off syslog
 
@@ -180,6 +181,7 @@ sub Main {
       'sponge-network'      => \(my $sponge_net),
       'statusfile=s'        => \(my $statusfile),
       'sweep=s'             => \(my $sweep_sec),
+      'sweep-skip-alive'    => \(my $sweep_skip_alive),
       'verbose|v+'          => \(my $verbose),
       'version|V'           => sub { print "$0 $VERSION\n"; exit 0 },
     ) or pod2usage(2);
@@ -261,6 +263,7 @@ sub Main {
     $sponge->user('learning', $learning);
     $proberate = $DFL_PROBERATE if $proberate < 0 || $proberate > 1e6;
     $sponge->user('probesleep', 1.0/$proberate);
+    $sponge->user('sweep_skip_alive', $sweep_skip_alive);
 
     if ($sweep_sec) {
         $sponge->user('sweep_sec', $sweep_sec);
@@ -537,6 +540,8 @@ sub get_status_info_s {
         sprintf("%-17s %d\n", 'max pending:', $sponge->max_pending),
         sprintf("%-17s %d sec\n", 'sweep period:', $sponge->user('sweep_sec')),
         sprintf("%-17s %d sec\n", 'sweep age:', $sponge->user('sweep_age')),
+        sprintf("%-17s %s\n", 'sweep skip alive:',
+                $sponge->user('sweep_skip_alive') ? "yes" : "no"),
         sprintf("%-17s %d sec\n", 'proberate:',
                 1/$sponge->user('probesleep')),
         sprintf("%-17s %d sec\n", 'next sweep in:',
@@ -767,7 +772,10 @@ sub do_sweep($) {
     for (my $num = $lo; $num <= $hi; $num++) {
         my $ip = sprintf("%08x", $num);
         my $age = time - $sponge->state_mtime($ip);
-        if ($age >= $threshold) {
+        if ($age >= $threshold &&
+            ! ($sponge->user('sweep_skip_alive') &&
+               $sponge->get_state($ip) == ALIVE))
+        {
             if ($verbose>1) {
                 log_sverbose(1, "DO PROBE %s (%d >= %d)\n",
                                 hex2ip($ip), $age, $threshold);
@@ -1153,6 +1161,7 @@ I<Options>:
     --sponge-network
     --statusfile=file
     --sweep=interval/threshold
+    --sweep-skip-alive
     --verbose[=n]
 
 B</etc/init.d/@NAME@> {B<start>|B<stop>|B<restart>|B<status>}
@@ -1552,6 +1561,10 @@ cost of more ARP queries from the daemon's host.
 
 =back
 
+=item X<--sweep-skip-alive>B<--sweep-skip-alive>
+
+Do not sweep IP addresses with sponge state of ALIVE.
+
 =item X<--verbose>B<--verbose>[=I<n>]
 
 Be verbose; print information on F<STDOUT>;
@@ -1714,6 +1727,10 @@ The argument to C<--pending>.
 =item I<SWEEP>
 
 The argument to C<--sweep>.
+
+=item I<SWEEP_SKIP_ALIVE> (boolean)
+
+Use C<--sweep-skip-alive>
 
 =item I<GRATUITOUS> (boolean)
 

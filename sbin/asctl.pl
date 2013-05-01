@@ -181,6 +181,9 @@ my %Syntax = (
     'set sweep_period $secs' => {
         '?'        => 'Set sweep/probe parameters.',
         '$secs'    => { type=>'int', min=>1 }, },
+    'set sweep_skip_alive $bool' => {
+        '?'        => 'Enable/disable sweeping of ALIVE addresses.',
+        '$bool'    => { type=>'bool' }, },
 );
 
 sub Main {
@@ -1390,6 +1393,18 @@ sub do_set_sweep_age {
                    -type    => 'int');
 }
 
+# cmd: set sweep_skip_alive
+sub do_set_sweep_skip_alive {
+    my ($conn, $parsed, $args) = @_;
+
+    do_set_generic(-conn    => $conn,
+                   -name    => 'sweep skip-alive',
+                   -val     => $args->{'bool'},
+                   -options => $args->{-options},
+                   -type    => 'bool');
+}
+
+
 sub do_set_ip_generic {
     my %opts      = @_;
     my $conn      = $opts{-conn};
@@ -1581,13 +1596,15 @@ sub do_param {
         sprintf("$tag= %d\n", 'queuedepth', $$info{queue_depth}),
         sprintf("$tag= %0.2f q/min\n", 'max_rate', $$info{max_rate}),
         sprintf("$tag= %0.2f q/sec\n", 'flood_protection',
-                $$info{flood_protection}),
+            $$info{flood_protection}),
         sprintf("$tag= %d\n", 'max_pending', $$info{max_pending}),
         sprintf("$tag= %d secs\n", 'sweep_period', $$info{sweep_period}),
         sprintf("$tag= %d secs\n", 'sweep_age', $$info{sweep_age}),
+        sprintf("$tag= %s\n", 'sweep_skip_alive',
+            $$info{sweep_skip_alive}?'yes':'no'),
         sprintf("$tag= %d pkts/sec\n", 'proberate', $$info{proberate}),
         sprintf("$tag= %s\n", 'learning', 
-                    $$info{learning}?"yes ($$info{learning} secs)":'no'),
+            $$info{learning}?"yes ($$info{learning} secs)":'no'),
         sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
         sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
         sprintf("$tag= %s\n", 'log_level', $$info{log_level}),
@@ -2294,9 +2311,15 @@ Set rate parameters
 
 =item B<set sweep_age> I<secs>
 
-=item B<set sweep_probe> I<secs>
+=item B<set sweep_period> I<secs>
 
 Set sweep/probe parameters
+
+=item B<set sweep_skip_alive> I<bool>
+
+Enable/disable skipping ALIVE addresses during sweeping; I<bool> can be any of:
+C<yes>, C<true>, C<on>, C<1>,
+C<no>, C<false>, C<off>, C<0>.
 
 =item B<show arp> [I<ip-any>]
 

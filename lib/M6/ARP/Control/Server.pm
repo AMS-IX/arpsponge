@@ -34,7 +34,7 @@ use Time::HiRes        qw( time );
 use POSIX qw( strftime );
 
 BEGIN {
-	our $VERSION = '0.03';
+	our $VERSION = '0.04';
 }
 
 my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
@@ -42,7 +42,7 @@ my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
     get_param get_arp get_ip get_status get_log ping quit
     set_queuedepth set_max_rate set_max_pending set_learning
     set_proberate set_flood_protection set_dummy
-    set_sweep_age set_sweep_sec
+    set_sweep_age set_sweep_sec set_sweep_skip_alive
     set_alive set_dead set_pending
     set_arp_update_flags
     set_log_level
@@ -551,6 +551,20 @@ sub _cmd_set_sweep_age {
     $sponge->user('sweep_age', $sec);
     my $new = $sponge->user('sweep_age');
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $new));
+}
+
+sub _cmd_set_sweep_skip_alive {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $int = is_valid_int($args[0], -min=>0, -max=>1);
+    if (!defined $int) {
+        return $self->send_error("$cmd {0|1}");
+    }
+    log_notice("[client %d] %s %d", $self->fileno, $cmd, $int);
+    my $old = $sponge->user('sweep_skip_alive');
+    $sponge->user('sweep_skip_alive', $int);
+    $int = $sponge->user('sweep_skip_alive');
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
 }
 
 sub _cmd_set_dummy {

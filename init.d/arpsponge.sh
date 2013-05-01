@@ -36,7 +36,8 @@ export  AGE \
         RATE \
         SPONGE_NETWORK \
         ARP_UPDATE_METHOD \
-        SWEEP
+        SWEEP \
+        SWEEP_SKIP_ALIVE
 
 # Defaults for all sponges.
 if test -f /etc/default/${PROG}/defaults ; then
@@ -81,6 +82,7 @@ start_sponge() {
         eval_bool ${SPONGE_NETWORK} && opts="$opts --sponge-network"
         eval_bool ${GRATUITOUS}     && opts="$opts --gratuitous"
         eval_bool ${DUMMY_MODE}     && opts="$opts --dummy"
+        eval_bool ${SWEEP_SKIP_ALIVE} && opts="$opts --sweep-skip-alive"
 
         [ -n "${INIT_MODE}" ]       && opts="$opts --init=${INIT_MODE}"
         [ -n "${LEARNING}" ]        && opts="$opts --learning=${LEARNING}"
