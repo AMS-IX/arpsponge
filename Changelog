@@ -1,3 +1,33 @@
+arpsponge (3.13) unstable; urgency=low
+
+  [2012-09-12] - steven (r288)
+    => sbin/asctl.pl:
+        * If the input does not come from an interactive terminal, the
+          $TERM object is not initialised, so we shouldn't try to call
+          methods on it.
+
+  [2012-10-08] - steven (r289)
+    => Makefile:
+        * Fix intermediate file creation in dist making.
+
+  [2013-03-30] - steven (r290)
+    => sbin/arpsponge.pl:
+        * POD fixes, courtesy of Chris Caputo, SIX (Seattle Internet
+          Exchange).
+
+  [2013-05-01] - steven (r291-r293)
+    => debian/control:
+        * Fixed dependency on libnetaddr-ip-perl. Dependency was
+          based on AMS-IX specific local install (which was newer for
+          an unrelated reason). Dependency is now on the default
+          squeeze version.
+    => init.d/arpsponge.sh, lib/M6/ARP/Control/Server.pm,
+    => sbin/arpsponge.pl, sbin/asctl.pl:
+        * Added patch for "--sweep-skip-alive" by Chris Caputo (SIX).
+          Also added controls for run-time setting. Updated asctl's POD.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed, 01 May 2013 16:31:47 +0200
+
 arpsponge (3.12.2) unstable; urgency=low
 
   [2012-08-14] - steven (r285)
