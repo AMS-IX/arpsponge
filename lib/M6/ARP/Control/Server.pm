@@ -179,19 +179,23 @@ sub handle_command {
 }
 
 sub _get_param_info_s {
-    my ($self, $sponge) = @_;
+    my ($self, $s) = @_;
+
+    my $probesleep = $s->user('probesleep');
+    my $proberate = $probesleep ? 1/$probesleep : 1e6;
 
     my @response = (
-        sprintf("%s=%d\n", 'queue_depth', $sponge->queuedepth),
-        sprintf("%s=%0.2f\n", 'max_rate', $sponge->max_rate),
-        sprintf("%s=%0.2f\n", 'flood_protection', $sponge->flood_protection),
-        sprintf("%s=%d\n", 'max_pending', $sponge->max_pending),
-        sprintf("%s=%d\n", 'sweep_period', $sponge->user('sweep_sec')),
-        sprintf("%s=%d\n", 'sweep_age', $sponge->user('sweep_age')),
-        sprintf("%s=%d\n", 'proberate', 1/$sponge->user('probesleep')),
-        sprintf("%s=%d\n", 'learning', $sponge->user('learning')),
-        sprintf("%s=%d\n", 'dummy', int($sponge->is_dummy)),
-        sprintf("%s=%d\n", 'arp_update_flags', $sponge->arp_update_flags),
+        sprintf("%s=%d\n", 'queue_depth', $s->queuedepth),
+        sprintf("%s=%0.2f\n", 'max_rate', $s->max_rate),
+        sprintf("%s=%0.2f\n", 'flood_protection', $s->flood_protection),
+        sprintf("%s=%d\n", 'max_pending', $s->max_pending),
+        sprintf("%s=%d\n", 'sweep_period', $s->user('sweep_sec')),
+        sprintf("%s=%d\n", 'sweep_age', $s->user('sweep_age')),
+        sprintf("%s=%d\n", 'sweep_skip_alive', $s->user('sweep_skip_alive')),
+        sprintf("%s=%d\n", 'proberate', $proberate),
+        sprintf("%s=%d\n", 'learning', $s->user('learning')),
+        sprintf("%s=%d\n", 'dummy', int($s->is_dummy)),
+        sprintf("%s=%d\n", 'arp_update_flags', $s->arp_update_flags),
         sprintf("%s=%d\n", 'log_level', log_level()),
     );
     return join('', @response);
