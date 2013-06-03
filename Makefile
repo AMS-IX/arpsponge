@@ -45,7 +45,7 @@ dist:
 	    mkdir -p /tmp/$(PACKAGE).$$PID/$(PACKAGE); \
 	    \
 	    echo "copying sources.."; \
-	    tar -T MANIFEST -cf /tmp/$(PACKAGE).$$PID/$(PACKAGE)/dist.tar; \
+	    tar -cf /tmp/$(PACKAGE).$$PID/$(PACKAGE)/dist.tar -T MANIFEST; \
 	    cd /tmp/$(PACKAGE).$$PID/$(PACKAGE); \
 	    tar xf dist.tar; \
 	    $(RM) dist.tar; \
