@@ -55,10 +55,18 @@ sub _send_data {
     my $data = join('', @_);
 
     local($::SIG{PIPE}) = 'IGNORE';
+
+    # Temporarily force blocking to avoid socket overflow
+    # on large data buffers.
+    my $oldblocking = $self->blocking(1);
+
     my $nwritten = $self->syswrite($data);
     if (!$nwritten && length($!)) {
         return $self->_set_error($!);
     }
+
+    # Restore blocking.
+    $self->blocking($oldblocking);
     return $self;
 }
 
