@@ -1,3 +1,26 @@
+arpsponge (3.13.1) unstable; urgency=low
+
+  [2013-06-03] - steven (r296)
+    => Makefile:
+        * Fix DIST target!
+
+  [2013-12-28] - steven (r297)
+    => lib/M6/ARP/Control/Base.pm:
+        * When sending data on a control socket, temporarily force
+          blocking to avoid socket overflow on large data buffers
+          (causing the client to miss the READY marker and thus wait
+          indefinitely).
+
+          Found by Niels Bakker and Attilla de Groot, when running "show
+          ip" on a /19.
+
+          This is a stop-gap, really. A malicious client could
+          connect, send many requests, and never read back the
+          results, causing the socket to fill up and at some point,
+          the arpsponge daemon to hang.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 02 Jan 2014 15:43:15 +0100
+
 arpsponge (3.13) unstable; urgency=low
 
   [2012-09-12] - steven (r288)
