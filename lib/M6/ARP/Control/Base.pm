@@ -220,9 +220,8 @@ In case there is data, it will read all the available data up to
 L<$M6::ARP::Control::BUFSIZ|M6::ARP::Control/$M6::ARP:Control::BUFSIZ>
 bytes.
 
-However, since it likes to read complete (i.e. newline-terminated input),
-the returned length run over I<BUFSIZ> if the last character in the input
-buffer is not a newline.
+Tries to read no more than I<BUFSIZ> characters, but may run over that
+until it encounters a newline.
 
 =back
 
