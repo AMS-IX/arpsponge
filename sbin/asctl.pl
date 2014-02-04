@@ -724,6 +724,13 @@ sub do_inform_about {
     my $print_freq = int(0.5/$estimate_per_update);
     $print_freq |= 1; # Make it an odd number;
 
+    if (get_arp_update_flags($conn) == 0) {
+        return print_error(
+            qq{** inform: arp_update_flags is set to "none",},
+            qq{ so this is a NOP}
+        );
+    }
+
     # Lovely, nested anonymous subs...
     my $reply = do_ip_run($dst_list,
         sub {
@@ -1239,26 +1246,24 @@ sub do_set_generic {
     my $new = $output->[0]->{new};
 
     my $fmt = '%s';
-    given ($type) {
-        when ('log-level') {
-            $old = log_level_to_string($old);
-            $new = log_level_to_string($new);
-        }
-        when ('arp-update-flags') {
-            $old = '('.join(',', update_flags_to_str($old)).')';
-            $new = '('.join(',', update_flags_to_str($new)).')';
-        }
-        when ('boolean') {
-            $old = $old ? 'yes' : 'no';
-            $new = $new ? 'yes' : 'no';
-            $type = '%s';
-        }
-        when ('int') {
-            $type = '%d';
-        }
-        when ('float') {
-            $fmt = '%0.2f';
-        }
+    if ($type eq 'log-level') {
+        $old = log_level_to_string($old);
+        $new = log_level_to_string($new);
+    }
+    elsif ($type eq 'arp-update-flags') {
+        $old = '('.join(',', update_flags_to_str($old)).')';
+        $new = '('.join(',', update_flags_to_str($new)).')';
+    }
+    elsif ($type eq 'boolean') {
+        $old = $old ? 'yes' : 'no';
+        $new = $new ? 'yes' : 'no';
+        $type = '%s';
+    }
+    elsif ($type eq 'int') {
+        $type = '%d';
+    }
+    elsif ($type eq 'float') {
+        $fmt = '%0.2f';
     }
     return print_output(sprintf("%s changed from $fmt to $fmt%s",
                                 $name, $old, $new, $unit));
@@ -1434,18 +1439,16 @@ sub do_set_ip_generic {
     my $new = $output->[0]->{new};
 
     my $fmt = '%s';
-    given ($type) {
-        when ('boolean') {
-            $old = $old ? 'yes' : 'no';
-            $new = $new ? 'yes' : 'no';
-            $type = '%s';
-        }
-        when ('int') {
-            $type = '%d';
-        }
-        when ('float') {
-            $fmt = '%0.2f';
-        }
+    if ($type eq 'boolean') {
+        $old = $old ? 'yes' : 'no';
+        $new = $new ? 'yes' : 'no';
+        $type = '%s';
+    }
+    elsif ($type eq 'int') {
+        $type = '%d';
+    }
+    elsif ($type eq 'float') {
+        $fmt = '%0.2f';
     }
     return print_output(sprintf("%s: %s changed from $fmt to $fmt%s",
                                 $output->[0]->{ip},
@@ -1568,6 +1571,15 @@ sub do_status {
                 $$info{next_sweep}-$$info{date},
                 $$info{next_sweep}),
     );
+}
+
+# $flags_integer = get_arp_update_flags();
+sub get_arp_update_flags {
+    my $conn = shift;
+    my $raw = check_send_command($conn, 'get_param') or return;
+
+    my ($opts, $reply, $output, $tag) = parse_server_reply($raw, {raw=>1});
+    return $output->[0]->{arp_update_flags};
 }
 
 sub do_param {
@@ -1799,23 +1811,20 @@ sub do_load_status {
     verbose("reading state tables...");
     local($_);
     while ($_ = $fh->getline) {
-        given ($_) {
-            when (/^<STATE>$/)       { $parse_state = 'state' }
-            when (/^<ARP-TABLE>$/)   { $parse_state = 'arp'   }
-            when (/^<\/[\w-]+>$/)    { $parse_state = 'none'  }
+        if (/^<STATE>$/)          { $parse_state = 'state' }
+        elsif (/^<ARP-TABLE>$/)   { $parse_state = 'arp'   }
+        elsif (/^<\/[\w-]+>$/)    { $parse_state = 'none'  }
+        elsif ($parse_state eq 'state' &&
+            /^([\d\.]+) \s+ ([A-Z]+) \s+ \d+ \s+ \d+\.\d+ \s+ \S+[\@\s]\S+$/x) {
+            my $ip = ip2hex($1);
+            $state_table{$ip} = $2;
+        }
 
-            when ($parse_state eq 'state' &&
-                  /^([\d\.]+) \s+ ([A-Z]+) \s+ \d+ \s+ \d+\.\d+ \s+ \S+[\@\s]\S+$/x) {
-                my $ip = ip2hex($1);
-                $state_table{$ip} = $2;
-            }
-
-            when ($parse_state eq 'arp' &&
-                    /^([a-f\d\:]+) \s+ ([\d\.]+) \s+ \d+ \s+ \S+[\@\s]\S+$/x) {
-                my ($mac, $ip) = (mac2hex($1), ip2hex($2));
-                if ($state_table{$ip} eq 'ALIVE') {
-                    $arp_table{$ip} = $mac;
-                }
+        elsif ($parse_state eq 'arp' &&
+                /^([a-f\d\:]+) \s+ ([\d\.]+) \s+ \d+ \s+ \S+[\@\s]\S+$/x) {
+            my ($mac, $ip) = (mac2hex($1), ip2hex($2));
+            if ($state_table{$ip} eq 'ALIVE') {
+                $arp_table{$ip} = $mac;
             }
         }
     }
@@ -1824,7 +1833,8 @@ sub do_load_status {
     
     verbose("checking and setting states\n");
 
-    my %ip_stats   = (ALIVE=>0, STATIC=>0, DEAD=>0, TOTAL=>0, PENDING=>0, CHANGED=>0);
+    my %ip_stats   = (ALIVE=>0, STATIC=>0, DEAD=>0, 
+                      TOTAL=>0, PENDING=>0, CHANGED=>0);
     for my $ip (sort { $a cmp $b } keys %state_table) {
         $ip_stats{'TOTAL'}++;
         $ip_stats{$state_table{$ip}}++;
@@ -1833,8 +1843,8 @@ sub do_load_status {
             #verbose "no change ", hex2ip($ip), "\n";
             next;
         }
-        given ($state_table{$ip}) {
-            when ('ALIVE') {
+        foreach ($state_table{$ip}) {
+            if ($_ eq 'ALIVE') {
                 $ip_stats{'CHANGED'}++;
                 do_set_ip_generic(
                     -conn    => $conn,
@@ -1845,7 +1855,7 @@ sub do_load_status {
                     -options => [],
                 )
             }
-            when ('DEAD') {
+            elsif ($_ eq 'DEAD') {
                 $ip_stats{'CHANGED'}++;
                 check_send_command($conn, "clear_ip $ip");
             }
