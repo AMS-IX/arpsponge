@@ -1,3 +1,14 @@
+arpsponge (3.14) unstable; urgency=low
+
+  [2014-02-04] - steven (r299-r301)
+    => Get rid of "given/when".
+    => sbin/asctl.pl:
+        * Check "arp_update_flags" on "inform" command.
+    => lib/M6/ARP/Control/Base.pm:
+        * Fix bad grammar in POD.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 04 Feb 2014 12:28:06 +0100
+
 arpsponge (3.13.1) unstable; urgency=low
 
   [2013-06-03] - steven (r296)
