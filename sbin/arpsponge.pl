@@ -578,16 +578,14 @@ sub get_ip_state_table_s {
         my $rate  = $queue->rate($ip);
         my $stamp = $sponge->state_mtime($ip);
 
-        given ($state) {
-            when (DEAD) {
-                $ndead++;
-            }
-            when (ALIVE) {
-                $nalive++;
-            }
-            when ($state >= PENDING(0)) {
-                $npending++;
-            }
+        if ($state == DEAD) {
+            $ndead++;
+        }
+        elsif ($state == ALIVE) {
+            $nalive++;
+        }
+        elsif ($state >= PENDING(0)) {
+            $npending++;
         }
 
         $fh->print(
