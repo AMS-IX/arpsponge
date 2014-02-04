@@ -717,15 +717,15 @@ sub yesno {
     my $answer = undef;
     my $key = '?';
     while (defined ($key = ReadKey(0))) {
-        given ($key) {
-            when ("\c[")     { $key = 'n' }
-            when (/[\r\n ]/) { $key = $default }
+        foreach ($key) {
+            if ($_ eq "\c[")  { $key = 'n' }
+            elsif (/[\r\n ]/) { $key = $default }
         }
         next if index(lc $answers, lc $key) < 0;
-        given (lc $key) {
-            when ("y") { $answer = 1  }
-            when ("n") { $answer = 0  }
-            when ("q") { $answer = -1 }
+        foreach (lc $key) {
+            if    ($_ eq "y") { $answer = 1  }
+            elsif ($_ eq "n") { $answer = 0  }
+            elsif ($_ eq "q") { $answer = -1 }
         }
         last if defined $answer;
     }
