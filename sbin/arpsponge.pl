@@ -731,7 +731,7 @@ sub init_state {
     my $hi = $sponge->user('net_hi');
     for (my $num = $lo; $num <= $hi; $num++) {
         my $ip = sprintf("%08x", $num);
-        $sponge->set_state($ip, $state);
+        $sponge->set_state($ip, $state, 0);
     }
 }
 
@@ -780,9 +780,21 @@ sub do_sweep {
     for (my $num = $lo; $num <= $hi; $num++) {
         my $ip = sprintf("%08x", $num);
         my $age = time - $sponge->state_mtime($ip);
-        if ($age >= $threshold &&
-            ! ($skip_alive && $sponge->get_state($ip) == ALIVE))
-        {
+
+        my $do_probe = 0;
+        if ($sponge->get_state($ip) == ALIVE) {
+            my ($dst_mac, $mtime) = $sponge->arp_table($ip);
+            if ($age >= $threshold) {
+                if (!$skip_alive || !defined $dst_mac) {
+                    $do_probe++;
+                }
+            }
+        }
+        elsif ($age >= $threshold) {
+            $do_probe++;
+        }
+
+        if ($do_probe) {
             if ($verbose>1) {
                 log_sverbose(1, "DO PROBE %s (%d >= %d)\n",
                                 hex2ip($ip), $age, $threshold);
@@ -793,8 +805,8 @@ sub do_sweep {
             handle_input($sponge, time+$sleep);
         }
         elsif ($verbose>1) {
-                log_sverbose(1, "SKIP PROBE %s (%d < %d)\n",
-                                hex2ip($ip), $age, $threshold);
+            log_sverbose(1, "SKIP PROBE %s (%d < %d)\n",
+                            hex2ip($ip), $age, $threshold);
         }
     }
     log_is_verbose($verbose);
@@ -1562,8 +1574,8 @@ L<asctl|asctl>(8) utility.
 X<--sweep>
 
 Every I<interval> seconds, sweep the IP range for IP addresses who we
-haven't heard from or queried in the last I<threshold> seconds. This sweeps
-over all IP addresses, both sponged and quietly alive.
+haven't heard from or queried in the last I<threshold> seconds. This
+sweeps over all IP addresses, both sponged and quietly alive.
 
 Example: C<--sweep=900/3600>. This will cause the program to sweep every
 15 minutes, looking for the IP addresses it hasn't heard anything from
@@ -1599,7 +1611,9 @@ round, including I<--sweep-skip-alive>.
 =item B<--sweep-skip-alive>
 X<--sweep-skip-alive>
 
-Do not sweep IP addresses with sponge state of ALIVE.
+Do not sweep IP addresses with sponge state of ALIVE. Note that this only
+counts for IP addresses that have an ARP entry: IP addresses in ALIVE state,
+but without an ARP entry are probed anyway.
 
 =item B<--verbose>[=I<n>]
 X<--verbose>
@@ -1764,6 +1778,10 @@ The argument to C<--pending>.
 =item I<SWEEP>
 
 The argument to C<--sweep>.
+
+=item I<SWEEP_AT_START> (boolean)
+
+Use C<--sweep-at-start>
 
 =item I<SWEEP_SKIP_ALIVE> (boolean)
 
