@@ -6,12 +6,12 @@
 #
 # ARP sponge
 #
-# (c) Copyright AMS-IX B.V. 2004-2010; all rights reserved.
+# (c) Copyright AMS-IX B.V. 2003-2010; all rights reserved.
 #
 # See the LICENSE file that came with this package.
 #
 # A.Vijn,   2003-2004;
-# S.Bakker, 2004-2010;
+# S.Bakker, 2004-;
 #
 # Yes, this file is BIG. There's a POD at the end.
 #
@@ -1260,17 +1260,19 @@ of its current state upon receiving a C<HUP> or C<USR1> signal.
 
 =over
 
-=item X<--age>B<--age>=I<secs>
+=item B<--age>=I<secs>
+X<--age>
 
 Time until we consider an ARP entry "stale" (default @DFL_ARP_AGE@).
 This really controls how often we refresh the entries in our internal
 ARP cache.
 
-=item X<--arp-update-methods>B<--arp-update-methods>=[B<!>]I<method>,...
+=item B<--arp-update-methods>=[B<!>]I<method>,...
+X<--arp-update-methods>
 
 Some routers do not update their ARP cache when an IP gets unsponged.
-We detect this by looking for traffic destined to our MAC, with a
-destination IP that is not ours. If the destination IP is in our local
+We detect this by looking for traffic destined for our MAC, with a
+destination IP that is I<not> ours. If the destination IP is in our local
 LAN, we should attempt to update the packet source's ARP cache.
 
 This can be done in three ways:
@@ -1318,7 +1320,10 @@ equivalent:
 
 Default value is C<all>.
 
-=item X<--control>B<--control>=I<socket>
+This value is also used by the L<inform|asctl/inform> command of L<asctl>(1).
+
+=item B<--control>=I<socket>
+X<--control>
 
 Location of the UNIX control socket. Default is
 "I<rundir>/B<control>". See also L<--permissions|/--permissions> below.
@@ -1343,12 +1348,14 @@ PID to I<pidfile>.
 This option turns off C<--verbose> and enables logging to
 L<syslogd(8)|syslogd>.
 
-=item X<--dummy>B<--dummy>
+=item B<--dummy>
+X<--dummy>
 
 Dummy operation (simulate sponging). Does send probes but no sponge
 replies.
 
-=item X<--flood-protection>B<--flood-protection>=I<r>
+=item B<--flood-protection>=I<r>
+X<--flood-protection>
 
 ARP threshold rate in queries/sec (default @DFL_FLOOD_PROTECTION@) above
 which we ignore ARP queries from a particular source.
@@ -1363,11 +1370,13 @@ I<DST_IP> in pending mode after a few second of this, we would check
 the ARP rate of I<SRC_IP> and see that it exceeds 3 and immediately
 reduce the queue back to 1.
 
-=item X<--gratuitious>X<--nogratuitous>B<--[no]gratuitous>
+=item B<--[no]gratuitous>
+X<--gratuitious>X<--nogratuitous>
 
 Do (not) send gratuitous ARP queries when sponging an address.
 
-=item X<--init>B<--init>={B<ALIVE>|B<DEAD>|B<PENDING>|B<NONE>}
+=item B<--init>={B<ALIVE>|B<DEAD>|B<PENDING>|B<NONE>}
+X<--init>
 
 How to initialise the sponge's state table:
 
@@ -1413,7 +1422,8 @@ dead addresses, but doesn't incur the overhead of large ARP sweeps.
 
 =back
 
-=item X<--learning>B<--learning>=I<secs>
+=item B<--learning>=I<secs>
+X<--learning>
 
 Spend I<secs> seconds on LEARNING mode. During the learning mode, we only
 listen to network traffic, we don't send probes or sponged answers. This
@@ -1422,11 +1432,13 @@ I<PENDING> and I<NONE> as it will clear the table for live IP addresses.
 
 A value of zero (0) disables the initial learning state.
 
-=item X<--loglevel>B<--loglevel>=I<level>
+=item B<--loglevel>=I<level>
+X<--loglevel>
 
 Logging level for L<syslogd(8)|syslogd> logging. Default is C<info>.
 
-=item X<--pending>B<--pending>=I<n>
+=item B<--pending>=I<n>
+X<--pending>
 
 Number of ARP queries the sponge itself sends before sponging an IP address
 (default: @DFL_PENDING@).
@@ -1451,7 +1463,8 @@ X<--permissions>
 Set the permissions on the L<control socket|/--control>. Default is
 C<@DFL_SOCK_PERMS@>.
 
-=item X<--pidfile>B<--pidfile>=I<pidfile>
+=item B<--pidfile>=I<pidfile>
+X<--pidfile>
 
 Write daemon PID to I<pidfile> instead of the default
 (I<rundir>/pid).
@@ -1494,24 +1507,28 @@ below.
 
 =back
 
-=item X<--queuedepth>B<--queuedepth>=I<n>
+=item B<--queuedepth>=I<n>
+X<--queuedepth>
 
 Number of ARP queries over which to calculate average rate (default
 @DFL_QUEUEDEPTH@).
 Sponging is not triggered until at least this number of ARP queries are seen.
 
-=item X<--rate>B<--rate>=I<r>
+=item B<--rate>=I<r>
+X<--rate>
 
 ARP threshold rate in queries/min (default @DFL_RATE@). If the ARP queue
 (see above) is full, and the average rate of incoming queries per second
 exceeds I<r>, we move the target IP to I<PENDING> state (but see also
 L<--flood-protection|/--flood-protection>.
 
-=item X<--rundir>B<--rundir>=I<path>
+=item B<--rundir>=I<path>
+X<--rundir>
 
 Base directory for run-time files. Default is "F<@SPONGE_VAR@>/I<interface>".
 
-=item X<--sponge-network>B<--sponge-network>
+=item B<--sponge-network>
+X<--sponge-network>
 
 Statically sponge the network base address. Although it I<is> possible
 to configure this on an interface and use it as a valid IP address, it
@@ -1521,7 +1538,8 @@ this address.
 Use this option if you have not assigned the base address to any interface
 in your network.
 
-=item X<--statusfile>B<--statusfile>=I<file>
+=item B<--statusfile>=I<file>
+X<--statusfile>
 
 Write status to I<file> when receiving the C<HUP> or C<USR1> signal.
 Default is "I<rundir>/B<status>".
@@ -1529,7 +1547,8 @@ Default is "I<rundir>/B<status>".
 Note that the daemon has no way of reloading this data, other than through the
 L<asctl|asctl>(8) utility.
 
-=item X<--sweep>B<--sweep>=I<interval>/I<threshold>
+=item B<--sweep>=I<interval>/I<threshold>
+X<--sweep>
 
 Every I<interval> seconds, sweep the IP range for IP addresses who we
 haven't heard from or queried in the last I<threshold> seconds. This sweeps
@@ -1559,11 +1578,13 @@ cost of more ARP queries from the daemon's host.
 
 =back
 
-=item X<--sweep-skip-alive>B<--sweep-skip-alive>
+=item B<--sweep-skip-alive>
+X<--sweep-skip-alive>
 
 Do not sweep IP addresses with sponge state of ALIVE.
 
-=item X<--verbose>B<--verbose>[=I<n>]
+=item B<--verbose>[=I<n>]
+X<--verbose>
 
 Be verbose; print information on F<STDOUT>;
 This options turns off logging to L<syslogd(8)|syslogd> and
@@ -1826,12 +1847,15 @@ not an exact figure.
 
 =head1 AUTHORS
 
-Arien Vijn at AMS-IX (arien.vijn@ams-ix.net),
-Steven Bakker at AMS-IX (steven.bakker@ams-ix.net).
+Arien Vijn at AMS-IX (arien.vijn@ams-ix.net) created the original
+version in 2003. 
+
+Steven Bakker at AMS-IX (steven.bakker@ams-ix.net) has been extending and
+maintaining this since 2004.
 
 =head1 COPYRIGHT
 
-Copyright 2005-2011, AMS-IX B.V.
+Copyright 2003-2014, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
 =cut

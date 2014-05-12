@@ -2006,6 +2006,7 @@ for ways to override this.
 =over
 
 =item B<--command> I<command> ...
+X<--command>
 
 Signals to the program that whatever follows the C<--command> option should be
 considered as input to the program. This is useful if you want to specify
@@ -2018,33 +2019,40 @@ options to the program's commands. The following are sort of equivalent:
 Note that you cannot specify C<--command> without at least one argument.
 
 =item B<--debug>
+X<--debug>
 
 Print debugging information to F<stderr> while executing.
 
 =item B<--interface>=I<ifname>
+X<--interface>
 
 Connect to the L<arpsponge> instance for interface I<ifname>.
 
 =item B<--rundir>=I<dir>
+X<--rundir>
 
 Override the default top directory for the L<arpsponge> control files.
 See also L<FILES|/FILES> below.
 
 =item B<--socket>=I<sock>
+X<--socket>
 
 Explicitly specify the path of the control socket to connect to. Mutually
 exclusive with L<--interface|/--interface>.
 
 =item B<--test>
+X<--test>
 
 Do not connect to any daemon or send any commands. This is really only
 used during development to check command parsing, etc.
 
-=item X<--verbose>B<--verbose>
+=item B<--verbose>
+X<--verbose>
 
 The C<--verbose> flag causes the program to be a little more talkative.
 
-=item X<--quiet>B<--quiet>
+=item B<--quiet>
+X<--quiet>
 
 Only has effect when executing commands from the command line.
 Causes all non-error output to be suppressed.
@@ -2063,14 +2071,17 @@ In the list below, the following constructions are used:
 =over
 
 =item B<clear arp> I<ip-range>
+X<clear arp>
 
 Clear ARP table for given IP(s)
 
 =item B<clear ip> I<ip-range>
+X<clear ip>
 
 Clear state table for given IP(s)
 
 =item B<dump status>
+X<dump status>
 
 =item B<dump status> [I<file>]
 
@@ -2093,10 +2104,12 @@ The format of the I<asctl> generated file differs slightly from the daemon's
 legacy format, but both can be used in a C<load status> command.
 
 =item B<help>
+X<help>
 
 Show command summary
 
 =item B<inform> I<dst_ip> B<about> I<src_ip>
+X<inform>
 
 Force I<dst_ip> to update its ARP entry for I<src_ip>. See also
 "L<set arp_update_flags|/arp_update_flags>" below.
@@ -2104,6 +2117,7 @@ Force I<dst_ip> to update its ARP entry for I<src_ip>. See also
 Both I<dst_ip> and I<src_ip> can be I<$ip-filter> arguments.
 
 =item B<load status> [B<--force>] I<file>
+X<load status>
 
 Load IP/ARP state from I<file>. The I<file> should be a dump file previously
 created by the daemon's dump facility (see also "L<dump status|/dump status>"
@@ -2160,6 +2174,7 @@ relatively old data, without resulting in sponging of active addresses, while
 still allowing quick discovery of the still-dead addresses.
 
 =item B<ping> [[I<count> [I<delay>]]
+X<ping>
 
 Send I<count> "ping" probes to the daemon, waiting I<delay>
 seconds between probes, display response RTT per probe and
@@ -2167,19 +2182,26 @@ a summary at the end. Can be stopped by an interrupt signal
 (C<Ctrl-C>).
 
 =item B<probe> [B<--delay>=I<sec> | B<--rate>=I<rate>] I<ip-range> 
+X<probe>
 
 Send broadcast ARP queries (probes) for addresses in I<ip-range>.
 By default, the request rate is 10 probes per second (delay is 0.1),
 but this can be changed with the C<--delay> or C<--rate> options.
 
 =item B<quit>
+X<quit>
 
 disconnect and quit
 
 =item X<arp_update_flags>B<set> B<arp_update_flags> I<flag>[,I<flag>,...]
+X<set arp_update_flags>
 
 Set the methods (comma-separated list) by which the sponge is to update
 its neighbors' ARP caches.
+
+This value is used for manual C<inform> commands as well as automatic inform
+actions (see L<--arp-update-methods|arpsponge/--arp-update-methods> in the
+L<arpsponge>(1) manpage).
 
 Assuming we want to update I<stanley> about I<livingston>, the possible
 values for I<flag> are:
@@ -2242,32 +2264,39 @@ As are these:
   gratuitous,reply
 
 =item B<set dummy> I<bool>
+X<set dummy>
 
 Enable/disable DUMMY mode; I<bool> can be any of:
 C<yes>, C<true>, C<on>, C<1>,
 C<no>, C<false>, C<off>, C<0>.
 
 =item B<set ip> I<ip-range> B<alive> [I<mac>]
+X<set ip alive>
 
 Unsponge given IP(s) (associate them with I<mac>)
 
 =item B<set ip> I<ip-range> B<dead>
+X<set ip dead>
 
 Sponge given IP(s)
 
 =item B<set ip> I<ip-range> B<mac> I<mac>
+X<set ip>
 
 Statically store <ip> -> <mac> in the ARP table
 
 =item B<set ip> I<ip-range> pending [I<pending>]
+X<set ip pending>
 
 Set given IP(s) to pending state I<pending> (default 0)
 
 =item B<set learning> I<secs>
+X<set learning>
 
 Switch in to/out of learning mode
 
 =item B<set log_level> I<level>
+X<set log_level>
 
 Set the level of logging for the daemon. Values are the same as
 L<syslog(3)|syslog> levels. In decreasing importance:
@@ -2312,44 +2341,61 @@ higher importance are logged, so C<notice> will log C<warning>, C<err>, etc.
 but not C<info> or C<debug>.
 
 =item B<set> {B<max_pending>|B<queuedepth>} I<num>
+X<set max_pending>
+X<set queuedepth>
 
 Set queue parameters
 
 =item B<set> {B<max_rate>|B<flood_protection>|B<proberate>} I<rate>
+X<set max_rate>
+X<set flood_protection>
+X<set proberate>
 
 Set rate parameters
 
 =item B<set sweep_age> I<secs>
+X<set sweep_age>
 
 =item B<set sweep_period> I<secs>
+X<set sweep_period>
 
 Set sweep/probe parameters
 
 =item B<set sweep_skip_alive> I<bool>
+X<set sweep_skip_alive>
 
 Enable/disable skipping ALIVE addresses during sweeping; I<bool> can be any of:
 C<yes>, C<true>, C<on>, C<1>,
 C<no>, C<false>, C<off>, C<0>.
 
 =item B<show arp> [I<ip-any>]
+X<show arp>
 
 Show ARP table for given IP(s)
 
 =item B<show ip> [I<ip-filter>]
+X<show ip>
 
 Show state table for given IP(s)
 
 =item B<show log> [I<nlines>]
+X<show log>
 
 Show daemon log (most recent <nlines>)
 
 =item B<show> {B<parameters>|B<status>|B<uptime>|B<version>}
+X<show parameters>
+X<show status>
+X<show uptime>
+X<show version>
 
 Show general information
 
 =item B<sponge> I<ip-range>
+X<sponge>
 
 =item B<unsponge> I<ip-range>
+X<unsponge>
 
 Sponge/unsponge given IP(s); see also C<set ip alive> and C<set ip dead>.
 
@@ -2399,6 +2445,6 @@ Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011.
 
 =head1 COPYRIGHT
 
-Copyright 2011, AMS-IX B.V.
+Copyright 2011-2014, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
