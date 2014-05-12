@@ -865,7 +865,8 @@ sub process_pkt {
                         $sponge->send_arp_update(tha => $src_mac,
                                                  tpa => $src_ip,
                                                  sha => $dst_mac,
-                                                 spa => $dst_ip);
+                                                 spa => $dst_ip,
+                                                 tag => '[auto] ');
                     }
                 }
             }

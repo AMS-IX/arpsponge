@@ -667,6 +667,7 @@ sub _cmd_inform {
     $sponge->send_arp_update(
                         sha => $mac2, spa => $ip2,
                         tha => $mac1, tpa => $ip1,
+                        tag => '[asctl] ',
                     );
     return $self->send_ok(
             "sha=$mac2\nspa=$ip2\ntha=$mac1\ntpa=$ip1\nmsg=update sent"

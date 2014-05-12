@@ -437,7 +437,9 @@ sub send_arp_update {
         my $dst_ip_s  = hex2ip($args{tpa});
         my $src_mac_s = hex2mac($args{sha});
         my $src_ip_s  = hex2ip($args{spa});
-        log_sverbose(1, "%sarp inform %s\@%s about %s\@%s\n",
+        my $tag       = $args{tag} // '';
+        log_sverbose(1, "%s%sarp inform %s\@%s about %s\@%s\n",
+                        $tag,
                         (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
                          $dst_ip_s, $dst_mac_s,
                          $src_ip_s, $src_mac_s,
