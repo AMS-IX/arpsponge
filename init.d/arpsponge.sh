@@ -36,6 +36,7 @@ export  AGE \
         RATE \
         SPONGE_NETWORK \
         ARP_UPDATE_METHOD \
+        SWEEP_AT_START \
         SWEEP \
         SWEEP_SKIP_ALIVE
 
@@ -79,10 +80,11 @@ start_sponge() {
 
         opts="--daemon --rundir=${rundir} --pidfile=${pidfile}"
 
-        eval_bool ${SPONGE_NETWORK} && opts="$opts --sponge-network"
-        eval_bool ${GRATUITOUS}     && opts="$opts --gratuitous"
-        eval_bool ${DUMMY_MODE}     && opts="$opts --dummy"
+        eval_bool ${SPONGE_NETWORK}   && opts="$opts --sponge-network"
+        eval_bool ${GRATUITOUS}       && opts="$opts --gratuitous"
+        eval_bool ${DUMMY_MODE}       && opts="$opts --dummy"
         eval_bool ${SWEEP_SKIP_ALIVE} && opts="$opts --sweep-skip-alive"
+        eval_bool ${SWEEP_AT_START}   && opts="$opts --sweep-at-start"
 
         [ -n "${INIT_MODE}" ]       && opts="$opts --init=${INIT_MODE}"
         [ -n "${LEARNING}" ]        && opts="$opts --learning=${LEARNING}"
