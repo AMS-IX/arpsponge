@@ -208,23 +208,44 @@ status() {
     return $retval
 }
 
+do_help() {
+    cat <<EOF
+
+Usage: $0 {start|stop|restart|flush|reload|force-reload}
+
+    start   - start daemon if not already running (reading state table)
+
+    stop    - stop daemon (saving state table)
+
+    restart, reload, force-reload
+            - restart daemon (re-using state table)
+
+    flush   - restart daemon, flushing state table
+
+EOF
+}
+
 case "$1" in
     debug)
         SPONGE_DEBUG=true
         start
         ;;
     start)
-        start
+        start re-init
         ;;
     restart)
         status re-init
         stop
-        start
+        start re-init
         ;;
     reload|force-reload)
         status re-init
         stop
         start re-init
+        ;;
+    flush)
+        stop
+        start
         ;;
     status)
         status
@@ -233,8 +254,11 @@ case "$1" in
         status re-init
         stop
         ;;
+    help)
+        do_help
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|reload|force-reload}"
+        echo "Usage: $0 {start|stop|restart|flush|reload|force-reload}"
         exit 1
         ;;
 esac
