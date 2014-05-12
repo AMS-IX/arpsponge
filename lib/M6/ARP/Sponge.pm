@@ -109,10 +109,11 @@ sub state_table      { shift->{state} }
 sub get_state        { $_[0]->{state}->{$_[1]} }
 
 sub set_state    {
-    my ($self, $ip, $state) = @_;
+    my ($self, $ip, $state, $time) = @_;
 
     if (defined $state) {
-        $self->{state_mtime}->{$ip} = $self->{state_atime}->{$ip} = time;
+        $time //= time;
+        $self->{state_mtime}->{$ip} = $self->{state_atime}->{$ip} = $time;
         $self->{state}->{$ip} = $state;
         if ($state >= PENDING(0)) {
             $self->{'pending'}->{$ip} = $state;
