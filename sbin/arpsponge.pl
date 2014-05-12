@@ -114,6 +114,7 @@ Options:
   --statusfile=file       - where to write status information when receiving
                             HUP or USR1 signal (<rundir>/status)
   --sweep=sec/thr         - periodically sweep for "quiet" IP addresses
+  --sweep-at-start        - perform sweep for all addresses at startup
   --sweep-skip-alive      - sweep avoids IP addresses in state ALIVE
   --verbose[=n]           - be verbose; print information on STDOUT;
                             turns off syslog
@@ -181,6 +182,7 @@ sub Main {
       'sponge-network'      => \(my $sponge_net),
       'statusfile=s'        => \(my $statusfile),
       'sweep=s'             => \(my $sweep_sec),
+      'sweep-at-start!'     => \(my $sweep_at_start),
       'sweep-skip-alive'    => \(my $sweep_skip_alive),
       'verbose|v+'          => \(my $verbose),
       'version|V'           => sub { print "$0 $VERSION\n"; exit 0 },
@@ -344,6 +346,10 @@ sub Main {
     $::SIG{'USR1'} = sub { do_status('USR1', $sponge)      };
     $::SIG{'HUP'}  = sub { do_status('HUP',  $sponge)      };
     # $::SIG{'ALRM'} = sub { do_timer($sponge)               };
+
+    if ($sweep_at_start) {
+        $sponge->user('next_sweep', time-1);
+    }
 
     packet_capture_loop($sponge);
 
@@ -744,19 +750,23 @@ sub do_learn($) {
 }
 
 ###############################################################################
-# do_sweep($sponge, $interval, $threshold);
+# do_sweep($sponge [, OPT => VAL, ...])
 #
 #    Called by the do_time() interrupt handler.
 #
 #    Sweep the range of IP addresses and send ARP requests for the ones
-#    that have been quiet for at least $threshold seconds.
+#    that have been quiet for at least sweep_age seconds.
 #
 ###############################################################################
-sub do_sweep($) {
+sub do_sweep {
     my $sponge    = shift;
-    my $interval  = $sponge->user('sweep_sec');
-    my $threshold = $sponge->user('sweep_age');
-    my $sleep     = $sponge->user('probesleep');
+    my %opts      = @_;
+
+    my $interval   = $opts{'sweep_sec'}  // $sponge->user('sweep_sec');
+    my $threshold  = $opts{'sweep_age'}  // $sponge->user('sweep_age');
+    my $sleep      = $opts{'probesleep'} // $sponge->user('probesleep');
+    my $skip_alive = $opts{'sweep_skip_alive'}
+                      // $sponge->user('sweep_skip_alive');
 
     log_notice("sweeping for quiet entries on %s/%d",
                         hex2ip($sponge->network), $sponge->prefixlen);
@@ -771,8 +781,7 @@ sub do_sweep($) {
         my $ip = sprintf("%08x", $num);
         my $age = time - $sponge->state_mtime($ip);
         if ($age >= $threshold &&
-            ! ($sponge->user('sweep_skip_alive') &&
-               $sponge->get_state($ip) == ALIVE))
+            ! ($skip_alive && $sponge->get_state($ip) == ALIVE))
         {
             if ($verbose>1) {
                 log_sverbose(1, "DO PROBE %s (%d >= %d)\n",
@@ -1160,6 +1169,7 @@ I<Options>:
     --sponge-network
     --statusfile=file
     --sweep=interval/threshold
+    --sweep-at-start
     --sweep-skip-alive
     --verbose[=n]
 
@@ -1578,6 +1588,13 @@ address that has come back, but has been quiet for some reason, at the
 cost of more ARP queries from the daemon's host.
 
 =back
+
+=item B<--sweep-at-start>, B<--no-sweep-at-start>
+X<--sweep-at-start>X<--no-sweep-at-start>
+
+Perform a sweep at the start of the program, I<after> the initial learning
+phase. All "sweep" related settings apart from I<interval> apply to this
+round, including I<--sweep-skip-alive>.
 
 =item B<--sweep-skip-alive>
 X<--sweep-skip-alive>
