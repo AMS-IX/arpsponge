@@ -1,3 +1,27 @@
+arpsponge (3.15) unstable; urgency=low
+
+  [2014-05-12] - steven (r304-r310)
+    => sbin/arpsponge.pl, sbin/asctl.pl:
+        * Update POD. Cross-reference ARP update flags between
+          arpsponge and asctl.
+    => init.d/arpsponge.sh:
+        * Make "start" and "restart" do a re-read of the state table as
+          well. Add a "flush" action to do a daemon restart with clean
+          state table. Add "help" action to show more help.
+        * Include SWEEP_AT_START option (--sweep-at-start).
+    => sbin/arpsponge.pl:
+        * Add --sweep-at-start option.
+        * Tag manual and auto informs differently in the log.
+        * Add SWEEP_AT_START to POD.
+        * Make sure IP states are initialised with mtime of 0, so any
+          initial sweep will sweep all silent IPs.
+        * Live IPs are probed if their age is too high and they
+          have no MAC address (regardless of --sweep-skip-alive).
+    => lib/M6/ARP/Sponge.pm:
+        * Add optional "time" argument to "set_state".
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 12 May 2014 13:44:37 +0200
+
 arpsponge (3.14) unstable; urgency=low
 
   [2014-02-04] - steven (r299-r301)
