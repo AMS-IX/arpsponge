@@ -1739,29 +1739,36 @@ to "true", other values are "false".
 
 =over 4
 
-=item I<$SPONGE_VAR> (default: F<@SPONGE_VAR@>)
+=item I<AGE> (integer)
 
-Directory root that holds state information for the various sponge
-instances. The script will create the directory if it doesn't exist yet.
-Together with the interface (I<$INTERFACE>) this is used to specify the
-I<rundir> to the sponge ("B<--rundir>=I<$SPONGE_VAR>/I<$INTERFACE>").
+The argument to C<--age>.
+
+=item I<DISABLED> (boolean)
+
+Whether the arpsponge is disabled. Can be set globally or per
+interface. Note that if it is set globally, the individual interface
+files can still explicitly override this value.
 
 =item I<DUMMY_MODE> (boolean)
 
 Use C<--dummy> on the sponge. Note that L<asctl(8)|asctl> clients can
 (re-)set this value on the fly.
 
+=item I<GRATUITOUS> (boolean)
+
+Whether or not to send gratuitous ARPs (C<--gratuitous>).
+
 =item I<INIT_MODE>
 
 Specify the C<--init> state.
 
-=item I<SPONGE_NETWORK> (boolean)
-
-Use C<--sponge-network>
-
 =item I<LEARNING> (integer)
 
 How many seconds to spend in learning mode.
+
+=item I<PENDING>
+
+The argument to C<--pending>.
 
 =item I<QUEUE_DEPTH> (integer)
 
@@ -1771,9 +1778,16 @@ The argument to C<--queuedepth>.
 
 The argument to C<--rate>.
 
-=item I<PENDING>
+=item I<SPONGE_NETWORK> (boolean)
 
-The argument to C<--pending>.
+Use C<--sponge-network>
+
+=item I<SPONGE_VAR> (default: F<@SPONGE_VAR@>)
+
+Directory root that holds state information for the various sponge
+instances. The script will create the directory if it doesn't exist yet.
+Together with the interface (I<$INTERFACE>) this is used to specify the
+I<rundir> to the sponge ("B<--rundir>=I<$SPONGE_VAR>/I<$INTERFACE>").
 
 =item I<SWEEP>
 
@@ -1786,14 +1800,6 @@ Use C<--sweep-at-start>
 =item I<SWEEP_SKIP_ALIVE> (boolean)
 
 Use C<--sweep-skip-alive>
-
-=item I<GRATUITOUS> (boolean)
-
-Whether or not to send gratuitous ARPs (C<--gratuitous>).
-
-=item I<AGE> (integer)
-
-The argument to C<--age>.
 
 =back
 

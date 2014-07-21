@@ -32,6 +32,10 @@ AGE=@DFL_ARP_AGE@
 # ARP_UPDATE_METHOD=all
 ARP_UPDATE_METHOD=none
 
+# Whether the sponge is disabled.
+# Can also be specified on a per-interface basis.
+DISABLED=false
+
 #############################################################################
 #
 # Now, for every ethX you want to monitor, create a "ethX" file in 

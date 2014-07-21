@@ -25,6 +25,7 @@ SPONGE_VAR=@SPONGE_VAR@
 
 # Program defaults
 export  AGE \
+        DISABLED \
         DUMMY_MODE \
         FLOOD_PROTECTION \
         GRATUITOUS \
@@ -68,11 +69,20 @@ start_sponge() {
     export file
     export mode
     (
+        # Execute in a sub-shell, so settings in individual interface
+        # files do not disturb the global (default) settings.
         DEVICE=$(basename $file)
         unset NETWORK
         . $file
 
         [ -n "${DEVICE}" ]  || fatal "$file: no device specified"
+
+        if eval_bool "${DISABLED}"
+        then
+            printf "  %-10s (skipped)\n" "${DEVICE}"
+            return
+        fi
+
         [ -n "${NETWORK}" ] || fatal "$file ($DEVICE): no network specified"
 
         rundir="${SPONGE_VAR}/${DEVICE}"
@@ -99,7 +109,7 @@ start_sponge() {
             opts="$opts --arp-update-method=${ARP_UPDATE_METHOD}"
         fi
 
-		if [ -n "${FLOOD_PROTECTION}" ]; then
+        if [ -n "${FLOOD_PROTECTION}" ]; then
             opts="$opts --flood-protection=${FLOOD_PROTECTION}"
         fi
 
