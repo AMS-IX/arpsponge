@@ -696,6 +696,7 @@ sub print_output {
     my $ret = 1;
     my $curr_fh = select;
     if ($TERM && -t $curr_fh) {
+        local($::SIG{PIPE}) = 'IGNORE';
         open(MORE, "|$PAGER");
         print MORE $out;
         close MORE;
