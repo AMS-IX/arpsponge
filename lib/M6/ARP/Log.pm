@@ -42,6 +42,7 @@ BEGIN {
         log_notice
         log_info
         log_fatal
+        log_debug
         log_is_verbose log_verbose log_sverbose
         log_level is_log_level
         is_valid_log_level log_level_to_string
