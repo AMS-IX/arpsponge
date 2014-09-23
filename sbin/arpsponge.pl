@@ -244,7 +244,6 @@ sub Main {
             is_dummy         => $dummy,
             queuedepth       => $queuedepth,
             device           => $device,
-            loglevel         => $loglevel,
             network          => ip2hex($network->addr),
             prefixlen        => $network->masklen,
             max_pending      => $pending,
@@ -256,6 +255,8 @@ sub Main {
         );
 
     $sponge->is_dummy($dummy);
+
+    log_level($loglevel);
 
     $sponge->user('version', $VERSION);
     $sponge->user('net_lo', $network->first->numeric);
