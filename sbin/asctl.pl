@@ -39,6 +39,7 @@ use IO::File;
 use Scalar::Util    qw( reftype );
 
 use M6::ARP::Control::Client;
+use M6::ARP::Event     qw( :standard );
 use M6::ARP::Log       qw( :standard :macros );
 use M6::ARP::Util      qw( :all );
 use M6::ReadLine       qw( :all );
@@ -154,8 +155,12 @@ my %Syntax = (
         '?'        => 'Set max. number of "pending" probes before'
                       .' sponging an IP',
         '$num'     => { type=>'int', min=>1 }, },
+    'set log_mask $mask' => {
+        '?'       => q{Specify a comma-separated list of events that}
+                    .q{ should be logged by the daemon (default: all).},
+        '$mask'  => { type=>'log-mask', min=>1 }, },
     'set log_level $level' => {
-        '?'        => 'Set logging threshold',
+        '?'        => 'Set logging threshold.',
         '$level'   => { type=>'log-level', min=>1 }, },
     'set queuedepth $num' => {
         '?'        => 'Max. ARP queue size per IP address.',
@@ -284,6 +289,7 @@ sub do_command {
     return "@parsed";
 }
 
+#############################################################################
 sub expand_ip_range {
     my ($arg_str, $name, $silent) = @_;
 
@@ -319,6 +325,7 @@ sub expand_ip_range {
     return \@list;
 }
 
+#############################################################################
 sub expand_ip_filter {
     my %args     = (name => 'ip', @_);
     my $arg_str  = $args{'arg'};
@@ -356,6 +363,7 @@ sub expand_ip_filter {
     return expand_ip_range($arg_str, $name, $silent);
 }
 
+#############################################################################
 sub check_ip_range_arg {
     my ($spec, $arg, $silent) = @_;
     DEBUG sprintf("check_ip_range_arg: <%s> <%d>", $arg, $silent ? $silent : 0);
@@ -380,6 +388,7 @@ sub complete_ip_range {
     return map { "$prefix$_" } complete_ip_address_arg($partial);
 }
 
+#############################################################################
 sub check_ip_filter_arg {
     my ($spec, $arg, $silent) = @_;
     DEBUG "check_ip_filter_arg: <$arg>";
@@ -398,6 +407,7 @@ sub complete_ip_filter {
     return (@IP_STATES, complete_ip_range($partial));
 }
 
+#############################################################################
 sub check_ip_any_arg {
     my ($spec, $arg, $silent) = @_;
     DEBUG "check_ip_filter_arg: <$arg>";
@@ -413,6 +423,7 @@ sub complete_ip_any {
     return (qw( all ), complete_ip_range($partial));
 }
 
+#############################################################################
 sub check_log_level {
     my ($spec, $arg, $silent) = @_;
     DEBUG "check_log_level $arg";
@@ -430,6 +441,49 @@ sub complete_log_level {
     return map { log_level_to_string($_) } (LOG_EMERG .. LOG_DEBUG);
 }
 
+#############################################################################
+sub check_log_mask {
+    my ($spec, $arg, $silent) = @_;
+    DEBUG "check_log_mask $arg";
+    if (defined $arg && length($arg)) {
+        my $err;
+        my $mask = parse_event_mask($arg, -err => \$err);
+        if (!defined $mask) {
+            $silent or print_error($err);
+            return;
+        }
+        return $mask;
+    }
+}
+
+sub complete_log_mask {
+    my $partial = shift @_;
+    my @words   = split(/,/, $partial);
+    if ($partial =~ /,$/) {
+        $partial = '';
+    }
+    else {
+        $partial = @words ? pop @words : '';
+    }
+    my $prefix  = join('', map { "$_," } @words);
+    DEBUG "\ncomplete_log_mask partial:<$partial>; prefix:<$prefix>";
+    
+    my @names;
+    for my $name (event_names()) {
+        if (substr($name, 0, length($partial)) eq $partial) {
+            push @names, $name;
+        }
+        if (substr("!$name", 0, length($partial)) eq $partial) {
+            push @names, $name;
+        }
+    }
+    if (@names==1) {
+        push @names, "$names[0],";
+    }
+    return map { "$prefix$_" } @names;
+}
+
+#############################################################################
 sub check_arp_update_flags {
     my ($spec, $arg, $silent) = @_;
     DEBUG "check_arp_update_flags: $arg";
@@ -472,6 +526,7 @@ sub complete_arp_update_flags {
 }
 
 
+#############################################################################
 sub check_send_command {
     my $conn = shift;
     my $command = join(' ', @_);
@@ -1091,6 +1146,9 @@ sub parse_server_reply {
                    /"$1=".join(q{,}, update_flags_to_str($2))
                    /gxme;
         $reply =~ s/\b(log_level)=(\d+)\b/"$1=".log_level_to_string($2)/gme;
+        $reply =~ s/\b(log_mask)=(\d+)\b
+                   /"$1=".join(q{,}, event_mask_to_str($2))
+                   /gxme;
     }
 
     my @output;
@@ -1254,6 +1312,10 @@ sub do_set_generic {
         $old = '('.join(',', update_flags_to_str($old)).')';
         $new = '('.join(',', update_flags_to_str($new)).')';
     }
+    elsif ($type eq 'log-mask') {
+        $old = '('.join(',', event_mask_to_str($old)).')';
+        $new = '('.join(',', event_mask_to_str($new)).')';
+    }
     elsif ($type eq 'boolean') {
         $old = $old ? 'yes' : 'no';
         $new = $new ? 'yes' : 'no';
@@ -1300,6 +1362,17 @@ sub do_set_log_level {
                    -val     => $args->{'level'},
                    -options => $args->{-options},
                    -type    => 'log-level');
+}
+
+# cmd: set log-mask
+sub do_set_log_mask {
+    my ($conn, $parsed, $args) = @_;
+
+    do_set_generic(-conn    => $conn,
+                   -name    => 'log_mask',
+                   -val     => $args->{'mask'},
+                   -options => $args->{-options},
+                   -type    => 'log-mask');
 }
 
 # cmd: set max_pending
@@ -1620,6 +1693,7 @@ sub do_param {
         sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
         sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
         sprintf("$tag= %s\n", 'log_level', $$info{log_level}),
+        #sprintf("$tag= %s\n", 'log_mask', $$info{log_mask}),
     );
 }
 
@@ -1952,6 +2026,10 @@ sub initialise {
     $M6::ReadLine::TYPES{'log-level'} = {
             'verify'   => \&check_log_level,
             'complete' => \&complete_log_level,
+        };
+    $M6::ReadLine::TYPES{'log-mask'} = {
+            'verify'   => \&check_log_mask,
+            'complete' => \&complete_log_mask,
         };
 
     $INTERACTIVE = -t STDIN && -t STDOUT && !@ARGV;

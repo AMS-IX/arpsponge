@@ -45,7 +45,7 @@ my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
     set_sweep_age set_sweep_sec set_sweep_skip_alive
     set_alive set_dead set_pending
     set_arp_update_flags
-    set_log_level
+    set_log_level set_log_mask
     probe inform
 );
 
@@ -197,6 +197,7 @@ sub _get_param_info_s {
         sprintf("%s=%d\n", 'dummy', int($s->is_dummy)),
         sprintf("%s=%d\n", 'arp_update_flags', $s->arp_update_flags),
         sprintf("%s=%d\n", 'log_level', log_level()),
+        sprintf("%s=%d\n", 'log_mask', event_mask()),
     );
     return join('', @response);
 }
@@ -479,6 +480,19 @@ sub _cmd_set_log_level {
                                     LOG_EMERG, LOG_DEBUG));
     }
     log_notice("[client %d] %s %d", $self->fileno, $cmd, $level);
+    my $old = log_level($level);
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $level));
+}
+
+sub _cmd_set_log_mask {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $mask = is_valid_int($args[0], -min=>EVENT_NONE, -max=>EVENT_ALL);
+    if (!defined $mask) {
+        return $self->send_error(sprintf("%s {%#06x-%#06x}", $cmd,
+                                    EVENT_NONE, EVENT_ALL));
+    }
+    log_notice("[client %d] %s %#06x", $self->fileno, $cmd, $mask);
     my $old = log_level($level);
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $level));
 }

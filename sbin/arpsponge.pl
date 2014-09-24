@@ -20,6 +20,7 @@ use feature ':5.10';
 use strict;
 use Getopt::Long;
 use Pod::Usage;
+use FindBin;
 
 use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
                   pcap_get_selectable_fd pcap_setnonblock );
@@ -39,18 +40,18 @@ use IO::Socket;
 
 use M6::ARP::Sponge;
 use M6::ARP::Log        qw( :standard );
+use M6::ARP::Event      qw( :standard );
 use M6::ARP::Const      qw( :all );
 use M6::ARP::Util       qw( :all );
 use M6::ARP::Control::Server;
 
-###############################################################################
-$0 =~ s|.*/||g;
 ###############################################################################
 
 use constant SYSLOG_IDENT => '@NAME@';
 
 my ($REVISION)           = '$Revision$' =~ /^.Revision: (\d+) \$$/;
 
+my $PROG                 = $FindBin::Script;
 my $VERSION              = '@RELEASE@'."($REVISION)";
 my $NULL_IP              = ip2hex('0.0.0.0');
 my $NULL_MAC             = mac2hex('0:0:0:0:0:0');
@@ -83,7 +84,7 @@ my $DFL_SOCK_PERMS       = '@DFL_SOCK_PERMS@';
 my $MAX_PKT_PER_CYCLE    = 100;
 
 $::USAGE=<<EOF;
-Usage: $0 [options] IPADDR/PREFIXLEN dev IFNAME
+Usage: $PROG [options] IPADDR/PREFIXLEN dev IFNAME
 
 Options:
   --age=secs              - time in seconds until we consider an ARP entry
@@ -119,7 +120,7 @@ Options:
   --verbose[=n]           - be verbose; print information on STDOUT;
                             turns off syslog
 
-See also "perldoc $0".
+See also "perldoc $PROG".
 EOF
 
 ###############################################################################
@@ -160,32 +161,32 @@ sub Main {
     Getopt::Long::Configure('no_ignore_case');
 
     GetOptions(
-      'age=i'               => \(my $age              = $DFL_ARP_AGE),
-      'arp-update-method=s' => \(my $arp_update_methods),
-      'control=s'           => \$control_socket,
-      'daemon!'             => \(my $daemon),
-      'dummy!'              => \(my $dummy),
-      'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
-      'gratuitous!'         => \(my $gratuitous),
-      'help|?'              => sub { print $::USAGE; exit 0 },
-      'init=s'              => \(my $init_arg         = $DFL_INIT),
-      'learning=i'          => \(my $learning         = $DFL_LEARN),
-      'loglevel=s'          => \(my $loglevel         = $DFL_LOGLEVEL),
-      'man'                 => \(my $man),
-      'pending=i'           => \(my $pending          = $DFL_PENDING),
-      'permissions=s'       => \(my $permissions      = $DFL_SOCK_PERMS),
-      'pidfile=s'           => \$pidfile,
-      'proberate=i'         => \(my $proberate        = $DFL_PROBERATE),
-      'queuedepth=i'        => \(my $queuedepth       = $DFL_QUEUEDEPTH),
-      'rate=f'              => \(my $rate             = $DFL_RATE),
-      'rundir=s'            => \(my $rundir),
-      'sponge-network'      => \(my $sponge_net),
-      'statusfile=s'        => \(my $statusfile),
-      'sweep=s'             => \(my $sweep_sec),
-      'sweep-at-start!'     => \(my $sweep_at_start),
-      'sweep-skip-alive'    => \(my $sweep_skip_alive),
-      'verbose|v+'          => \(my $verbose),
-      'version|V'           => sub { print "$0 $VERSION\n"; exit 0 },
+        'age=i'               => \(my $age              = $DFL_ARP_AGE),
+        'arp-update-method=s' => \(my $arp_update_methods),
+        'control=s'           => \$control_socket,
+        'daemon!'             => \(my $daemon),
+        'dummy!'              => \(my $dummy),
+        'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
+        'gratuitous!'         => \(my $gratuitous),
+        'help|?'              => sub { print $::USAGE; exit 0 },
+        'init=s'              => \(my $init_arg         = $DFL_INIT),
+        'learning=i'          => \(my $learning         = $DFL_LEARN),
+        'loglevel=s'          => \(my $loglevel         = $DFL_LOGLEVEL),
+        'man'                 => \(my $man),
+        'pending=i'           => \(my $pending          = $DFL_PENDING),
+        'permissions=s'       => \(my $permissions      = $DFL_SOCK_PERMS),
+        'pidfile=s'           => \$pidfile,
+        'proberate=i'         => \(my $proberate        = $DFL_PROBERATE),
+        'queuedepth=i'        => \(my $queuedepth       = $DFL_QUEUEDEPTH),
+        'rate=f'              => \(my $rate             = $DFL_RATE),
+        'rundir=s'            => \(my $rundir),
+        'sponge-network'      => \(my $sponge_net),
+        'statusfile=s'        => \(my $statusfile),
+        'sweep=s'             => \(my $sweep_sec),
+        'sweep-at-start!'     => \(my $sweep_at_start),
+        'sweep-skip-alive'    => \(my $sweep_skip_alive),
+        'verbose|v+'          => \(my $verbose),
+        'version|V'           => sub { print "$PROG $VERSION\n"; exit 0 },
     ) or pod2usage(2);
 
     pod2usage(-exitstatus => 0, -verbose => 2) if $man;
@@ -223,7 +224,7 @@ sub Main {
     # Create the "var" directory for the sponge.
     mkpath($rundir, { mode => 0775, error => \my $err });
     if (@$err) {
-        my $msg = "$0: errors creating $rundir\n";
+        my $msg = "$PROG: errors creating $rundir\n";
         for my $diag (@$err) {
             my ($file, $str) = %$diag;
             $msg .= "$file: " if length $file;
@@ -333,7 +334,7 @@ sub Main {
 
     ####################################################################
 
-    log_notice("Initializing $0 on [%s, %s, %s]",
+    event_notice(EVENT_STATE, "Initializing $PROG on [%s, %s, %s]",
                     $sponge->device, $sponge->my_ip_s, $sponge->my_mac_s);
 
     # If we have to run in daemon mode, do so.
@@ -358,11 +359,11 @@ sub Main {
 }
 
 sub create_control_socket {
-    my ($sponge, $control_socket, $permissions) = @_;
+    my ($sponge, $ctl_socket, $permissions) = @_;
 
-    if (-e $control_socket) {
-        if (!unlink $control_socket) {
-            log_fatal("$0: cannot delete stale $control_socket: $!\n");
+    if (-e $ctl_socket) {
+        if (!unlink $ctl_socket) {
+            log_fatal("$PROG cannot delete stale $ctl_socket $!\n");
         }
     }
 
@@ -378,18 +379,18 @@ sub create_control_socket {
     my $sock_perms = oct($perms[2] // $dfl_perms[2]);
 
     my $sock_uid = getpwnam($sock_owner)
-                        // log_fatal qq{$0: unknown username "$sock_owner"\n};
+        // log_fatal qq{$PROG: unknown username "$sock_owner"\n};
 
     my $sock_gid = getgrnam($sock_group)
-                        // log_fatal qq{$0: unknown group "$sock_group"\n};
+        // log_fatal qq{$PROG: unknown group "$sock_group"\n};
 
     chown($sock_uid, $sock_gid, $control_socket)
         or log_err(qq{chown %s:%s %s: %s},
-                              $sock_owner, $sock_group, $control_socket, $!);
+                    $sock_owner, $sock_group, $control_socket, $!);
 
     chmod($sock_perms, $control_socket)
         or log_err(qq{chmod %04o %s: %s},
-                              $sock_perms, $control_socket, $!);
+                    $sock_perms, $control_socket, $!);
 
     return $control_fh;
 }
@@ -441,7 +442,7 @@ sub handle_input {
         if ($err_count > 1 && $now > $last_err + 15) {
             # We've seen multiple select errors in the last 15 seconds.
             # Only the first was logged. Log the number of repetitions.
-            log_err("select error repeated %d time(s)", $err_count-1);
+            event_err(EVENT_IO, "select error repeated %d time(s)", $err_count-1);
             $err_count = 0;
         }
 
@@ -450,7 +451,7 @@ sub handle_input {
             if ($! == EINTR) { # Ignore EINTR errors; they are expected.
                 $err_count++;
                 if ($err_count == 1) { # Suppress multiple errors.
-                    log_err("error in select(): %s", $!);
+                    event_err(EVENT_IO, "error in select(): %s", $!);
                     $last_err = $now;
                 }
             }
@@ -468,7 +469,8 @@ sub handle_input {
                 if (my $client = $control_fh->accept()) {
                     $select->add($client);
                     add_notify($client);
-                    log_info("[client %d] connected", $client->fileno);
+                    event_info(EVENT_CTL,
+                        "[client %d] connected", $client->fileno);
                 }
                 else {
                     log_fatal(
@@ -480,7 +482,8 @@ sub handle_input {
             elsif (!$ready_fh->handle_command($sponge)) {
                 $select->remove($ready_fh);
                 remove_notify($ready_fh);
-                log_info("[client %d] disconnected", $ready_fh->fileno);
+                event_info(EVENT_CTL,
+                    "[client %d] disconnected", $ready_fh->fileno);
                 $ready_fh->close;
             }
         }
@@ -657,7 +660,8 @@ sub reset_timer {
         # but it's better than running timer triggers in tight
         # circles.
         my $caller = (caller(1))[3];
-        log_info("$caller - timer event LAG: %s; %s",
+        event_warning(EVENT_STATE,
+            "$caller - timer event LAG: %s; %s",
             strftime("planned=%H:%M:%S",
                     localtime($next_alarm+$timer_cycle)),
             strftime("adjusted=%H:%M:%S",
@@ -684,7 +688,7 @@ sub do_timer($) {
         do_learn($sponge);
         $sponge->user('learning', $learning-1);
         if ($learning-1 == 0) {
-            log_notice("exiting learning state");
+            event_notice(EVENT_STATE, "exiting learning state");
         }
     }
     else {
@@ -707,7 +711,7 @@ sub do_timer($) {
             $n++;
         }
         if ($n > 1 || log_is_verbose() > 1) {
-            log_notice("%d pending IPs probed", $n);
+            event_notice(EVENT_STATE, "%d pending IPs probed", $n);
         }
 
         my $next_sweep = $sponge->user('next_sweep');
@@ -769,7 +773,7 @@ sub do_sweep {
     my $skip_alive = $opts{'sweep_skip_alive'}
                       // $sponge->user('sweep_skip_alive');
 
-    log_notice("sweeping for quiet entries on %s/%d",
+    event_notice(EVENT_STATE, "sweeping for quiet entries on %s/%d",
                         hex2ip($sponge->network), $sponge->prefixlen);
     
     my $lo = $sponge->user('net_lo');
@@ -811,7 +815,7 @@ sub do_sweep {
         }
     }
     log_is_verbose($verbose);
-    log_notice("probed $nprobe IP address(es)");
+    event_notice(EVENT_STATE, "probed $nprobe IP address(es)");
 }
 
 ###############################################################################
@@ -830,7 +834,7 @@ sub update_state {
         $sponge->set_alive($src_ip, $src_mac);
     }
     else {
-        log_warning(
+        event_warning(EVENT_STATIC,
             "traffic from STATIC sponged IP: src.mac=%s src.ip=%s",
             hex2mac($src_mac), hex2ip($src_ip),
         );
@@ -915,7 +919,7 @@ sub process_pkt {
 
     if ( $arp_obj->{sha} ne $src_mac ) {
         # Interesting ...
-        log_warning(
+        event_warning(EVENT_SPOOF,
             "ARP spoofing: src.mac=%s arp.sha=%s arp.spa=%s"
             ." arp.tpa=%s dst.mac=%s",
             hex2mac($src_mac), hex2mac($arp_obj->{sha}),
@@ -927,11 +931,12 @@ sub process_pkt {
     if ( ! $sponge->is_my_network($dst_ip) ) {
         # We only store/sponge ARPs for our "local" IP addresses.
 
-        log_warning("misplaced ARP: src.mac=%s arp.spa=%s arp.tpa=%s",
-                        hex2mac($src_mac),
-                        hex2ip($src_ip),
-                        hex2ip($dst_ip),
-                    );
+        event_warning(EVENT_ALIEN,
+            "misplaced ARP: src.mac=%s arp.spa=%s arp.tpa=%s",
+            hex2mac($src_mac),
+            hex2ip($src_ip),
+            hex2ip($dst_ip),
+        );
 
         return; # b-bye...
     }
@@ -951,7 +956,7 @@ sub process_pkt {
     elsif ($src_ip eq $NULL_IP) {
         # DHCP duplicate IP detection.
         # See RFC 2131, p38, bottom.
-        log_notice(
+        event_notice(EVENT_SPONGE,
                 "DHCP duplicate IP detection: src.mac=%s arp.tpa=%s\n",
                 hex2mac($src_mac), hex2ip($dst_ip)
             );
@@ -996,7 +1001,7 @@ sub process_pkt {
                     my $r1 = $sponge->queue->rate($dst_ip);
                     my $d2 = $sponge->queue->reduce($dst_ip, $fprate);
                     my $r2 = $sponge->queue->rate($dst_ip);
-                    log_notice(
+                    event_notice(EVENT_SPONGE,
                             "%s queue reduced: [depth,rate] = "
                             ."[%d,%0.1f] -> [%d,%0.1f]",
                             hex2ip($dst_ip), $d1, $r1, $d2, $r2
@@ -1039,11 +1044,11 @@ sub start_daemon($$) {
         open(PID, "<$pidfile"); chomp(my $pid = <PID>); close PID;
         if ($pid) {
             chomp(my $proc = `ps h -p $pid -o args`);
-            if ($proc =~ /$0/) {
+            if ($proc =~ /$PROG/) {
                 log_fatal("already running (pid = $pid)\n");
             }
         }
-        print STDERR "$0: WARNING: removing stale PID file $pidfile\n";
+        print STDERR "$PROG: WARNING: removing stale PID file $pidfile\n";
         log_warning("removing stale PID file %s", $pidfile);
         unlink $pidfile;
     }
@@ -1051,7 +1056,7 @@ sub start_daemon($$) {
     if (my $pid = fork) {
         # Parent process. We are going to exit, letting our child
         # roam free.
-        log_verbose(1, "$0: going into the background; pid=$pid\n");
+        log_verbose(1, "$PROG: going into the background; pid=$pid\n");
         exit(0);
     }
 
@@ -1097,28 +1102,28 @@ sub process_signal {
 
 # do_status($signal, $sponge)
 #
-#   Write status information to $filename.
+#   Write status information to the 'statusfile'.
 #
 sub do_status {
     my $signal = shift;
     my $sponge = shift;
-    my $filename = $sponge->user('statusfile');
+    my $fname = $sponge->user('statusfile');
     my $start_time = $sponge->user('start_time');
 
-    if (!length($filename)) {
-        $filename = '/dev/null';
+    if (!length($fname)) {
+        $fname = '/dev/null';
     }
 
-    log_info("SIG%s; dumping status to %s", $signal, $filename);
+    event_info(EVENT_STATE, "SIG%s; dumping status to %s", $signal, $fname);
 
     # Open the status file as read/write, non-blocking,
     # and don't buffer anything. This is useful if the destination
     # is a FIFO and there is not always a reader.
 
-    my $fh = new IO::File($filename, O_RDWR|O_CREAT);
+    my $fh = new IO::File($fname, O_RDWR|O_CREAT);
 
     unless ($fh) {
-        log_err("cannot write status to %s: %s", $filename, $!);
+        event_err(EVENT_IO, "cannot write status to %s: %s", $fname, $!);
         return;
     }
 
@@ -1140,8 +1145,9 @@ sub do_status {
                         $nalive, $ndead, $npending, $nmac));
     ##########################################################################
     $fh->close;
-    log_notice("status dumped; alive=%d dead=%d pending=%d ARP_entries=%d",
-                        $nalive, $ndead, $npending, $nmac);
+    event_notice(EVENT_STATE,
+            "status dumped; alive=%d dead=%d pending=%d ARP_entries=%d",
+            $nalive, $ndead, $npending, $nmac);
 }
 
 Main;

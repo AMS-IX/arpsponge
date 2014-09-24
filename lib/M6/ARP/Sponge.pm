@@ -33,6 +33,7 @@ use strict;
 use base qw( M6::ARP::Base );
 
 use M6::ARP::Queue;
+use M6::ARP::Event;
 use M6::ARP::Log;
 use M6::ARP::Const      qw( :all );
 use M6::ARP::Util       qw( :all );
@@ -293,69 +294,68 @@ sub get_ip {
 }
 
 ###############################################################################
-# $bool = $sponge->is_my_network($target_ip)
+# $bool = $sponge->is_my_network($ip)
 #
-#   Returns whether or not $target_ip is in the monitored
+#   Returns whether or not $ip is in the monitored
 #   network range(s).
 #
 ###############################################################################
 sub is_my_network {
-    my ($self, $target_ip) = @_;
-    return hex_addr_in_net($target_ip, $self->network, $self->prefixlen);
+    my ($self, $ip) = @_;
+    return hex_addr_in_net($ip, $self->network, $self->prefixlen);
 }
 
 sub is_my_network_s {
-    my ($self, $target_ip) = @_;
-    return hex_addr_in_net(ip2hex($target_ip),
-                           $self->network, $self->prefixlen);
+    my ($self, $ip) = @_;
+    return hex_addr_in_net(ip2hex($ip), $self->network, $self->prefixlen);
 }
 
 
 ###############################################################################
-# $state = $sponge->set_pending($target_ip, $n);
+# $state = $sponge->set_pending($ip, $n);
 #
-#   Set $target_ip's state to PENDING "$n". Returns new state.
+#   Set $ip's state to PENDING "$n". Returns new state.
 #
 ###############################################################################
 sub set_pending {
-    my ($self, $target_ip, $n) = @_;
-    my $state = $self->set_state($target_ip, PENDING($n));
-    log_notice("pending: ip=%s state=%d", hex2ip($target_ip), $n);
+    my ($self, $ip, $n) = @_;
+    my $state = $self->set_state($ip, PENDING($n));
+    event_notice(EVENT_SPONGE, "pending: ip=%s state=%d", hex2ip($ip), $n);
     return $state;
 }
 
 ###############################################################################
-# $state = $sponge->incr_pending($target_ip);
+# $state = $sponge->incr_pending($ip);
 #
-#   Increment $target_ip's PENDING state. Returns new state.
+#   Increment $ip's PENDING state. Returns new state.
 #
 ###############################################################################
 sub incr_pending {
-    my ($self, $target_ip) = @_;
-    my $pending = $self->get_state($target_ip) - PENDING(0);
-    return $self->set_pending($target_ip, $pending+1);
+    my ($self, $ip) = @_;
+    my $pending = $self->get_state($ip) - PENDING(0);
+    return $self->set_pending($ip, $pending+1);
 }
 
 ###############################################################################
-# $sponge->send_probe($target_ip);
+# $sponge->send_probe($ip);
 #
-#   Send a (probe) ARP "WHO HAS $target_ip". This prevents us from
+#   Send a (probe) ARP "WHO HAS $ip". This prevents us from
 #   erroneously sponging when there's a cretin sending ARP floods.
 #
 ###############################################################################
 sub send_probe {
-    my ($self, $target_ip) = @_;
+    my ($self, $ip) = @_;
 
     if (log_is_verbose >=2) {
         log_sverbose(2,
-            "Probing [dev=%s]: %s\n", $self->phys_device, hex2ip($target_ip)
+            "Probing [dev=%s]: %s\n", $self->phys_device, hex2ip($ip)
         );
     }
 
-    $self->set_state_atime($target_ip, time);
+    $self->set_state_atime($ip, time);
 
     $self->send_arp( tha => $ETH_ADDR_BROADCAST,
-                     tpa => $target_ip,
+                     tpa => $ip,
                      opcode => $ARP_OPCODE_REQUEST );
     return;
 }
@@ -417,7 +417,7 @@ sub send_arp {
                 });
 
     if (Net::Pcap::sendpacket($pcap_h, $pkt) < 0) {
-        log_err("ERROR sending ARP packet: %s", $!);
+        event_err(EVENT_IO, "ERROR sending ARP packet: %s", $!);
     }
     return;
 }
@@ -516,16 +516,17 @@ sub send_reply {
 }
 
 ###############################################################################
-# $sponge->set_dead($target_ip);
+# $sponge->set_dead($ip);
 #
-#    Set $target_ip's state to DEAD (i.e. "sponged").
+#    Set $ip's state to DEAD (i.e. "sponged").
 #
 ###############################################################################
 sub set_dead {
     my ($self, $ip) = @_;
     my $rate = $self->queue->rate($ip) // 0.0;
 
-    log_notice("sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
+    event_notice(EVENT_SPONGE,  
+        "sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
 
     $self->gratuitous_arp($ip) if $self->gratuitous;
     $self->set_state($ip, DEAD);
@@ -534,9 +535,9 @@ sub set_dead {
 }
 
 ###############################################################################
-# set_alive($data, $target_ip, $target_mac);
+# set_alive($data, $ip, $target_mac);
 #
-#   Unsponge the $target_ip, which is now seen from $target_mac.
+#   Unsponge the $ip, which is now seen from $target_mac.
 #   Update ARP cache and print appropriate notifications.
 #
 ###############################################################################
@@ -550,14 +551,16 @@ sub set_alive {
     $mac //= $arp[0] // $ETH_ADDR_NONE;
 
     if ($self->get_state($ip) == DEAD) {
-        log_notice("unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+        event_notice(EVENT_SPONGE,
+            "unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
     }
     elsif ($self->get_state($ip) >= PENDING(0)) {
-        log_notice("clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+        event_notice(EVENT_SPONGE,
+            "clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
     }
     elsif (log_is_verbose && $self->queue->depth($ip) > 0) {
         log_sverbose(1,
-                "clearing: ip=%s mac=%s\n", hex2ip($ip), hex2mac($mac));
+            "clearing: ip=%s mac=%s\n", hex2ip($ip), hex2mac($mac));
     }
 
     $self->queue->clear($ip);
