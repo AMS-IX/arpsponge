@@ -18,6 +18,7 @@ INSTALLFILES		=	\
 		$(INSTALLDIR)/Base.pm \
 		$(INSTALLDIR)/Const.pm \
 		$(INSTALLDIR)/Control.pm \
+		$(INSTALLDIR)/Event.pm \
 		$(INSTALLDIR)/Log.pm \
 		$(INSTALLDIR)/NetPacket.pm \
 		$(INSTALLDIR)/Queue.pm \
