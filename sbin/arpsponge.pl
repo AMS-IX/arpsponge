@@ -193,6 +193,14 @@ sub Main {
 
     log_is_verbose($verbose);
 
+    if (defined(my $level = is_valid_log_level($loglevel))) {
+        log_level($level);
+    }
+    else {
+        log_fatal("Bad value '%s' for --loglevel", $loglevel);
+    }
+
+
     my $sweep_threshold  = undef;
     if (length($sweep_sec)) {
         ($sweep_sec, $sweep_threshold) = $sweep_sec =~ m|^(\d+)/(\d+)$|
@@ -256,8 +264,6 @@ sub Main {
         );
 
     $sponge->is_dummy($dummy);
-
-    log_level($loglevel);
 
     $sponge->user('version', $VERSION);
     $sponge->user('net_lo', $network->first->numeric);
