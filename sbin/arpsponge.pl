@@ -57,6 +57,7 @@ my $NULL_IP              = ip2hex('0.0.0.0');
 my $NULL_MAC             = mac2hex('0:0:0:0:0:0');
 
 my $SPONGE_VAR           = '@SPONGE_VAR@';
+my $DFL_LOGMASK          = 'all';
 my $DFL_LOGLEVEL         = '@DFL_LOGLEVEL@';
 my $DFL_RATE             = '@DFL_RATE@';
 my $DFL_ARP_AGE          = '@DFL_ARP_AGE@';
@@ -100,6 +101,7 @@ Options:
   --init=state            - how to initialize (default: $DFL_INIT)
   --learning=secs         - number of seconds to spend in LEARN state
   --loglevel=level        - syslog logging level ("$DFL_LOGLEVEL")
+  --logmask=mask          - syslog event filter ("$DFL_LOGMASK")
   --pending=n             - number of seconds we send ARP queries before
                             sponging ($DFL_PENDING)
   --permissions=u:g:m     - permissions for the control socket
@@ -172,6 +174,7 @@ sub Main {
         'init=s'              => \(my $init_arg         = $DFL_INIT),
         'learning=i'          => \(my $learning         = $DFL_LEARN),
         'loglevel=s'          => \(my $loglevel         = $DFL_LOGLEVEL),
+        'logmask=s'           => \(my $logmask          = $DFL_LOGMASK),
         'man'                 => \(my $man),
         'pending=i'           => \(my $pending          = $DFL_PENDING),
         'permissions=s'       => \(my $permissions      = $DFL_SOCK_PERMS),
@@ -198,6 +201,12 @@ sub Main {
     }
     else {
         log_fatal("Bad value '%s' for --loglevel", $loglevel);
+    }
+    if (defined(my $mask = parse_event_mask($logmask, -err => \(my $err)))) {
+        event_mask($mask);
+    }
+    else {
+        log_fatal("Bad value '%s' for --logmask: %s", $logmask, $err);
     }
 
 
@@ -1184,6 +1193,7 @@ I<Options>:
     --init={ALIVE|DEAD|PENDING|NONE}
     --learning=secs
     --loglevel=level
+    --logmask=mask
     --pending=n
     --permissions=owner:group:mode
     --pidfile=pidfile
@@ -1472,6 +1482,69 @@ A value of zero (0) disables the initial learning state.
 X<--loglevel>
 
 Logging level for L<syslogd(8)|syslogd> logging. Default is C<info>.
+
+=item B<--logmask>=[B<!>|B<+>]I<event>,...
+
+Specify which event types should be logged. Some events can occur
+very often and it can be useful to filter them out to prevent filling
+the logs. The default value is C<all>, meaning that all event classes
+are logged by default.
+
+The following event classes exist:
+
+=over
+
+=item C<io>
+
+I/O related events (broken pipes, disconnections, read failures, etc.).
+
+=item C<alien>
+
+The "misplaced ARP" events. When multiple subnets are active on a single
+LAN, it may be prudent to filter this one out.
+
+=item C<spoof>
+
+Messages about "spoofed" ARP packets, i.e. where the Ethernet source
+is different than the ARP header's "source hardware address".
+
+=item C<static>
+
+Warnings about traffic coming from a statically sponged address.
+
+=item C<sponge>
+
+Sponge events (sponge/unsponge/pending/clear, etc.)
+
+=item C<ctl>
+
+Control socket events (connect/disconnect, commands).
+
+=item C<state>
+
+Daemon state.
+
+=back
+
+The classes can be specified as a comma-separated list, e.g.:
+
+   io,alien,spoof
+
+If a class starts with a C<+>, it is added to the current mask, if
+it starts with a C<!>, it is subtracted from the current mask.
+
+If the first class in the list does not start with either a C<+> or C<!>, then
+the mask is reset to the class, i.e.:
+
+   io,+alien
+
+Will set the mask to C<io> and C<alien> only, while:
+
+   +io,+alien
+
+Will add C<io> and C<alien> to the current mask.
+
+Default value is C<all>.
 
 =item B<--pending>=I<n>
 X<--pending>

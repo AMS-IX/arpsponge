@@ -2431,6 +2431,69 @@ When the C<log_level> is set to I<level>, all messages of level I<level> and
 higher importance are logged, so C<notice> will log C<warning>, C<err>, etc.
 but not C<info> or C<debug>.
 
+=item B<set log_mask> [B<!>|B<+>]I<event>,...
+
+Specify which event types should be logged. Some events can occur
+very often and it can be useful to filter them out to prevent filling
+the logs. The default value is C<all>, meaning that all event classes
+are logged by default.
+
+The following event classes exist:
+
+=over
+
+=item C<io>
+
+I/O related events (broken pipes, disconnections, read failures, etc.).
+
+=item C<alien>
+
+The "misplaced ARP" events. When multiple subnets are active on a single
+LAN, it may be prudent to filter this one out.
+
+=item C<spoof>
+
+Messages about "spoofed" ARP packets, i.e. where the Ethernet source
+is different than the ARP header's "source hardware address".
+
+=item C<static>
+
+Warnings about traffic coming from a statically sponged address.
+
+=item C<sponge>
+
+Sponge events (sponge/unsponge/pending/clear, etc.)
+
+=item C<ctl>
+
+Control socket events (connect/disconnect, commands).
+
+=item C<state>
+
+Daemon state.
+
+=back
+
+The classes can be specified as a comma-separated list, e.g.:
+
+   io,alien,spoof
+
+If a class starts with a C<+>, it is added to the current mask, if
+it starts with a C<!>, it is subtracted from the current mask.
+
+If the first class in the list does not start with either a C<+> or C<!>, then
+the mask is reset to the class, i.e.:
+
+   io,+alien
+
+Will set the mask to C<io> and C<alien> only, while:
+
+   +io,+alien
+
+Will add C<io> and C<alien> to the current mask.
+
+Default value is C<all>.
+
 =item B<set> {B<max_pending>|B<queuedepth>} I<num>
 X<set max_pending>
 X<set queuedepth>
