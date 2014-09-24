@@ -76,10 +76,13 @@ BEGIN {
 our $FACILITY  = 'user';
 our $LOGOPT    = 'pid';
 
-our $Default_Level  = LOG_NOTICE;
+#############################################################################
 our $Debug          = 0;
 our $Verbose        = 0;
 our $Syslog_Ident   = $0;
+
+#############################################################################
+our $Default_Level  = LOG_NOTICE;
 
 our %STR_TO_LOGLEVEL = (
         'emerg'   => LOG_EMERG,
@@ -92,11 +95,11 @@ our %STR_TO_LOGLEVEL = (
         'debug'   => LOG_DEBUG,
     );
 
-our %LOGLEVEL_TO_STR = (
-        map { ($STR_TO_LOGLEVEL{$_} => $_) } keys %STR_TO_LOGLEVEL,
-    );
+our %LOGLEVEL_TO_STR = %STR_TO_LOGLEVEL;
 
-my $Log_Level       = LOG_NOTICE;
+#############################################################################
+
+my $Log_Level      = LOG_NOTICE;
 my @Log_Buffer      = ();
 my $Log_Buffer_Size = 256;
 my $Notify;
