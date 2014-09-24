@@ -1,3 +1,54 @@
+arpsponge (3.17) unstable; urgency=low
+
+  [2014-09-23] - steven (r317-r319)
+    => lib/M6/ReadLine.pm:
+        * Ignore SIGPIPE when piping to the $PAGER.
+    => lib/M6/ARP/Log.pm:
+        * Export log_debug() as well.
+    => sbin/arpsponge.pl:
+        * Fix setting of log_level on startup.
+
+  [2014-09-24] - steven (r320-r333)
+    => lib/M6/ARP/Const.pm:
+        * Fix quoting in diagnostic message in parse_update_flags.
+    => lib/M6/ARP/Log.pm:
+        * Re-order some variable declarations. Use "reverse" to turn the
+          int/string hash on its head.
+    => sbin/arpsponge.pl:
+        * The "M6::ARP::Sponge" object has no log_*() methods, so don't
+          try to use them.
+    => lib/M6/ARP/Log.pm:
+        * Export print_log_level() as well.
+        * Forgot the "reverse" the assignment to %STR_TO_LOGLEVEL.
+    => lib/M6/ARP/Event.pm:
+        * Add M6::Log::Event for event specific logging.
+    => lib/M6/ARP/Control/Server.pm, lib/M6/ARP/Sponge.pm,
+    => sbin/arpsponge.pl, sbin/asctl.pl:
+        * Use the M6::ARP::Event module for event specific
+          logging/filtering. Add asctl support for event filtering.
+    => lib/M6/ARP/Control/Server.pm:
+        * Use M6::ARP::Event.
+    => lib/M6/ARP/Makefile:
+        * Add Event.pm to Makefile.
+    => lib/M6/ARP/Event.pm, lib/M6/ARP/Log.pm:
+        * Remove prototypes where possible. Fix other prototypes to fold
+          $fmt in @args.
+    => sbin/arpsponge.pl:
+        * Parse the loglevel argument before trying to set it...
+    => sbin/asctl.pl:
+        * Parse set_log_mask arguments based on the current log_mask, so
+          we can do "set log_mask !alien" to subtract only "alien" from
+          the current mask or "set log_mask +sponge" to add "sponge" to
+          the current mask.
+    => lib/M6/ARP/Event.pm:
+        * When using the EVENT macros as keys in a hash, make sure to
+          tack on "()", lest Perl will turn them into strings. Parse
+          event mask against current setting.
+    => sbin/arpsponge.pl, sbin/asctl.pl:
+        * Add log_mask to POD info.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed, 24 Sep 2014 18:23:22 +0200
+
 arpsponge (3.16) unstable; urgency=low
 
   [2014-07-21] - steven (r315)
