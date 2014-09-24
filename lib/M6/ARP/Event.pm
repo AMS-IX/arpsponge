@@ -91,15 +91,15 @@ our %EVENT_MASK_TO_STR = (
 
 our %STR_TO_EVENT_MASK = (
     reverse(%EVENT_MASK_TO_STR),
-    'all'  => EVENT_ALL,
-    'none' => EVENT_NONE,
+    'all'  => EVENT_ALL(),
+    'none' => EVENT_NONE(),
 );
 
-our $Default_Mask = EVENT_ALL;
+our $Default_Mask = EVENT_ALL();
 
 #############################################################################
 
-my $Event_Mask    = EVENT_ALL;
+my $Event_Mask    = EVENT_ALL();
 
 sub __event_getset {
     my $ref = shift;
@@ -190,7 +190,7 @@ X<parse_event_mask>
 
 Check whether I<ARG> represents a valid list of event masks. Returns an
 integer representing the mask on success, C<undef> on error. Note that an
-undefined I<ARG> is still valid, and represents C<EVENT_NONE>.
+undefined I<ARG> is still valid, and represents the current mask.
 
 If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
 contain a diagnostic.
@@ -202,20 +202,32 @@ sub parse_event_mask {
     my $err_s;
     my %opts = (-err => \$err_s, @_);
 
-    my $mask = EVENT_NONE;
-    return $mask if ! defined $arg;
+    return event_mask() if ! defined $arg;
+    my $mask;
     for my $event (split(/\s*,\s*/, lc $arg)) {
         my $negate = 0;
-        if ($event =~ s/^\!//) {
-            $negate = 1;
+        my $cumulative = 0;
+
+        if ($event =~ s/^([\!\+])//) {
+            $mask //= event_mask();
+            $negate = 1 if $1 eq '!';
         }
+        else {
+            $mask //= EVENT_NONE;
+        }
+
         if ($event eq 'none') {
             $event = 'all';
             $negate = !$negate;
         }
+
         if (exists $STR_TO_EVENT_MASK{$event}) {
-            $mask = $negate ? $mask & ~ $STR_TO_EVENT_MASK{$event}
-                            : $mask | $STR_TO_EVENT_MASK{$event};
+            if ($negate) {
+                $mask &= ~ int($STR_TO_EVENT_MASK{$event});
+            }
+            else {
+                $mask |= $STR_TO_EVENT_MASK{$event};
+            }
         }
         else {
             ${$opts{-err}} = qq/"$event" is not a valid event name/;
