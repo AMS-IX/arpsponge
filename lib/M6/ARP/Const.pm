@@ -167,7 +167,7 @@ sub parse_update_flags {
             }
         }
         else {
-            ${$opts{-err}} = q/"$method" is not a valid ARP update flag/;
+            ${$opts{-err}} = qq/"$method" is not a valid ARP update flag/;
             return;
         }
     }
