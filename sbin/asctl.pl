@@ -1368,11 +1368,15 @@ sub do_set_log_level {
 sub do_set_log_mask {
     my ($conn, $parsed, $args) = @_;
 
+    event_mask( get_log_mask($conn) );
+
     do_set_generic(-conn    => $conn,
                    -name    => 'log_mask',
                    -val     => $args->{'mask'},
                    -options => $args->{-options},
                    -type    => 'log-mask');
+
+    event_mask( get_log_mask($conn) );
 }
 
 # cmd: set max_pending
@@ -1655,6 +1659,15 @@ sub get_arp_update_flags {
     return $output->[0]->{arp_update_flags};
 }
 
+# $log_mask_integer = get_log_mask();
+sub get_log_mask {
+    my $conn = shift;
+    my $raw = check_send_command($conn, 'get_param') or return;
+
+    my ($opts, $reply, $output, $tag) = parse_server_reply($raw, {raw=>1});
+    return $output->[0]->{log_mask};
+}
+
 sub do_param {
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
@@ -1693,7 +1706,7 @@ sub do_param {
         sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
         sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
         sprintf("$tag= %s\n", 'log_level', $$info{log_level}),
-        #sprintf("$tag= %s\n", 'log_mask', $$info{log_mask}),
+        sprintf("$tag= %s\n", 'log_mask', $$info{log_mask}),
     );
 }
 
