@@ -30,15 +30,18 @@ use M6::ARP::Log        qw( :standard :macros );
 BEGIN {
     our $VERSION   = 1.00;
 
-    our @func = qw(
-        event_log
-        event_mask
-        event_mask_split
-        event_mask_to_str
-        event_names event_values
-        is_event_mask
-        is_valid_event_mask
-        parse_event_mask
+    our @func = (qw(
+            event_log
+            event_mask
+            event_mask_split
+            event_mask_to_str
+            event_names event_values
+            is_event_mask
+            is_valid_event_mask
+            parse_event_mask
+        ),
+        map { "event_$_" }
+            qw( emerg alert crit errr warning notice info debug )
     );
 
     our @macros = qw(
@@ -77,13 +80,13 @@ use constant {
 };
 
 our %EVENT_MASK_TO_STR = (
-    EVENT_IO     => 'io',
-    EVENT_ALIEN  => 'alien',
-    EVENT_SPOOF  => 'spoof',
-    EVENT_STATIC => 'static',
-    EVENT_SPONGE => 'sponge',
-    EVENT_CTL    => 'ctl',
-    EVENT_STATE  => 'state',
+    EVENT_IO()     => 'io',
+    EVENT_ALIEN()  => 'alien',
+    EVENT_SPOOF()  => 'spoof',
+    EVENT_STATIC() => 'static',
+    EVENT_SPONGE() => 'sponge',
+    EVENT_CTL()    => 'ctl',
+    EVENT_STATE()  => 'state',
 );
 
 our %STR_TO_EVENT_MASK = (
@@ -114,14 +117,14 @@ sub event_values    { return sort keys %EVENT_MASK_TO_STR }
 sub event_mask      { return __event_getset(\$Event_Mask, @_) }
 sub is_event_mask   { return ($_[0] & $Event_Mask) != 0 }
 
-sub event_emerg($$@)   { event_log(LOG_EMERG,    @_) }
-sub event_alert($$@)   { event_log(LOG_ALERT,    @_) }
-sub event_crit($$@)    { event_log(LOG_CRIT,     @_) }
-sub event_err($$@)     { event_log(LOG_ERR,      @_) }
-sub event_warning($$@) { event_log(LOG_WARNING,  @_) }
-sub event_notice($$@)  { event_log(LOG_NOTICE,   @_) }
-sub event_info($$@)    { event_log(LOG_INFO,     @_) }
-sub event_debug($$@)   { event_log(LOG_DEBUG,    @_) }
+sub event_emerg   { event_log(LOG_EMERG,    shift, @_) }
+sub event_alert   { event_log(LOG_ALERT,    shift, @_) }
+sub event_crit    { event_log(LOG_CRIT,     shift, @_) }
+sub event_err     { event_log(LOG_ERR,      shift, @_) }
+sub event_warning { event_log(LOG_WARNING,  shift, @_) }
+sub event_notice  { event_log(LOG_NOTICE,   shift, @_) }
+sub event_info    { event_log(LOG_INFO,     shift, @_) }
+sub event_debug   { event_log(LOG_DEBUG,    shift, @_) }
 
 =item B<event_log> ( I<LOGLEVEL>, I<EVENT>, I<FMT> [, I<ARG>, ... ] )
 X<event_log>
@@ -136,7 +139,7 @@ otherwise it is discarded.
 =cut
 
 sub event_log($$@) {
-    my ($event, $level, @args) = @_;
+    my ($level, $event, @args) = @_;
 
     if ( ($event & $Event_Mask) and ($level <= log_level()) ) {
         print_log_level($level, @args);

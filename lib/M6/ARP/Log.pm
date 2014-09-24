@@ -140,14 +140,14 @@ sub clear_log_buffer {
     @Log_Buffer = ();
 }
 
-sub log_emerg($@)   { print_log_level(LOG_EMERG,    @_) }
-sub log_alert($@)   { print_log_level(LOG_ALERT,    @_) }
-sub log_crit($@)    { print_log_level(LOG_CRIT,     @_) }
-sub log_err($@)     { print_log_level(LOG_ERR,      @_) }
-sub log_warning($@) { print_log_level(LOG_WARNING,  @_) }
-sub log_notice($@)  { print_log_level(LOG_NOTICE,   @_) }
-sub log_info($@)    { print_log_level(LOG_INFO,     @_) }
-sub log_debug($@)   { print_log_level(LOG_DEBUG,    @_) }
+sub log_emerg   { print_log_level(LOG_EMERG,    @_) }
+sub log_alert   { print_log_level(LOG_ALERT,    @_) }
+sub log_crit    { print_log_level(LOG_CRIT,     @_) }
+sub log_err     { print_log_level(LOG_ERR,      @_) }
+sub log_warning { print_log_level(LOG_WARNING,  @_) }
+sub log_notice  { print_log_level(LOG_NOTICE,   @_) }
+sub log_info    { print_log_level(LOG_INFO,     @_) }
+sub log_debug   { print_log_level(LOG_DEBUG,    @_) }
 
 ###############################################################################
 # add_notify($fh);
@@ -197,7 +197,7 @@ sub print_notify($@) {
 ###############################################################################
 # print_log_level($level, $format, ...);
 ###############################################################################
-sub print_log_level($$@) {
+sub print_log_level {
     my ($level, $format, @args) = @_;
 
     return if $level > $Log_Level;
@@ -227,7 +227,7 @@ sub print_log_level($$@) {
 #   Log $format, ... to syslog. Syntax is identical to that of printf().
 #   Prints to STDOUT if verbose or dummy.
 ###############################################################################
-sub print_log($@) {
+sub print_log {
     my ($format, @args) = @_;
     print_log_level($Default_Level, $format, @args);
 }
@@ -239,7 +239,7 @@ sub print_log($@) {
 #   identical to that of printf().  Prints to STDOUT if verbose or dummy,
 #   so you may see duplicate messages in that case.
 ###############################################################################
-sub log_fatal($;@) {
+sub log_fatal {
     my ($format, @args) = @_;
     if (@args == 0) {
         @args = ($format);
@@ -256,7 +256,7 @@ sub log_fatal($;@) {
 #   Print the arguments to STDOUT if verbosity is at least $level.
 #
 ###############################################################################
-sub log_verbose($$@) {
+sub log_verbose($@) {
     my ($level, @args)  = @_;
 
     if (log_is_verbose >= $level) {
@@ -271,7 +271,7 @@ sub log_verbose($$@) {
 #   Functions like sprintf();
 #
 ###############################################################################
-sub log_sverbose($$@) {
+sub log_sverbose($@) {
     my ($level, $fmt, @args) = @_;
     if (log_is_verbose >= $level) {
         print STDOUT strftime("%Y-%m-%d %H:%M:%S ", localtime(time)),
