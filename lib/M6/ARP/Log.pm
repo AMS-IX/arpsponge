@@ -34,6 +34,7 @@ BEGIN {
     our @func = qw(
         init_log
         print_log
+        print_log_level
         log_emerg
         log_alert
         log_crit
