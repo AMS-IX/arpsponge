@@ -29,6 +29,7 @@ use M6::ARP::Const     qw( :states :flags );
 use M6::ARP::Util      qw( :all );
 use M6::ARP::NetPacket qw( :vars );
 use M6::ARP::Log       qw( :func :macros );
+use M6::ARP::Event     qw( :func :macros );
 use Time::HiRes        qw( time );
 
 use POSIX qw( strftime );
@@ -86,6 +87,16 @@ sub new {
 
     $self->blocking(0); # Make sure we never hang as a server.
     bless $self, $type;
+}
+
+sub _log_ctl {
+    my $self = shift;
+    event_notice(EVENT_CTL, @_);
+}
+
+sub _log_crit {
+    my $self = shift;
+    event_crit(EVENT_CTL, @_);
 }
 
 # my $conn = $obj->accept();
@@ -160,13 +171,14 @@ sub handle_command {
 
     my $sub_name = $Command_Dispatch{lc $cmd};
     if (!$sub_name) {
-        log_notice("[client %d] unknown command <%s>", $self->fileno, $cmd);
+        $self->_log_ctl(
+            "[client %d] unknown command <%s>", $self->fileno, $cmd);
         $self->send_error(qq/unknown command "$cmd"/);
         return; # Signal caller to disconnect misbehaving client.
     }
     elsif (!$self->can($sub_name)) {
         # We forgot to implement something.
-        log_crit("FIXME: $cmd -> $sub_name not implemented!");
+        $self->_log_crit("FIXME: $cmd -> $sub_name not implemented!");
         return $self->send_error("FIXME: $cmd not implemented!");
     }
     my $retval = eval '$self->'.$sub_name.'($sponge, $cmd, @args)';
@@ -372,7 +384,7 @@ sub _cmd_clear_ip_all {
         return $self->send_error("$cmd");
     }
 
-    log_notice("[client %d] %s", $self->fileno, $cmd);
+    $self->_log_ctl("[client %d] %s", $self->fileno, $cmd);
     $sponge->init_all_state();
     return $self->send_ok();
 }
@@ -390,7 +402,8 @@ sub _cmd_clear_ip {
     }
     $sponge->set_state($ip, undef);
     $sponge->arp_table($ip, undef);
-    log_notice("[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
+    $self->_log_ctl(
+        "[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
     return $self->send_ok();
 }
 
@@ -405,8 +418,10 @@ sub _cmd_set_pending {
     if ( ! $sponge->is_my_network($ip) ) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
-    log_notice("[client %d] %s %s %d", $self->fileno,
-                        $cmd, hex2ip($ip), $state);
+    $self->_log_ctl(
+        "[client %d] %s %s %d",
+        $self->fileno, $cmd, hex2ip($ip), $state);
+
     my $old_s = $sponge->state_name($sponge->get_state($ip));
     $state = $sponge->set_pending($ip, PENDING($state));
     my $new_s = $sponge->state_name($state);
@@ -423,7 +438,9 @@ sub _cmd_set_dead {
     if ( ! $sponge->is_my_network($ip) ) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
-    log_notice("[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
+    $self->_log_ctl(
+        "[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
+
     my $old_s = $sponge->state_name($sponge->get_state($ip));
     $sponge->set_dead($ip);
     my $new_s = $sponge->state_name(DEAD());
@@ -451,8 +468,10 @@ sub _cmd_set_alive {
     }
     my $new_s = $sponge->state_name($sponge->get_state($ip));
     my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
-    log_notice("[client %d] %s %s %s", $self->fileno, $cmd,
-                        hex2ip($ip), hex2mac($mac));
+    $self->_log_ctl(
+        "[client %d] %s %s %s",
+        $self->fileno, $cmd, hex2ip($ip), hex2mac($mac));
+
     return $self->send_ok("ip=$ip\nold=$old_s\nnew=$new_s\n"
                          ."rate=$rate\nmac=$mac");
 }
@@ -464,7 +483,7 @@ sub _cmd_set_queuedepth {
     if (!defined $max) {
         return $self->send_error("$cmd <POSITIVE-INT>");
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $max);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $max);
     my $old = $sponge->queuedepth();
     $sponge->queuedepth($max);
     $max    = $sponge->queuedepth();
@@ -479,7 +498,7 @@ sub _cmd_set_log_level {
         return $self->send_error(sprintf("%s {%d-%d}", $cmd,
                                     LOG_EMERG, LOG_DEBUG));
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $level);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $level);
     my $old = log_level($level);
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $level));
 }
@@ -492,9 +511,10 @@ sub _cmd_set_log_mask {
         return $self->send_error(sprintf("%s {%#06x-%#06x}", $cmd,
                                     EVENT_NONE, EVENT_ALL));
     }
-    log_notice("[client %d] %s %#06x", $self->fileno, $cmd, $mask);
-    my $old = log_level($level);
-    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $level));
+    $self->_log_ctl(
+        "[client %d] %s %#06x", $self->fileno, $cmd, $mask);
+    my $old = event_mask($mask);
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $mask));
 }
 
 sub _cmd_set_learning {
@@ -504,7 +524,7 @@ sub _cmd_set_learning {
     if (!defined $int) {
         return $self->send_error("$cmd <NON-NEGATIVE-INT>");
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $int);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
     my $old = $sponge->user('learning');
     $sponge->user('learning', $int);
     $int    = $sponge->user('learning');
@@ -518,7 +538,7 @@ sub _cmd_set_max_pending {
     if (!defined $max) {
         return $self->send_error("$cmd <POSITIVE-INT>");
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $max);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $max);
     my $old = $sponge->max_pending();
     $sponge->max_pending($max);
     $max    = $sponge->max_pending();
@@ -546,7 +566,7 @@ sub _cmd_set_sweep_sec {
     if (!defined $sec) {
         return $self->send_error("$cmd <POSITIVE-INT>");
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $sec);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $sec);
     my $old = $sponge->user('sweep_sec');
     $sponge->user('sweep_sec', $sec);
     my $new = $sponge->user('sweep_sec');
@@ -564,7 +584,7 @@ sub _cmd_set_sweep_age {
     if (!defined $sec) {
         return $self->send_error("$cmd <POSITIVE-INT>");
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $sec);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $sec);
     my $old = $sponge->user('sweep_age');
     $sponge->user('sweep_age', $sec);
     my $new = $sponge->user('sweep_age');
@@ -578,7 +598,7 @@ sub _cmd_set_sweep_skip_alive {
     if (!defined $int) {
         return $self->send_error("$cmd {0|1}");
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $int);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
     my $old = $sponge->user('sweep_skip_alive');
     $sponge->user('sweep_skip_alive', $int);
     $int = $sponge->user('sweep_skip_alive');
@@ -592,7 +612,7 @@ sub _cmd_set_dummy {
     if (!defined $int) {
         return $self->send_error("$cmd {0|1}");
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $int);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
     my $old = $sponge->is_dummy;
     $sponge->is_dummy($int);
     $int    = $sponge->is_dummy;
@@ -606,7 +626,7 @@ sub _cmd_set_max_rate {
     if (!defined $max) {
         return $self->send_error("$cmd <POSITIVE-FLOAT>");
     }
-    log_notice("[client %d] %s %d", $self->fileno, $cmd, $max);
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $max);
     my $old = $sponge->max_rate();
     $sponge->max_rate($max);
     $max    = $sponge->max_rate();
@@ -620,7 +640,7 @@ sub _cmd_set_flood_protection {
     if (!defined $rate) {
         return $self->send_error("$cmd <POSITIVE-FLOAT>");
     }
-    log_notice("[client %d] %s %0.2f", $self->fileno, $cmd, $rate);
+    $self->_log_ctl("[client %d] %s %0.2f", $self->fileno, $cmd, $rate);
     my $old = $sponge->flood_protection();
     $sponge->flood_protection($rate);
     $rate   = $sponge->flood_protection();
