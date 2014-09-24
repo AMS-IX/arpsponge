@@ -309,21 +309,21 @@ sub Main {
         );
 
     if (!$pcap_h) {
-        $sponge->log_fatal("cannot capture on %s: %s", $sponge->device, $err);
+        log_fatal("cannot capture on %s: %s", $sponge->device, $err);
     }
 
     if (pcap_setnonblock($pcap_h, 0, \$err) < 0) {
-        $sponge->log_fatal("cannot capture in non-blocking mode: %s", $err);
+        log_fatal("cannot capture in non-blocking mode: %s", $err);
     }
 
     my $pcap_fd = pcap_get_selectable_fd($pcap_h);
     if ($pcap_fd < 0) {
-        $sponge->log_fatal("cannot get selectable fd for %s", $sponge->device);
+        log_fatal("cannot get selectable fd for %s", $sponge->device);
     }
 
     my $pcap_fh = IO::Handle->new();
     if (!$pcap_fh->fdopen($pcap_fd, "r")) {
-        $sponge->log_fatal("fdopen(%s,'r') for %s failed: %s",
+        log_fatal("fdopen(%s,'r') for %s failed: %s",
                            $pcap_fd, $sponge->device, $!);
     }
 
@@ -471,7 +471,7 @@ sub handle_input {
                     log_info("[client %d] connected", $client->fileno);
                 }
                 else {
-                    $sponge->log_fatal(
+                    log_fatal(
                         "cannot accept control connection: %s",
                         $control_fh->error
                     );
