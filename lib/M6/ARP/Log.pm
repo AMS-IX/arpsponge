@@ -96,7 +96,7 @@ our %STR_TO_LOGLEVEL = (
         'debug'   => LOG_DEBUG,
     );
 
-our %LOGLEVEL_TO_STR = %STR_TO_LOGLEVEL;
+our %LOGLEVEL_TO_STR = reverse %STR_TO_LOGLEVEL;
 
 #############################################################################
 
