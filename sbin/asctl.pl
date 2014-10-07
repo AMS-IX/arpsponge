@@ -1910,7 +1910,7 @@ sub do_load_status {
         elsif ($parse_state eq 'arp' &&
                 /^([a-f\d\:]+) \s+ ([\d\.]+) \s+ \d+ \s+ \S+[\@\s]\S+$/x) {
             my ($mac, $ip) = (mac2hex($1), ip2hex($2));
-            if ($state_table{$ip} eq 'ALIVE') {
+            if (exists $state_table{$ip} && $state_table{$ip} eq 'ALIVE') {
                 $arp_table{$ip} = $mac;
             }
         }
