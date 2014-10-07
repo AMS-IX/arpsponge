@@ -1,3 +1,12 @@
+arpsponge (3.17.1) unstable; urgency=low
+
+  [2014-10-07] - steven (r336)
+    => sbin/asctl.pl:
+        * Fix "Use of uninitialized value within %state_table" warning
+          when reloading.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 07 Oct 2014 11:31:45 +0200
+
 arpsponge (3.17) unstable; urgency=low
 
   [2014-09-23] - steven (r317-r319)
