@@ -41,7 +41,7 @@ BEGIN {
             parse_event_mask
         ),
         map { "event_$_" }
-            qw( emerg alert crit errr warning notice info debug )
+            qw( emerg alert crit err warning notice info debug )
     );
 
     our @macros = qw(
