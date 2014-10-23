@@ -1848,6 +1848,12 @@ Whether or not to send gratuitous ARPs (C<--gratuitous>).
 
 Specify the C<--init> state.
 
+=item I<LOGMASK> (string)
+
+The value for L<--logmask|/--logmask>. Note that negations
+(starting with "!") should be escaped to prevent history
+expansion in shells.
+
 =item I<LEARNING> (integer)
 
 How many seconds to spend in learning mode.

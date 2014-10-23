@@ -36,6 +36,14 @@ ARP_UPDATE_METHOD=none
 # Can also be specified on a per-interface basis.
 DISABLED=false
 
+# Which events to log.
+# Valid events: io, alien, spoof, static, sponge, ctl, state, all, none
+# See also arpsponge(8).
+# Note that negations start with '!' and that the '!' probably needs
+# to be escaped to avoid history expansion.
+##LOGMASK='!alien'
+LOGMASK=all
+
 #############################################################################
 #
 # Now, for every ethX you want to monitor, create a "ethX" file in 
