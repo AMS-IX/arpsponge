@@ -1,3 +1,11 @@
+arpsponge (3.17.3-2) unstable; urgency=low
+
+  [2014-10-23] - steven (r346)
+    => debian/arpsponge.init, debian/conffiles:
+        * Fix init file reference.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 23 Oct 2014 10:19:45 +0200
+
 arpsponge (3.17.3-1) unstable; urgency=low
 
   [2014-10-23] - steven (r343-r344)
