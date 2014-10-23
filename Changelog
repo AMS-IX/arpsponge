@@ -1,3 +1,13 @@
+arpsponge (3.17.3-1) unstable; urgency=low
+
+  [2014-10-23] - steven (r343-r344)
+    => init.d/arpsponge.sh:
+        * Use "/bin/sh" instead of "/bin/bash" for init script.
+    => defaults.sample.src, sbin/arpsponge.pl:
+        * Add support/doc for LOGMASK init variable.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 23 Oct 2014 10:16:15 +0200
+
 arpsponge (3.17.2) unstable; urgency=high
 
   [2014-10-22] - steven (r338)
