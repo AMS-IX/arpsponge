@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ### BEGIN INIT INFO
 # Provides:          arpsponge
 # Required-Start:    $network
@@ -31,6 +31,7 @@ export  AGE \
         GRATUITOUS \
         INIT_MODE \
         LEARNING \
+        LOG_MASK \
         PENDING \
         PROBERATE \
         QUEUE_DEPTH \
@@ -104,6 +105,7 @@ start_sponge() {
         [ -n "${SWEEP}" ]           && opts="$opts --sweep=${SWEEP}"
         [ -n "${PROBERATE}" ]       && opts="$opts --proberate=${PROBERATE}"
         [ -n "${AGE}" ]             && opts="$opts --age=${AGE}"
+        [ -n "${LOGMASK}" ]         && opts="$opts --logmask=${LOGMASK}"
 
         if [ -n "${ARP_UPDATE_METHOD}" ]; then
             opts="$opts --arp-update-method=${ARP_UPDATE_METHOD}"
