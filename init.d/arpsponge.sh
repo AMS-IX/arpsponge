@@ -47,6 +47,7 @@ if test -f /etc/default/${PROG}/defaults ; then
     . /etc/default/${PROG}/defaults
 fi
 
+
 eval_bool() {
     var=$1
     case $var in
@@ -59,10 +60,12 @@ eval_bool() {
     esac
 }
 
+
 fatal() {
     echo "** arpsponge init error:" $@ >&2
     exit 1
 }
+
 
 start_sponge() {
     mode="$1"
@@ -141,6 +144,7 @@ start_sponge() {
     )
 }
 
+
 start() {
     SPONGES=$(find "/etc/default/${PROG}" \
                 -maxdepth 1 -type f -name 'eth*' 2>/dev/null)
@@ -153,6 +157,7 @@ start() {
         done
     fi
 }
+
 
 stop() {
     echo "Stopping ${PROG}(s):"
@@ -186,41 +191,64 @@ stop() {
     done
 }
 
+
 status() {
     local pid
     local cruft
     local pidfiles
     local pf
+    local isroot=false
     local retval=0
-
-    if [ "X$1" = "Xre-init" ]
-    then
-        echo "Saving state:"
-    else
-        echo "Dumping status:"
-    fi
 
     pidfiles=$(find ${SPONGE_VAR} -mindepth 2 -maxdepth 2 \
                 -type f -name pid 2>/dev/null)
-    for pf in $pidfiles
-    do
-        if [ -f "$pf" ]
-        then
-            read pid cruft <"${pf}"
-            iface=$(basename $(dirname "${pf}"))
-            printf "  interface=%-10s pid=%-6s " "${iface}" "${pid}"
-            if kill -USR1 "${pid}" 2>/dev/null
-            then
-                sleep 1
-                echo "[Ok]"
-            else
-                retval=1
-                echo "[FAILED]"
-            fi
+
+    if [ -n "$pidfiles" ]; then
+        [ `id -u` = 0 ] && isroot=true
+
+        if [ "X$1" = "Xre-init" ]; then
+            echo "Saving state:"
+        else
+            echo "Arpsponge status:"
         fi
-    done
+
+        for pf in $pidfiles
+        do
+            if [ -f "$pf" ]
+            then
+                read pid cruft <"${pf}"
+                iface=$(basename $(dirname "${pf}"))
+                printf "  interface=%-10s pid=%-6s " "${iface}" "${pid}"
+                if ps -p "${pid}" > /dev/null 2>&1
+                then
+                    if $isroot
+                    then
+                        if kill -USR1 "${pid}" 2>/dev/null
+                        then
+                            sleep 1
+                            echo "[Ok]"
+                        else
+                            retval=1
+                            echo "[FAILED]"
+                        fi
+                    else
+                        echo "[Ok]"
+                    fi
+                else 
+                    retval=1
+                    echo "[FAILED]"
+                fi
+            fi
+        done
+    else
+        if [ "X$1" != "Xre-init" ]; then
+            echo "  no arpsponge instance running"
+        fi
+        retval=1
+    fi
     return $retval
 }
+
 
 do_help() {
     cat <<EOF
@@ -238,6 +266,7 @@ Usage: $0 {start|stop|restart|flush|reload|force-reload}
 
 EOF
 }
+
 
 case "$1" in
     debug)
