@@ -1,3 +1,13 @@
+arpsponge (3.17.4) unstable; urgency=low
+
+  [2014-11-24] - steven (r348)
+    => init.d/arpsponge.sh:
+        * Fix "status" to exit with appropriate code when there's no
+          sponge running. Also don't try to send a USR1 signal when not
+          running as root.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 24 Nov 2014 15:12:52 +0100
+
 arpsponge (3.17.3-2) unstable; urgency=low
 
   [2014-10-23] - steven (r346)
