@@ -20,7 +20,6 @@ debian/compat
 debian/docs
 debian/rules
 debian/conffiles
-debian/files
 debian/postinst
 debian/postrm
 debian/prerm
