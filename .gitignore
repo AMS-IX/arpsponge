@@ -1,5 +1,13 @@
+arpsponge-*.tar.gz
+build-stamp
+configure-stamp
+debian/arpsponge/
+debian/arpsponge.debhelper.log
+debian/arpsponge.substvars
+debian/files
 defaults.sample
 init.d/arpsponge
+installed.log
 man/arpsponge.8
 man/arpsponge.pod
 man/asctl.8
@@ -9,4 +17,3 @@ man/aslogtail.pod
 sbin/arpsponge
 sbin/asctl
 sbin/aslogtail
-arpsponge-*.tar.gz
