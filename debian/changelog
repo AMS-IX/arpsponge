@@ -1,3 +1,11 @@
+arpsponge (3.17.5) unstable; urgency=low
+
+  * init script start/stop/status return codes
+  * Switch around changelog/Changelog symlink.
+  * Get rid of debian/files in MANIFEST.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Fri, 06 Mar 2015 18:35:07 +0100
+
 arpsponge (3.17.4) unstable; urgency=low
 
   [2014-11-24] - steven (r348)
