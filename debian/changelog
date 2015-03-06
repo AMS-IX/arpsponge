@@ -1,3 +1,9 @@
+arpsponge (3.17.6) unstable; urgency=low
+
+  * Get rid of $REVISION/svn keywords.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Fri, 06 Mar 2015 18:46:37 +0100
+
 arpsponge (3.17.5) unstable; urgency=low
 
   * init script start/stop/status return codes
