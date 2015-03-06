@@ -156,6 +156,7 @@ start() {
             start_sponge "$1" ${file}
         done
     fi
+    return 0
 }
 
 
@@ -189,6 +190,7 @@ stop() {
             fi
         fi
     done
+    return 0
 }
 
 
