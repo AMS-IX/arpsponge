@@ -30,7 +30,8 @@ package M6::ARP::Sponge;
 
 use strict;
 
-use base qw( M6::ARP::Base );
+use Modern::Perl;
+use Mouse;
 
 use M6::ARP::Queue;
 use M6::ARP::Event;
@@ -43,18 +44,98 @@ use POSIX               qw( strftime );
 use Net::ARP;
 use IO::Select;
 
-our $VERSION = 1.07;
+our $VERSION = 1.08;
+
+has 'is_dummy' => (
+    is  => 'rw',
+    isa => 'Bool',
+    default => 0);
+
+has 'gratuitous' => (
+    is  => 'rw',
+    isa => 'Bool',
+    default => 0);
+
+has 'sponge_net' => (
+    is  => 'rw',
+    isa => 'Bool',
+    default => 0);
+
+has 'max_rate' => (
+    is  => 'rw',
+    isa => 'Num',
+    default => 0);
+
+has 'queuedepth' => (
+    is  => 'rw',
+    isa => 'Int',
+    default => $M6::ARPSponge::Queue::DFL_DEPTH);
+
+has 'arp_update_flags' => (
+    is  => 'rw',
+    isa => 'Int',
+    default => ARP_UPDATE_ALL);
+
+has 'device' => (
+    is  => 'ro',
+    isa => 'Str',
+    required => 1);
+
+has 'network' => (
+    is  => 'ro',
+    isa => 'Str',
+    required => 1);
+
+has 'prefixlen' => (
+    is  => 'ro',
+    isa => 'Int',
+    required => 1);
 
 # Accessors; use the factory :-)
 __PACKAGE__->mk_accessors(qw( 
-                is_dummy
-                queuedepth      my_ip               my_mac
-                network         prefixlen
-                arp_age         gratuitous          flood_protection
-                max_rate        max_pending         sponge_net
+                my_ip           my_mac
+                arp_age         flood_protection
+                max_rate        max_pending
                 pcap_handle
-                arp_update_flags
         ));
+
+###############################################################################
+# $sponge = new M6::ARP::Sponge(ARG => VAL ...)
+#
+#    Create a new Sponge object.
+#
+###############################################################################
+sub new {
+    my $type = shift;
+
+    while (@_ >= 2) {
+        my $k = shift @_;
+        my $v = shift @_;
+        $k =~ s/^-//;
+        $self->{lc $k} = $v;
+    
+    }
+    bless $self, $type;
+
+    ($self->{'phys_device'}) = split(/:/, $self->{'device'});
+    
+    $self->{'ip_all'} = { map { $_ => 1 } $self->get_ip_all };
+    $self->my_ip( $self->get_ip );
+    $self->my_mac( $self->get_mac );
+
+    $self->{user}        = {};
+    $self->{queue}       = new M6::ARP::Queue($self->queuedepth);
+
+    $self->init_all_state();
+
+    if (log_is_verbose) {
+        log_sverbose(1, "Device: %s\n", $self->device);
+        log_sverbose(1, "Device: %s\n", $self->phys_device);
+        log_sverbose(1, "MAC:    %s\n", $self->my_mac_s);
+        log_sverbose(1, "IP:     %s\n", $self->my_ip_s);
+    }
+    return $self;
+}
 
 ###############################################################################
 #
@@ -133,48 +214,6 @@ sub set_state    {
     return $state;
 }
 
-###############################################################################
-# $sponge = new M6::ARP::Sponge(ARG => VAL ...)
-#
-#    Create a new Sponge object.
-#
-###############################################################################
-sub new {
-    my $type = shift;
-
-    my $self = {
-            'arp_update_flags'  => ARP_UPDATE_ALL,
-            'queuedepth'        => $M6::ARP::Queue::DFL_DEPTH,
-        };
-
-    while (@_ >= 2) {
-        my $k = shift @_;
-        my $v = shift @_;
-        $k =~ s/^-//;
-        $self->{lc $k} = $v;
-    
-    }
-    bless $self, $type;
-
-    ($self->{'phys_device'}) = split(/:/, $self->{'device'});
-    
-    $self->{'ip_all'} = { map { $_ => 1 } $self->get_ip_all };
-    $self->my_ip( $self->get_ip );
-    $self->my_mac( $self->get_mac );
-
-    $self->{user}        = {};
-    $self->{queue}       = new M6::ARP::Queue($self->queuedepth);
-
-    $self->init_all_state();
-
-    if (log_is_verbose) {
-        log_sverbose(1, "Device: %s\n", $self->device);
-        log_sverbose(1, "Device: %s\n", $self->phys_device);
-        log_sverbose(1, "MAC:    %s\n", $self->my_mac_s);
-        log_sverbose(1, "IP:     %s\n", $self->my_ip_s);
-    }
-    return $self;
-}
 
 ###############################################################################
 # $sponge->init_all_state();
