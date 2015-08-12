@@ -1,7 +1,5 @@
 #!@PERL@ -I../lib
 # ============================================================================
-# @(#)$Id$
-# ============================================================================
 #
 #         File:  asctl.pl
 #
@@ -67,8 +65,7 @@ my $INTERACTIVE   = 1;
 my $MAX_HISTORY   = 1000;
 my $HISTFILE      = "$::ENV{HOME}/.$0_history";
 
-my ($REVISION) = '$Revision$' =~ /Revision: (\S+) \$/;
-my $VERSION    = '@RELEASE@'."($REVISION)";
+my $VERSION    = '@RELEASE@';
 my $app_header = "\nThis is $0, v$VERSION\n\n"
                . "See \"perldoc $0\" for more information.\n"
                ;

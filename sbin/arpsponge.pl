@@ -1,8 +1,6 @@
 #!@PERL@ -I../lib
 # [Net::ARP is not clean, so "-w" flag to perl produces spurious warnings]
 ###############################################################################
-# @(#)$Id$
-###############################################################################
 #
 # ARP sponge
 #
@@ -49,10 +47,8 @@ use M6::ARP::Control::Server;
 
 use constant SYSLOG_IDENT => '@NAME@';
 
-my ($REVISION)           = '$Revision$' =~ /^.Revision: (\d+) \$$/;
-
 my $PROG                 = $FindBin::Script;
-my $VERSION              = '@RELEASE@'."($REVISION)";
+my $VERSION              = '@RELEASE@';
 my $NULL_IP              = ip2hex('0.0.0.0');
 my $NULL_MAC             = mac2hex('0:0:0:0:0:0');
 
