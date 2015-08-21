@@ -1,8 +1,6 @@
 ###############################################################################
-# @(#)$Id$
-###############################################################################
 #
-# ARP sponge
+# M6::ARPSponge
 #
 #   Copyright (c) 2005-2011 AMS-IX B.V.; All rights reserved.
 #
@@ -17,7 +15,7 @@
 #   See the "Copying" file that came with this package.
 #
 # A.Vijn,   2003-2004;
-# S.Bakker, 2004-2010;
+# S.Bakker, 2004-2015;
 #
 # IMPORTANT:
 #
@@ -26,12 +24,11 @@
 #     form.
 #
 ###############################################################################
-package M6::ARP::Sponge;
-
-use strict;
+package M6::ARPSponge;
 
 use Modern::Perl;
-use Mouse;
+use Moo;
+use Types::Standard -types;
 
 use M6::ARP::Queue;
 use M6::ARP::Event;
@@ -41,96 +38,71 @@ use M6::ARP::Util       qw( :all );
 use M6::ARP::NetPacket  qw( :all );
 
 use POSIX               qw( strftime );
-use Net::ARP;
 use IO::Select;
+use File::Which         qw( which );
 
 our $VERSION = 1.08;
 
-has 'is_dummy' => (
-    is  => 'rw',
-    isa => 'Bool',
-    default => 0);
+my $INT_ZERO    = sub {0};
+my $EMPTY_HASH  = sub {{}};
 
-has 'gratuitous' => (
-    is  => 'rw',
-    isa => 'Bool',
-    default => 0);
+# Required attributes.
+has 'device'           => ( is => 'ro', isa => Str,  required => 1);
+has 'network'          => ( is => 'ro', isa => Str,  required => 1);
+has 'prefixlen'        => ( is => 'ro', isa => Int,  required => 1);
+has 'max_pending'      => ( is => 'rw', isa => Int,  required => 1);
+has 'pcap_handle'      => ( is => 'rw', isa => Object, required => 1);
 
-has 'sponge_net' => (
-    is  => 'rw',
-    isa => 'Bool',
-    default => 0);
+# Public r/w attributes.
+has 'arp_age'     => ( is => 'rw', isa => Num,     default => $INT_ZERO );
+has 'is_dummy'    => ( is => 'rw', isa => Bool,    default => $INT_ZERO );
+has 'gratuitous'  => ( is => 'rw', isa => Bool,    default => $INT_ZERO );
+has 'sponge_net'  => ( is => 'rw', isa => Bool,    default => $INT_ZERO );
+has 'max_rate'    => ( is => 'rw', isa => Num,     default => $INT_ZERO );
+has 'state_table' => ( is => 'rw', isa => HashRef, default => $EMPTY_HASH );
+has 'queuedepth'  => ( is => 'rw', isa => Int, 
+                            default => sub { $M6::ARPSponge::Queue::DFL_DEPTH });
+has 'arp_update_flags' => ( is => 'rw', isa => Int,
+                            default => sub { ARP_UPDATE_ALL });
+has 'flood_protection' => ( is => 'rw', isa => Num,  default => $INT_ZERO );
 
-has 'max_rate' => (
-    is  => 'rw',
-    isa => 'Num',
-    default => 0);
+# Public r/o attributes.
+has 'my_ip'  => ( is => 'rw', isa => Str,    writer => '_set_my_ip' );
+has 'my_mac' => ( is => 'rw', isa => Str,    writer => '_set_my_mac' );
+has 'queue'  => ( is => 'rw', isa => Object, writer => '_set_queue' );
 
-has 'queuedepth' => (
-    is  => 'rw',
-    isa => 'Int',
-    default => $M6::ARPSponge::Queue::DFL_DEPTH);
-
-has 'arp_update_flags' => (
-    is  => 'rw',
-    isa => 'Int',
-    default => ARP_UPDATE_ALL);
-
-has 'device' => (
-    is  => 'ro',
-    isa => 'Str',
-    required => 1);
-
-has 'network' => (
-    is  => 'ro',
-    isa => 'Str',
-    required => 1);
-
-has 'prefixlen' => (
-    is  => 'ro',
-    isa => 'Int',
-    required => 1);
-
-# Accessors; use the factory :-)
-__PACKAGE__->mk_accessors(qw( 
-                my_ip           my_mac
-                arp_age         flood_protection
-                max_rate        max_pending
-                pcap_handle
-        ));
+# Private attributes.
+has '_phys_device' => ( is => 'rw', isa => Str ); 
+has '_all_ip'      => ( is => 'rw', isa => HashRef, default => $EMPTY_HASH );
+has '_user_data'   => ( is => 'rw', isa => HashRef, default => $EMPTY_HASH );
+has '_pending'     => ( is => 'rw', isa => HashRef, default => $EMPTY_HASH );
+has '_state'       => ( is => 'rw', isa => HashRef, default => $EMPTY_HASH );
+has '_state_mtime' => ( is => 'rw', isa => HashRef, default => $EMPTY_HASH );
+has '_state_atime' => ( is => 'rw', isa => HashRef, default => $EMPTY_HASH );
+has '_arp_table'   => ( is => 'rw', isa => HashRef, default => $EMPTY_HASH );
 
 ###############################################################################
-# $sponge = new M6::ARP::Sponge(ARG => VAL ...)
+# $sponge = new M6::ARPSponge(ARG => VAL ...)
 #
 #    Create a new Sponge object.
 #
 ###############################################################################
-sub new {
-    my $type = shift;
+sub BUILD {
+    my ($self, $args) = @_;
 
-    while (@_ >= 2) {
-        my $k = shift @_;
-        my $v = shift @_;
-        $k =~ s/^-//;
-        $self->{lc $k} = $v;
+    $self->_phys_device((split /:/, $self->{'device'})[0]);
     
-    }
-    bless $self, $type;
+    $self->_all_ip( { map { ip2hex($_) => 1 } $self->_get_all_ip_addr } );
+    $self->my_ip( $self->_get_ip );
+    $self->my_mac( $self->_get_mac );
 
-    ($self->{'phys_device'}) = split(/:/, $self->{'device'});
-    
-    $self->{'ip_all'} = { map { $_ => 1 } $self->get_ip_all };
-    $self->my_ip( $self->get_ip );
-    $self->my_mac( $self->get_mac );
-
-    $self->{user}        = {};
-    $self->{queue}       = new M6::ARP::Queue($self->queuedepth);
+    $self->_set_queue(M6::ARP::Queue->new($self->queuedepth));
 
     $self->init_all_state();
 
     if (log_is_verbose) {
         log_sverbose(1, "Device: %s\n", $self->device);
-        log_sverbose(1, "Device: %s\n", $self->phys_device);
+        log_sverbose(1, "Device: %s\n", $self->_phys_device);
         log_sverbose(1, "MAC:    %s\n", $self->my_mac_s);
         log_sverbose(1, "IP:     %s\n", $self->my_ip_s);
     }
@@ -148,67 +120,91 @@ sub new {
 # $oldval = $sponge->user($attr, $newval);
 sub user {
     my $self = shift;
-    my $user = $self->{'user'};
+    my $user = $self->_user_data;
 
     return $user if @_ == 0;
 
     my $attr = shift;
-    my $oldval = $user->{$attr};
+
     if (@_) {
-        my $val = shift;
-        $user->{$attr} = $val;
+        my $old = $user->{$attr};
+        $user->{$attr} = shift;
+        return $old;
     }
-    return $oldval;
+    else {
+        return $user->{$attr};
+    }
 }
 
 sub state_name { return state_to_string($_[1]) }
 
 ###############################################################################
 #
-#                   Object Attributes
+#                   Simple Queries
 #
 ###############################################################################
 
-sub queue            { shift->{'queue'} }
-sub device           { shift->{'device'} }
-sub phys_device      { shift->{'phys_device'} }
-sub pending          { shift->{'pending'} }
+sub is_my_ip {
+    $_[0]->_all_ip->{$_[1]}
+}
 
-sub is_my_ip         { $_[0]->{'ip_all'}->{$_[1]} }
-sub is_my_ip_s       { $_[0]->{'ip_all'}->{ip2hex($_[1])} }
+sub is_my_ip_s {
+    return $_[0]->_all_ip->{ip2hex($_[1])}
+}
 
-sub my_ip_s          { return hex2ip(shift->my_ip)   }
-sub network_s        { return hex2ip(shift->network) }
-sub my_mac_s         { return hex2mac(shift->my_mac) }
+sub my_ip_s {
+    return hex2ip(shift->my_ip)
+}
 
-sub state_atime      { $_[0]->{state_atime}->{$_[1]} }
-sub set_state_atime  { $_[0]->{state_atime}->{$_[1]} = $_[2] }
+sub network_s {
+    return hex2ip(shift->network)
+}
 
-sub state_mtime      { $_[0]->{state_mtime}->{$_[1]} }
-sub set_state_mtime  { $_[0]->{state_mtime}->{$_[1]} = $_[2] }
+sub my_mac_s  {
+    return hex2mac(shift->my_mac)
+}
 
-sub state_table      { shift->{state} }
-sub get_state        { $_[0]->{state}->{$_[1]} }
+sub state_atime {
+    return $_[0]->_state_atime->{$_[1]}
+}
 
-sub set_state    {
+sub set_state_atime {
+    return $_[0]->_state_atime->{$_[1]} = $_[2]
+}
+
+sub state_mtime {
+    return $_[0]->_state_mtime->{$_[1]}
+}
+
+sub set_state_mtime {
+    return $_[0]->_state_mtime->{$_[1]} = $_[2]
+}
+
+sub get_state {
+    return $_[0]->state_table->{$_[1]}
+}
+
+sub set_state {
     my ($self, $ip, $state, $time) = @_;
 
     if (defined $state) {
         $time //= time;
-        $self->{state_mtime}->{$ip} = $self->{state_atime}->{$ip} = $time;
-        $self->{state}->{$ip} = $state;
+        $self->_state_mtime->{$ip} = $self->_state_atime->{$ip} = $time;
+        $self->_state_table->{$ip} = $state;
+        # If IP is in any pending state, add it to the pending table, to
+        # facilitate quick lookup.
         if ($state >= PENDING(0)) {
-            $self->{'pending'}->{$ip} = $state;
+            $self->_pending->{$ip} = $state;
         }
         else {
-            delete $self->{'pending'}->{$ip};
+            delete $self->_pending->{$ip};
         }
     }
     else {
-        delete $self->{state_mtime}->{$ip};
-        delete $self->{state_atime}->{$ip};
-        delete $self->{state}->{$ip};
-        delete $self->{'pending'}->{$ip};
+        delete $self->_state_mtime->{$ip};
+        delete $self->_state_atime->{$ip};
+        delete $self->_state_table->{$ip};
+        delete $self->_pending->{$ip};
         $self->queue->clear($ip);
     }
     return $state;
@@ -227,12 +223,12 @@ sub set_state    {
 sub init_all_state {
     my $self = shift;
 
-    $self->{pending}     = {};
-    $self->{state}       = {};
-    $self->{state_mtime} = {};
-    $self->{state_atime} = {};
-    $self->{queue}->clear_all();
-    $self->{'arp_table'} = {};
+    $self->_pending({});
+    $self->_state({});
+    $self->_state_mtime({});
+    $self->_state_atime({});
+    $self->_queue->clear_all();
+    $self->_arp_table({});
 
     # Build up a bit of state again...
 
@@ -243,6 +239,7 @@ sub init_all_state {
     }
     return $self;
 }
+
 
 ###############################################################################
 # $table = $sponge->arp_table;
@@ -255,82 +252,96 @@ sub init_all_state {
 sub arp_table {
     my $self = shift;
 
-    return $self->{'arp_table'} if @_ == 0;
+    return $self->_arp_table if @_ == 0;
 
-    my $ip        = shift;
-    my $arp_table = $self->{'arp_table'};
+    my $ip = shift;
 
     if (@_) {
-        my $mac = shift;
+        my $mac  = shift;
         my $time = @_ ? shift : time;
         if (defined $mac && $mac ne $ETH_ADDR_NONE) {
-            $self->{'arp_table'}->{$ip} = [ $mac, $time ];
+            $self->_arp_table->{$ip} = [ $mac, $time ];
         }
         else {
-            delete $self->{'arp_table'}->{$ip};
+            delete $self->_arp_table->{$ip};
         }
     }
-    return $self->{'arp_table'}->{$ip} ? @{$self->{'arp_table'}->{$ip}} : ();
+    return $self->_arp_table->{$ip} ? @{$self->_arp_table->{$ip}} : ();
 }
 
+
 ###############################################################################
-# $mac = $sponge->get_mac;
-# $mac = $sponge->get_mac($device);
-# $mac = get_mac($device);
+# $mac = $sponge->_get_mac;
+# $mac = $sponge->_get_mac($device);
 #
 #   Return MAC address for device $device.
 #
 ###############################################################################
 sub get_mac {
-    my $dev = pop @_;
-    if (ref $dev) { $dev = $dev->device }
+    my $self = shift;
+    my $dev = @_ ? shift @_ : $self->device;
 
-    # get_mac is SCARY! and WRONG!
-    my $mac = Net::ARP::get_mac($dev);
-
-    #print STDERR "Net::ARP::get_mac($dev) -> \"$mac\"\n";
-    return mac2hex($mac);
+    my @mac;
+    if (my $ip_command = which('ip')) {
+        my $mac_list = `$ip_command addr show $dev 2>/dev/null`;
+        @mac = $mac_list =~ m{^\s*link/ether ([a-f\d\:]+) }gmi;
+    }
+    elsif (my $ifconfig_command = which('ifconfig')) {
+        my $mac_list = `$ifconfig_command $dev 2>/dev/null`;
+        @mac = $mac_list =~ m{\s(?:ether|hwaddr)\s+([a-f\d\:]+) }gmi;
+    }
+    else {
+        die "cannot determine MAC address: ",
+            "no 'ip' or 'ifconfig' command in the PATH";
+    }
+    return mac2hex(lc $mac[0]);
 }
 
+
 ###############################################################################
-# @ip = $sponge->get_ip_all;
+# @ip = $sponge->_get_all_ip_addr;
 #
-#   Return all IP addresses for physical device $device. This includes all
-#   addresses configured on "sub" interfaces.
+#   Return all IP addresses for this host.
 #
 ###############################################################################
-sub get_ip_all {
+sub _get_all_ip_addr {
     my @ip;
 
-    open(IFCONFIG, 'ifconfig -a 2>/dev/null|');
-    local($_);
-    while (<IFCONFIG>) {
-        if (/^.*inet addr:(\S+)/) {
-            push @ip, ip2hex($1);
-        }
+    if (my $ip_command = which('ip')) {
+        my $ip_list = `$ip_command addr show 2>/dev/null`;
+        @ip = $ip_list =~ m{^\s*inet ([\d\.]+)/\d+ }gm;
     }
-    close IFCONFIG;
+    elsif (my $ifconfig_command = which('ifconfig')) {
+        my $ip_list = `$ifconfig_command -a 2>/dev/null`;
+        @ip = $ip_list =~ m{^\s*inet (?:addr:)?([\d\.]+) }gm;
+    }
+    else {
+        die "cannot determine IP addresses: ",
+            "no 'ip' or 'ifconfig' command in the PATH";
+    }
     return @ip;
 }
 
+
 ###############################################################################
-# $ip = $sponge->get_ip;
-# $ip = $sponge->get_ip($device);
-# $ip = get_ip($device);
+# $ip = $sponge->_get_ip;
+# $ip = $sponge->_get_ip($device);
 #
 #   Return IP address for device $device, or '0.0.0.0' if none.
 #
 ###############################################################################
-sub get_ip {
-    my $dev = pop @_;
-    if (ref $dev) { $dev = $dev->device }
+sub _get_ip {
+    my $self = shift;
+    my $dev = @_ ? shift @_ : $self->device;
+
     my $ip = `ifconfig $dev 2>/dev/null`;
 
-    if ($ip !~ s/^.*inet addr:(\S+).*$/$1/s) {
+    if ($ip !~ s/^.*inet (?:addr:)?([\d\.]+).*$/$1/s) {
         $ip = '0.0.0.0';
     }
     return ip2hex($ip);
 }
+
 
 ###############################################################################
 # $bool = $sponge->is_my_network($ip)
@@ -387,7 +398,7 @@ sub send_probe {
 
     if (log_is_verbose >=2) {
         log_sverbose(2,
-            "Probing [dev=%s]: %s\n", $self->phys_device, hex2ip($ip)
+            "Probing [dev=%s]: %s\n", $self->_phys_device, hex2ip($ip)
         );
     }
 
@@ -411,7 +422,7 @@ sub gratuitous_arp {
     if (log_is_verbose) {
         log_sverbose(1, "%sgratuitous ARP [dev=%s]: %s\n",
                 ($self->is_dummy ? '[DUMMY] ' : ''),
-                $self->phys_device, hex2ip($ip));
+                $self->_phys_device, hex2ip($ip));
     }
 
     $self->set_state_atime($ip, time);
