@@ -56,16 +56,19 @@ sub update {
     else {
         delete $self->table->{$ip};
     }
+    return;
 }
 
 sub delete {
     my ($self, $ip) = @_;
     delete $self->table->{$ip};
+    return;
 }
 
 sub clear {
     my $self = shift;
     %{$self->table} = ();
+    return;
 }
 
 
@@ -81,199 +84,119 @@ M6::ARPSponge::ARPTable - Perl object class for ARP information.
 =head1 SYNOPSIS
 
  use M6::ARPSponge::ARPTable;
+ use M6::ARPSponge::Util qw(
+    ip2hex hex2ip mac2hex hex2mac
+    format_time
+ );
 
  my $table = M6::ARPSponge::ARPTable->new();
 
- $table->update(
- '525400853c0a', 
- '28b2bd906ab9',
+ my $ip  = '10.0.0.1';
+ my $mac = '52:54:00:85:3c:0a';
 
- say "ARPSponge States:";
- for my $state ( M6::ARPSponge::State->ALL ) {
-    printf("   %-10s %d\n", $state, $state);
+ # Add or update ARP entry
+ $table->update( ip2hex($ip), mac2hex($mac) );
+
+ # Perform lookup of an ARP entry
+ my ($hex_mac, $mtime) = $table->lookup( ip2hex($ip) );
+
+ if (defined $hex_mac) {
+    say $ip, ' -> ', hex2mac($hex_mac),
+        ' (', format_time($mtime), ')';
  }
 
- print "\n";
+ # Delete an ARP entry.
+ $table->delete( ip2hex($ip) );
 
- my $state_1 = ALIVE;
- my $state_2 = $state_1;
+ # Clear the whole ARP table.
+ $table->clear();
 
- printf "state_1: %d (%s)\n", $state_1, $state_1;
- printf "state_2: %d (%s)\n", $state_2, $state_2;
+ # Access the internal ARP HASH table.
+ my $hash = $table->table;
 
- say "decrementing state_2:";
+ for my $hex_ip (sort { $a cmp $b } keys %$hash) {
+    my ($hex_mac, $mtime) = @{$hash->{$hex_ip}};
 
- $state_2--;
- 
- say "state_2 is ", ($state_2 == DEAD)   ? "" : "not ", "DEAD";
- say "state_2 is ", ($state_2 eq 'DEAD') ? "" : "not ", "DEAD";
+    say hex2ip($hex_ip),
+        ' -> ', hex2mac($hex_mac),
+        ' (', format_time($mtime), ')';
+ }
 
 =head1 DESCRIPTION
 
-The M6::ARPSponge::State class represents the states that an IP address
-can be in (as perceived by the sponge).
+The M6::ARPSponge::ARPTable class keeps track of IP-to-MAC mappings,
+along with a timestamp.
 
-Instances of the class behave like simple integer scalars that stringify
-to a textual description of the state.
+IP addresses and MAC addresses are interpreted and stored as
+hex-strings, timestamps are interpreted as seconds since epoch.
 
-=head1 STATE VALUES
-
-The module defines a number of symbolic names for the states, which
-can be imported using the C<:states> or C<:all> tag.
+=head1 CONSTRUCTOR
 
 =over
 
-=item B<NONE>
-X<NONE>
-
-Integer value I<undef>, string value C<NONE>.
-
-=item B<ALIVE>
-X<ALIVE>
-
-Integer value C<-1>, string value C<ALIVE>.
-
-=item B<DEAD>
-X<DEAD>
-
-Integer value C<-2>, string value C<DEAD>.
-
-=item B<STATIC>
-X<STATIC>
-
-Integer value C<-3>, string value C<STATIC>.
-
-=item B<PENDING> ( I<NUM> )
-X<PENDING>
-
-Integer value I<NUM> (>= 0), string value C<PENDING(NUM)>.
-
-=back
-
-=head1 CLASS METHODS
-
-=over
-
-=item B<ALL>
-X<ALL>
-
-Return a list of the state values (L<see above|/STATE VALUES>), except I<NONE>:
-
-    STATIC, DEAD, ALIVE, PENDING(0)
-
-=back
-
-=head1 CONSTRUCTORS
-
-You will probably never have to call a constructor explicitly; assignment
-is overloaded, so you can simply assign one of the state constants to a
-variable to instantiate a new instance:
-
-   my $state = ALIVE;
-   say $state;              # prints "ALIVE"
-
-   $state = PENDING(0);
-   say $state;              # prints "PENDING(0)"
-   $state++;
-   say $state;              # prints "PENDING(1)"
-
-   $state = DEAD;
-   say $state;              # prints "DEAD"
-
-=over
-
-=item B<new> ( I<ARG> )
+=item B<new>
 X<new>
 
-Create a new C<M6::ARPSponge::State> object with I<ARG> as its value.
-I<ARG> can be a number representing a state, a string, or another 
-C<M6::ARPSponge::State> reference. Depending on which type of argument
-it gets, it will either call L</new_from_int> or L</new_from_string>.
-
-=item B<new_from_int> ( I<INT> )
-X<new_from_int>
-
-Create a new C<M6::ARPSponge::State> object with I<INT> as its value.
-I<INT> is a number representing a state.
-
-=item B<new_from_string> ( I<STR> )
-X<new_from_string>
-
-Create a new C<M6::ARPSponge::State> object with I<STR> as its value.
-I<STR> is a string representing a state.
+Create a new, empty C<M6::ARPSponge::ARPTable> object and return a
+reference to it.
 
 =back
-
-=head1 OVERLOADED OPERATORS AND COMPARISON
-
-The '""' (stringify), '0+' (numify), '++', '--', and '=' operators are
-overloaded and implemented by the L<methods below|/METHODS>.
-
-Because of this overloading, instances of this class can be compared
-with both integer comparison and string comparison.
 
 =head1 METHODS
 
-=over
-
-=item B<to_string>
-X<to_string>
-
-Implements stringification.
-
-=item B<to_num>
-X<to_snum>
-
-Implements numification.
-
-=item B<increment>
-X<increment>
-
-Implements C<++>.
-
-=item B<decrement>
-X<decrement>
-
-Implements C<-->.
-
-=item B<clone>
-X<clone>
-
-Implements the assignment (C<=>) operator.
-
-=back
-
-=head1 CAVEATS
+Unless explicitly mentioned, the methods below return no value.
 
 =over
 
-=item Inconsistent comparison
+=item B<clear>
+X<clear>
 
-Since we don't explicitly overload the comparision operators, they will
-use the numified and stringified values of the object instances to compare.
+Clear all entries from the table.
 
-Specifically, this means that:
+=item B<delete> ( I<HEXIP> )
+X<delete>
 
-=over
+Delete any entry for I<HEXIP>.
 
-=item *
+=item B<lookup> ( I<HEXIP> )
+X<lookup>
 
-Integer comparison (C<E<lt>>, C<E<gt>>, C<==>, etc.) will use the integer
-values and produce an ordering of:
+Look up the ARP entry for I<HEXIP> and either return a list of two
+elements, (I<HEXMAC>, I<TSTAMP>), or an empty list.
 
-  STATIC, DEAD, ALIVE, PENDING(0), PENDING(1), ...
+=item B<table>
+X<table>
 
-=item *
+Return a reference to the internal HASH table that is used to
+store the ARP entries. The structure of the table is:
 
-String comparison (C<lt>, C<gt>, C<eq>, etc.) will use the stringified
-values and produce an ordering of:
+    {
+        HEXIP1 => [ HEXMAC1, TSTAMP1 ],
+        HEXIP2 => [ HEXMAC2, TSTAMP2 ],
+        ...
+    }
 
-  STATIC, DEAD, ALIVE, PENDING(0), PENDING(1), ..., STATIC
+Note that this returns a reference to the internal table, so any
+operations through the object API will affect the hash. For example:
 
-(Also note that in lexical comparisons, C<PENDING(10)> will sort lower
-than C<PENDING(2)>).
+    my $ref = $arp_table->table;
+    $arp_table->clear();
 
-=back
+    # %$ref is now empty!
+
+This HASHREF should be treated as a read-only value, for example to
+iterate over all entries efficiently.
+
+=item B<update> ( I<HEXIP>, I<HEXMAC> [, I<TSTAMP>] )
+X<update>
+
+Add or update the ARP entry for I<HEXIP>, mapping it to I<HEXMAC>.
+If I<TSTAMP> is given, its value is used for the entry's timestamp;
+otherwise, the current time is used.
+
+If I<HEXMAC> matches the C<000000000000> string (i.e. the MAC address
+is C<00:00:00:00:00:00>), any existing entry for I<HEXIP> is deleted,
+effectively implementing L</delete>().
 
 =back
 
