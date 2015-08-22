@@ -619,5 +619,3 @@ Steven Bakker at AMS-IX (steven.bakker AT ams-ix.net).
 
 Copyright 2005-2015, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
-
-=cut
