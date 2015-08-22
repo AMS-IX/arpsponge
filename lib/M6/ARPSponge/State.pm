@@ -22,18 +22,22 @@ package M6::ARPSponge::State;
 use Modern::Perl;
 use Scalar::Util qw( looks_like_number );
 
-use parent qw( Exporter );
-
 BEGIN {
     our $VERSION = '1.00';
 
-    my @states = qw( STATIC DEAD ALIVE PENDING NONE );
+    use parent qw( Exporter );
+
+    my @states = qw(
+        STATE_STATIC STATE_DEAD
+        STATE_ALIVE STATE_PENDING
+        STATE_NONE
+    );
 
     our @EXPORT_OK = ( @states );
     our %EXPORT_TAGS = ( 
-            'states' => \@states,
-            'all'    => [ @states ]
-        );
+        'states' => \@states,
+        'all'    => \@EXPORT_OK,
+    );
 }
 
 # State constants/macros
@@ -45,26 +49,26 @@ my $INT_PENDING = 0;
 
 my ($OBJ_NONE, $OBJ_STATIC, $OBJ_DEAD, $OBJ_ALIVE);
 
-sub NONE {
+sub STATE_NONE {
     return $OBJ_NONE //= __PACKAGE__->new_from_int( $INT_NONE );
 }
 
-sub STATIC {
+sub STATE_STATIC {
     return $OBJ_STATIC //= __PACKAGE__->new_from_int( $INT_STATIC );
 }
 
-sub DEAD {
+sub STATE_DEAD {
     return $OBJ_DEAD //= __PACKAGE__->new_from_int( $INT_DEAD );
 }
 
-sub ALIVE {
+sub STATE_ALIVE {
     return $OBJ_ALIVE //= __PACKAGE__->new_from_int( $INT_ALIVE );
 }
 
-sub PENDING { __PACKAGE__->new_from_int(0 + $_[$#_]) };
+sub STATE_PENDING { __PACKAGE__->new_from_int(0 + $_[$#_]) };
 
 sub ALL {
-    return (STATIC, DEAD, ALIVE, PENDING(0));
+    return (STATE_STATIC, STATE_DEAD, STATE_ALIVE, STATE_PENDING(0));
 }
 
 my %STR_TO_INT = (
@@ -79,7 +83,7 @@ use overload
     '0+'        => \&to_num,
     '='         => \&clone,
     '++'        => \&increment,
-    '--'        => \&decrements,
+    '--'        => \&decrement,
     fallback    => 1;
 
 
@@ -141,20 +145,27 @@ sub clone {
 sub to_string {
     my $self = shift;
 
-    if (!defined $$self)        { return 'NONE' }
-    elsif ($$self == STATIC)    { return 'STATIC' }
-    elsif ($$self == DEAD)      { return 'DEAD' }
-    elsif ($$self == ALIVE)     { return 'ALIVE' }
-    elsif ($$self < PENDING(0)) { return 'ILLEGAL' }
+    if (!defined $$self)              { return 'NONE' }
+    elsif ($$self == STATE_STATIC)    { return 'STATIC' }
+    elsif ($$self == STATE_DEAD)      { return 'DEAD' }
+    elsif ($$self == STATE_ALIVE)     { return 'ALIVE' }
+    elsif ($$self < STATE_PENDING(0)) { return 'ILLEGAL' }
     else {
-        return sprintf("PENDING(%d)", $$self - PENDING(0));
+        return sprintf("PENDING(%d)", $$self - STATE_PENDING(0));
     }
 }
 
-sub to_num    { ${$_[0]} },
-sub increment { ++${$_[0]} }
-sub decrement { --${$_[0]} }
+sub to_num {
+    ${$_[0]}
+}
 
+sub increment {
+    ++${$_[0]}
+}
+
+sub decrement {
+    --${$_[0]}
+}
 
 1;
 
@@ -175,7 +186,7 @@ M6::ARPSponge::State - Perl "state" object for arpsponge(8)
 
  print "\n";
 
- my $state_1 = ALIVE;
+ my $state_1 = STATE_ALIVE;
  my $state_2 = $state_1;
 
  printf "state_1: %d (%s)\n", $state_1, $state_1;
@@ -185,7 +196,7 @@ M6::ARPSponge::State - Perl "state" object for arpsponge(8)
 
  $state_2--;
  
- say "state_2 is ", ($state_2 == DEAD)   ? "" : "not ", "DEAD";
+ say "state_2 is ", ($state_2 == STATE_DEAD)   ? "" : "not ", "DEAD";
  say "state_2 is ", ($state_2 eq 'DEAD') ? "" : "not ", "DEAD";
 
 =head1 DESCRIPTION
@@ -203,28 +214,28 @@ can be imported using the C<:states> or C<:all> tag.
 
 =over
 
-=item B<NONE>
-X<NONE>
+=item B<STATE_NONE>
+X<STATE_NONE>
 
 Integer value I<undef>, string value C<NONE>.
 
-=item B<ALIVE>
-X<ALIVE>
+=item B<STATE_ALIVE>
+X<STATE_ALIVE>
 
 Integer value C<-1>, string value C<ALIVE>.
 
-=item B<DEAD>
-X<DEAD>
+=item B<STATE_DEAD>
+X<STATE_DEAD>
 
 Integer value C<-2>, string value C<DEAD>.
 
-=item B<STATIC>
-X<STATIC>
+=item B<STATE_STATIC>
+X<STATE_STATIC>
 
 Integer value C<-3>, string value C<STATIC>.
 
-=item B<PENDING> ( I<NUM> )
-X<PENDING>
+=item B<STATE_PENDING> ( I<NUM> )
+X<STATE_PENDING>
 
 Integer value I<NUM> (>= 0), string value C<PENDING(NUM)>.
 
@@ -239,7 +250,7 @@ X<ALL>
 
 Return a list of the state values (L<see above|/STATE VALUES>), except I<NONE>:
 
-    STATIC, DEAD, ALIVE, PENDING(0)
+    STATE_STATIC, STATE_DEAD, STATE_ALIVE, STATE_PENDING(0)
 
 =back
 
@@ -249,15 +260,15 @@ You will probably never have to call a constructor explicitly; assignment
 is overloaded, so you can simply assign one of the state constants to a
 variable to instantiate a new instance:
 
-   my $state = ALIVE;
+   my $state = STATE_ALIVE;
    say $state;              # prints "ALIVE"
 
-   $state = PENDING(0);
+   $state = STATE_PENDING(0);
    say $state;              # prints "PENDING(0)"
    $state++;
    say $state;              # prints "PENDING(1)"
 
-   $state = DEAD;
+   $state = STATE_DEAD;
    say $state;              # prints "DEAD"
 
 =over
@@ -341,14 +352,19 @@ Specifically, this means that:
 Integer comparison (C<E<lt>>, C<E<gt>>, C<==>, etc.) will use the integer
 values and produce an ordering of:
 
-  STATIC, DEAD, ALIVE, PENDING(0), PENDING(1), ...
+  STATE_STATIC, STATE_DEAD, STATE_ALIVE,
+  STATE_PENDING(0), STATE_PENDING(1), ...
 
 =item *
 
 String comparison (C<lt>, C<gt>, C<eq>, etc.) will use the stringified
 values and produce an ordering of:
 
-  STATIC, DEAD, ALIVE, PENDING(0), PENDING(1), ..., STATIC
+  STATE_STATIC, STATE_DEAD, STATE_ALIVE,
+  STATE_PENDING(0),
+  STATE_PENDING(1), STATE_PENDING(10), STATE_PENDING(11), ...
+  STATE_PENDING(2), STATE_PENDING(20), STATE_PENDING(21), ...
+  STATE_STATIC
 
 (Also note that in lexical comparisons, C<PENDING(10)> will sort lower
 than C<PENDING(2)>).
