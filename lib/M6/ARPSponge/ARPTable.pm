@@ -29,7 +29,7 @@ use Modern::Perl;
 use Moo;
 use Types::Standard -types;
 
-use M6::ARPSponge::NetPacket;
+use M6::ARPSponge::NetPacket qw( :eth_addr );
 
 our $VERSION    = 1.00;
 
@@ -44,13 +44,13 @@ has 'table'  => (
 
 sub lookup {
     my ($self, $ip) = @_;
-    return $self->table->{$ip} ? @{$self->_arp_table->{$ip}} : ();
+    return $self->table->{$ip} ? @{$self->table->{$ip}} : ();
 }
 
 sub update {
     my ($self, $ip, $mac, $time) = @_;
 
-    if (defined $mac && $mac ne $ETH_ADDR_NONE) {
+    if (defined $mac && $mac ne ETH_ADDR_NONE) {
         $self->table->{$ip} = [ $mac, $time // time ];
     }
     else {
