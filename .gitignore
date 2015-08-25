@@ -17,3 +17,5 @@ man/aslogtail.pod
 sbin/arpsponge
 sbin/asctl
 sbin/aslogtail
+blib
+_build
