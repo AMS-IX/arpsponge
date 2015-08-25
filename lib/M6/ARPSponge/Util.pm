@@ -420,14 +420,6 @@ Returns 1 if I<ADDR> is part of I<NET>/I<PREFIX>, C<undef> otherwise.
 =item B<is_valid_int> ( I<ARG> [, I<OPTS> ] )
 X<is_valid_int>
 
-Check whether I<ARG> is defined and represents a valid integer. If I<MIN>
-and/or I<MAX> are given and not C<undef>, it also checks the boundaries
-(by default inclusive). Returns the integer value if the checks are successful,
-C<undef> otherwise.
-
-=item B<is_valid_int> ( I<ARG> [, I<OPTS> ] )
-X<is_valid_int>
-
 =over
 
 =item I<OPTS>:
