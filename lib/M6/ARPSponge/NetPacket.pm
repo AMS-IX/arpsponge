@@ -383,7 +383,8 @@ set. B<They do not set C<_parent> or C<_frame>!>
 
 =over
 
-=item X<decode_ethernet>B<decode_ethernet> ( I<DATA> )
+=item B<decode_ethernet> ( I<DATA> )
+X<decode_ethernet>
 
 (TCP/IP Illustrated, Volume 1, Section 2.2, p21-23.)
 
@@ -410,7 +411,8 @@ Payload data of the Ethernet frame.
 
 =back
 
-=item X<encode_ethernet>B<encode_ethernet> ( I<HASHREF> )
+=item B<encode_ethernet> ( I<HASHREF> )
+X<encode_ethernet>
 
 (TCP/IP Illustrated, Volume 1, Section 2.2, p21-23.)
 
@@ -437,11 +439,13 @@ Payload data of the Ethernet frame.
 
 =back
 
-=item X<decode_ip>B<decode_ip> ( I<DATA> )
+=item B<decode_ip> ( I<DATA> )
+X<decode_ip>
 
 Synonymous with L<decode_ipv4()|/decode_ipv4>.
 
-=item X<decode_ipv4>B<decode_ipv4> ( I<DATA> )
+=item B<decode_ipv4> ( I<DATA> )
+X<decode_ipv4>
 
 (TCP/IP Illustrated, Volume 1, Section 3.2, p34-37.)
 
@@ -504,7 +508,8 @@ Payload data of the IP datagram.
 
 =back
 
-=item X<decode_arp>B<decode_arp> ( I<DATA> )
+=item B<decode_arp> ( I<DATA> )
+X<decode_arp>
 
 (TCP/IP Illustrated, Volume 1, Section 4.4, p56-57.)
 
@@ -565,7 +570,8 @@ in practice (and our use case), we only see IP over Ethernet.
 Still, it pays to check the C<proto> and C<htype> fields, just to make sure you
 don't get nonsense.
 
-=item X<encode_arp>B<encode_arp> ( I<HASHREF> )
+=item B<encode_arp> ( I<HASHREF> )
+X<encode_arp>
 
 (TCP/IP Illustrated, Volume 1, Section 4.4, p56-57.)
 
