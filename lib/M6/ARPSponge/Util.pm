@@ -46,51 +46,51 @@ BEGIN {
 
 
 sub int2ip {
-	hex2ip(sprintf("%08x", shift @_));
+    hex2ip(sprintf("%08x", shift @_));
 }
 
 
 sub ip2int {
-	hex(ip2hex(shift @_));
+    hex(ip2hex(shift @_));
 }
 
 
 sub hex2ip {
-	my $hex = shift;
+    my $hex = shift;
 
-	$hex =~ /(..)(..)(..)(..)/;
-	my $ip = sprintf("%d.%d.%d.%d", hex($1), hex($2), hex($3), hex($4));
-	return $ip;
+    $hex =~ /(..)(..)(..)(..)/;
+    my $ip = sprintf("%d.%d.%d.%d", hex($1), hex($2), hex($3), hex($4));
+    return $ip;
 }
 
 
 sub ip2hex {
-	return sprintf("%02x%02x%02x%02x", split(/\./, shift));
+    return sprintf("%02x%02x%02x%02x", split(/\./, shift));
 }
 
 
 sub hex2mac {
-	my $hex = substr("000000000000".(shift @_), -12);
-	$hex =~ /(..)(..)(..)(..)(..)(..)/;
-	return sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
-			hex($1), hex($2), hex($3), hex($4), hex($5), hex($6));
+    my $hex = substr("000000000000".(shift @_), -12);
+    $hex =~ /(..)(..)(..)(..)(..)(..)/;
+    return sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
+            hex($1), hex($2), hex($3), hex($4), hex($5), hex($6));
 }
 
 
 sub mac2hex {
     return if !@_ or !defined $_[0];
-	my @mac = split(/[\s\.\-:\-]/, shift);
-	return undef if 12 % int(@mac);
-	my $digits = int(12 / int(@mac));
-	my $hex;
-	my $pref = "0" x $digits;
-	foreach (@mac) { $hex .= substr($pref.$_, -$digits) }
-	return lc $hex;
+    my @mac = split(/[\s\.\-:\-]/, shift);
+    return undef if 12 % int(@mac);
+    my $digits = int(12 / int(@mac));
+    my $hex;
+    my $pref = "0" x $digits;
+    foreach (@mac) { $hex .= substr($pref.$_, -$digits) }
+    return lc $hex;
 }
 
 
 sub mac2mac {
-	hex2mac(mac2hex($_[0]));
+    hex2mac(mac2hex($_[0]));
 }
 
 
@@ -234,7 +234,7 @@ sub is_valid_ip {
 
 
 sub format_time {
-	my $time = shift;
+    my $time = shift;
     my $separator = @_ ? shift : '@';
     if (defined $time && $time > 0) {
         return strftime("%Y-%m-%d${separator}%H:%M:%S", localtime($time));
@@ -243,7 +243,7 @@ sub format_time {
 }
 
 sub relative_time {
-	my $time = shift;
+    my $time = shift;
     my $with_direction = @_ ? shift : 1;
     my $now  = time;
 
