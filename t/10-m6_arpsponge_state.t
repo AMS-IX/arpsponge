@@ -1,3 +1,5 @@
+#!perl
+
 use Modern::Perl;
 use Test::Class;
 use FindBin;
