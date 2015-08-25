@@ -23,7 +23,6 @@
 package M6::ARPSponge::NetPacket;
 
 use Modern::Perl;
-use Const::Fast;
 
 our $VERSION = 1.00;
 
