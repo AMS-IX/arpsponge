@@ -859,6 +859,7 @@ AMS-IX extensions on top of Term::ReadLine.
 =item X<yesno>B<yesno>
 
 =back
+
 =head1 SEE ALSO
 
 L<Term::ReadKey|Term::ReadKey>(3pm),
