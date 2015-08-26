@@ -20,3 +20,6 @@ sbin/aslogtail
 blib
 _build
 Build
+META.*
+MYMETA.*
+cover_db
