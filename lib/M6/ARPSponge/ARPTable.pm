@@ -56,19 +56,19 @@ sub update {
     else {
         delete $self->table->{$ip};
     }
-    return;
+    return $self;
 }
 
 sub delete {
     my ($self, $ip) = @_;
     delete $self->table->{$ip};
-    return;
+    return $self;
 }
 
 sub clear {
     my $self = shift;
     %{$self->table} = ();
-    return;
+    return $self;
 }
 
 
@@ -144,19 +144,17 @@ reference to it.
 
 =head1 METHODS
 
-Unless explicitly mentioned, the methods below return no value.
-
 =over
 
 =item B<clear>
 X<clear>
 
-Clear all entries from the table.
+Clear all entries from the table. Returns the object reference.
 
 =item B<delete> ( I<HEXIP> )
 X<delete>
 
-Delete any entry for I<HEXIP>.
+Delete any entry for I<HEXIP>. Returns the object reference.
 
 =item B<lookup> ( I<HEXIP> )
 X<lookup>
@@ -197,6 +195,10 @@ otherwise, the current time is used.
 If I<HEXMAC> matches the C<000000000000> string (i.e. the MAC address
 is C<00:00:00:00:00:00>), any existing entry for I<HEXIP> is deleted,
 effectively implementing L</delete>().
+
+Returns the object reference, so calls can be chained:
+
+  $table->update($hex_ip1, $hex_mac1)->update($hex_ip2, $hex_mac2);
 
 =back
 
