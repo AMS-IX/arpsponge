@@ -51,6 +51,7 @@ sub update {
     my ($self, $ip, $mac, $time) = @_;
 
     if (defined $mac && $mac ne ETH_ADDR_NONE) {
+        # uncoverable condition false
         $self->table->{$ip} = [ $mac, $time // time ];
     }
     else {
