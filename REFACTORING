@@ -1,0 +1,10 @@
+* Use of Moo (or Mouse) for object building.
+* Re-work event loop.
+
+Current:
+ - Rename M6::ARP:* to M6::ARPSponge::*
+ - Split off "State".
+
+Need to work further on ARPSponge.pm:
+
+ - Create "StateTable" and "ARPTable" classes.
