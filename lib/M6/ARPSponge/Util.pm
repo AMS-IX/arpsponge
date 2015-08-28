@@ -78,9 +78,10 @@ sub hex2mac {
 
 
 sub mac2hex {
-    return if !@_ or !defined $_[0];
+    return if @_ == 0 or !defined $_[0];
     my @mac = split(/[\s\.\-:\-]/, shift);
-    return undef if 12 % int(@mac);
+    return if 12 % int(@mac);
+
     my $digits = int(12 / int(@mac));
     my $hex;
     my $pref = "0" x $digits;
@@ -136,7 +137,8 @@ sub is_valid_int {
         ${$opts{-err}} = 'not a valid number';
         return;
     }
-    elsif ($opts{-inclusive}) {
+
+    if ($opts{-inclusive}) {
         if (defined $opts{-min} && $num < $opts{-min}) {
             ${$opts{-err}} = 'number too small';
             return;
@@ -591,7 +593,7 @@ Example:
 
 Returns:
 
-  1 day 4h49m5s ago
+  1 day, 04:49:05 ago
 
 =back
 
