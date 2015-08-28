@@ -47,22 +47,25 @@ my $INT_DEAD    = -2;
 my $INT_ALIVE   = -1;
 my $INT_PENDING = 0;
 
-my ($OBJ_NONE, $OBJ_STATIC, $OBJ_DEAD, $OBJ_ALIVE);
+my $OBJ_NONE    = __PACKAGE__->new_from_int( $INT_NONE );
+my $OBJ_STATIC  = __PACKAGE__->new_from_int( $INT_STATIC );
+my $OBJ_DEAD    = __PACKAGE__->new_from_int( $INT_DEAD );
+my $OBJ_ALIVE   = __PACKAGE__->new_from_int( $INT_ALIVE );
 
 sub STATE_NONE {
-    return $OBJ_NONE //= __PACKAGE__->new_from_int( $INT_NONE );
+    return $OBJ_NONE;
 }
 
 sub STATE_STATIC {
-    return $OBJ_STATIC //= __PACKAGE__->new_from_int( $INT_STATIC );
+    return $OBJ_STATIC;
 }
 
 sub STATE_DEAD {
-    return $OBJ_DEAD //= __PACKAGE__->new_from_int( $INT_DEAD );
+    return $OBJ_DEAD;
 }
 
 sub STATE_ALIVE {
-    return $OBJ_ALIVE //= __PACKAGE__->new_from_int( $INT_ALIVE );
+    return $OBJ_ALIVE;
 }
 
 sub STATE_PENDING { __PACKAGE__->new_from_int(0 + $_[$#_]) };
