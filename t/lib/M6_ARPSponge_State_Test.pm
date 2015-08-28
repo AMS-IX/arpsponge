@@ -60,6 +60,16 @@ sub test_methods : Test(1) {
 }
 
 
+sub test_new : Test(3) {
+    my $self = shift;
+    my $from_int    = M6::ARPSponge::State->new(-3);
+    my $from_string = M6::ARPSponge::State->new('STATIC');
+    my $from_state  = M6::ARPSponge::State->new($from_int);
+    ok($from_int, 'new(-3)');
+    ok($from_string, 'new("STATIC")');
+    ok($from_string == $from_int, 'new("STATIC") == new(-3)');
+}
+
 sub test_new_from_int : Test(4) {
     my $self = shift;
     my $static  = M6::ARPSponge::State->new_from_int(-3);
