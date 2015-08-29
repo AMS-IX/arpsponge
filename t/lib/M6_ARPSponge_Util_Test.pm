@@ -22,7 +22,7 @@ use parent qw( Test::Class );
 
 use Modern::Perl;
 use Test::More;
-#use Test::Warnings qw( :all );
+use Test::Warnings qw( :all );
 use POSIX qw( strftime );
 
 use M6::ARPSponge::Util qw(:all);
@@ -363,7 +363,7 @@ sub test_relative_time : Test(9) {
     is($got, $expected, qq{relative_time() #9});
 }
 
-sub test_is_valid_ip : Test(6) {
+sub test_is_valid_ip : Test(no_plan) {
     my $ip_str1 = '192.168.100.2';
     my $ip_str2 = '192.168.100.300';
 
@@ -385,12 +385,15 @@ sub test_is_valid_ip : Test(6) {
     $got = is_valid_ip($ip_str1, -network => '192.168.100.0/25');
     is($got, $ip_str1, 'is_valid_ip #6');
 
-    #my $warning = warning { $got = is_valid_ip($ip_str1, -network => '192.168.300.0/25') };
+    my $warning = warning { $got = is_valid_ip($ip_str1, -network => '192.168.300.0/25') };
 
-    #like($warning,
-        #qr/\*\* INTERNAL.*-network argument .* is not valid/,
-        #'is_valid_ip #7'
-    #);
+    like($warning,
+        qr/\*\* INTERNAL.*-network argument .* is not valid/,
+        'is_valid_ip #7'
+    );
+
+    $got = is_valid_ip($ip_str1, -network => '192.168.200.0/24');
+    ok(!defined($got), 'is_valid_ip #8');
 }
 
 
