@@ -23,3 +23,5 @@ Build
 META.*
 MYMETA.*
 cover_db
+.*.swp
+.swp
