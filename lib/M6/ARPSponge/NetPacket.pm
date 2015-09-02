@@ -460,7 +460,7 @@ IP version (4, duh).
 
 =item C<hlen>
 
-Header length.
+Header length (in number of 4-byte words).
 
 =item C<tos>
 
@@ -468,11 +468,15 @@ Type of Service.
 
 =item C<len>
 
-IP packet length.
+IP packet length (in bytes).
 
 =item C<id>
 
 IP datagram identification.
+
+=item C<flags>
+
+IP flags (3 bits).
 
 =item C<foffset>
 
