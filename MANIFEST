@@ -29,6 +29,7 @@ lib/M6/ARPSponge.pm
 lib/M6/ARPSponge/ARPTable.pm
 lib/M6/ARPSponge/NetPacket.pm
 lib/M6/ARPSponge/State.pm
+lib/M6/ARPSponge/Queue.pm
 lib/M6/ARPSponge/Util.pm
 lib/M6/ReadLine.pm
 lib/Makefile
