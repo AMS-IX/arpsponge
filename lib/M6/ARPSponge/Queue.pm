@@ -40,11 +40,6 @@ has '_table' => (
     default => sub {{}},
 );
 
-BEGIN {
-    *get = \&get_timestamp;
-}
-
-
 sub clear_all {
     my $self = shift;
     %{$self->_table} = ();
@@ -125,7 +120,7 @@ sub add {
         return int(@$q);
     }
     else {
-        $self->_table->{$ip} = [ $src_ip, $val ];
+        $self->_table->{$ip} = [ [ $src_ip, $val ] ];
         return 1;
     }
 }
@@ -165,9 +160,7 @@ sub reduce {
 
     my $q = $self->_table->{$ip};
 
-    if (!$q || @$q == 0) {
-        return 0;
-    }
+    return 0 if !defined $q;
 
     if ($max_rate <= 0) {
         return int(@$q);
@@ -175,7 +168,8 @@ sub reduce {
 
     my $min_delta = 1/$max_rate;
 
-    my @sorted  = sort { $$a[0] cmp $$b[0] || $$a[1] <=> $$b[1] } @$q;
+    my @sorted  = sort { return ($$a[0] cmp $$b[0]) || ($$a[1] <=> $$b[1]) } @$q;
+
     my @reduced = ();
     my $prev_entry = undef;
     for my $entry (@sorted) {
