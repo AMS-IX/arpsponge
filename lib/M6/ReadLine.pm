@@ -1,4 +1,3 @@
-# @(#)$Id$
 #===============================================================================
 #
 #       Module:  M6::ReadLine
@@ -26,42 +25,52 @@
 
 package M6::ReadLine;
 
-use strict;
-use warnings;
-use feature ':5.10';
-use base qw( Exporter );
+use Modern::Perl;
+
+use parent qw( Exporter );
+
 use Term::ReadLine;
 use Term::ReadKey;
 use NetAddr::IP;
-use M6::ARP::Util qw( :all );
+use M6::ARPSponge::Util qw( :all );
 use Data::Dumper;
-use M6::ARP::Sponge qw( :flags );
 use Scalar::Util qw( reftype );
+use FindBin;
 
 BEGIN {
-	use Exporter;
-
     our $VERSION     = '1.00';
-	my  @check_func  = qw(
-            check_ip_address_arg  complete_ip_address_arg
-            check_int_arg
-            check_float_arg
-            check_bool_arg
-            match_prefix
-        );
-	my  @gen_functions = qw( compile_syntax init_readline exit_readline
-                             parse_line
-                             print_error_cond print_error
-                             last_error set_error clear_error
-                             yesno print_output
-                             clr_to_eol term_width fmt_text );
-	my  @functions   = (@check_func, @gen_functions);
-    my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER
-                           $HISTORY_FILE $IP_NETWORK );
+	my @check_func  = qw(
+        check_ip_address_arg
+        complete_ip_address_arg
+        check_int_arg
+        check_float_arg
+        check_bool_arg
+        match_prefix
+    );
+	my @gen_functions = qw(
+        compile_syntax
+        init_readline exit_readline
+        parse_line
+        print_error_cond print_error
+        last_error set_error clear_error
+        yesno print_output
+        clr_to_eol term_width fmt_text
+    );
+	my @functions   = (@check_func, @gen_functions);
+    my @vars        = qw(
+        $TERM $IN $OUT $PROMPT $PAGER
+        $HISTORY_FILE $IP_NETWORK
+    );
+
 	our @EXPORT_OK   = (@functions, @vars);
 	our @EXPORT      = @gen_functions;
-	our %EXPORT_TAGS = ( func => \@functions, check => \@check_func,
-                         all => \@EXPORT_OK, vars => \@vars );
+
+	our %EXPORT_TAGS = (
+        func  => \@functions,
+        check => \@check_func,
+        all   => \@EXPORT_OK,
+        vars  => \@vars
+    );
 }
 
 our $TERM         = undef;
@@ -484,6 +493,7 @@ sub clr_to_eol {
     return $CLR_TO_EOL;
 }
 
+
 # $fmt = fmt_text($prefix, $text, $maxlen, $indent);
 sub fmt_text {
     my ($prefix, $text, $maxlen, $indent) = @_;
@@ -509,6 +519,8 @@ sub fmt_text {
     }
     $out .= "\n";
 }
+
+
 sub exit_readline {
     return if !$TERM;
 
@@ -520,11 +532,10 @@ sub exit_readline {
 }
 
 sub init_readline {
-    my ($prog) = $0 =~ /.*?([^\/]+)$/;
     my %args = (
             'history_lines' => 1000,
             'completion'    => \&complete_line,
-            'name'          => $prog,
+            'name'          => $FindBin::Script,
             @_,
     );
     $args{history_file} //= "$::ENV{HOME}/.$args{name}_history";
@@ -594,6 +605,7 @@ sub _compile_syntax_element {
     return $curr;
 }
 
+
 # $compiled = _compile_branch($curr, $spec, $word, @rest);
 #
 #   We've parsed the syntax element of $spec up to $word. $word
@@ -649,6 +661,7 @@ sub print_error_cond {
     return set_error($out);
 }
 
+
 # print_error($msg, ...);
 #
 #   Always returns false, always prints to STDERR, always ends
@@ -697,9 +710,9 @@ sub print_output {
     my $curr_fh = select;
     if ($TERM && -t $curr_fh) {
         local($::SIG{PIPE}) = 'IGNORE';
-        open(MORE, "|$PAGER");
-        print MORE $out;
-        close MORE;
+        open my $pager, "|$PAGER";
+        $pager->print($out);
+        close $pager;
         $ret = $? == 0;
         $TERM->on_new_line();
     }
@@ -747,8 +760,10 @@ M6::ReadLine - AMS-IX extensions on top of Term::ReadLine
 
 =head1 SYNOPSIS
 
+ use FindBin;
  use M6::ReadLine qw( :all );
 
+ my $prog = $FindBin::Script;
  init_readline(
             'history_lines' => 1000,
             'completion'    => \&M6::ReadLine::complete_line,
@@ -756,7 +771,28 @@ M6::ReadLine - AMS-IX extensions on top of Term::ReadLine
             'history_file'  => "$::ENV{HOME}/.${prog}_history";
         );
 
-    ...
+ my $syntax = compile_syntax({
+    'quit' => { '?' => 'Exit program.' },
+    'help' => { '?' => 'Show command summary.' },
+    'ping $count? $delay?' => {
+        '?'      => 'Send "ping" packets, display RTT.',
+        '$count' => { type=>'int', min=>1, default=>1 },
+        '$delay' => { type=>'float', min=>0.01, default=>1 },
+    }
+ });
+
+ while (1) {
+    my $input = $TERM->readline('~> ');
+    last if !defined $input;
+
+    next if $input =~ /^\s*(?:#.*)?$/;
+
+    if (parse_line($line, \@parsed, \%args)) {
+        print "@parsed\n";
+    }
+ }
+
+ ...
 
  exit_readline();
 
@@ -790,11 +826,14 @@ AMS-IX extensions on top of Term::ReadLine.
 
 =over
 
-=item X<compile_syntax>B<compile_syntax>
+=item B<compile_syntax>
+X<compile_syntax>
 
-=item X<exit_readline>B<exit_readline>
+=item B<exit_readline>
+X<exit_readline>
 
-=item X<init_readline>B<init_readline>
+=item B<init_readline>
+X<init_readline>
 
 =back
 
@@ -802,21 +841,29 @@ AMS-IX extensions on top of Term::ReadLine.
 
 =over
 
-=item X<check_bool_arg>B<check_bool_arg>
+=item B<check_bool_arg>
+X<check_bool_arg>
 
-=item X<check_float_arg>B<check_float_arg>
+=item B<check_float_arg>
+X<check_float_arg>
 
-=item X<check_int_arg>B<check_int_arg>
+=item B<check_int_arg>
+X<check_int_arg>
 
-=item X<check_ip_address_arg>B<check_ip_address_arg>
+=item B<check_ip_address_arg>
+X<check_ip_address_arg>
 
-=item X<check_mac_address_arg>B<check_mac_address_arg>
+=item B<check_mac_address_arg>
+X<check_mac_address_arg>
 
-=item X<match_prefix>B<match_prefix>
+=item B<match_prefix>
+X<match_prefix>
 
-=item X<parse_line>B<parse_line>
+=item B<parse_line>
+X<parse_line>
 
-=item X<parse_words>B<parse_words>
+=item B<parse_words>
+X<parse_words>
 
 =back
 
@@ -824,11 +871,14 @@ AMS-IX extensions on top of Term::ReadLine.
 
 =over
 
-=item X<complete_ip_address_arg>B<complete_ip_address_arg>
+=item B<complete_ip_address_arg>
+X<complete_ip_address_arg>
 
-=item X<complete_line>B<complete_line>
+=item B<complete_line>
+X<complete_line>
 
-=item X<complete_words>B<complete_words>
+=item B<complete_words>
+X<complete_words>
 
 =back
 
@@ -836,19 +886,26 @@ AMS-IX extensions on top of Term::ReadLine.
 
 =over
 
-=item X<clear_error>B<clear_error>
+=item B<clear_error>
+X<clear_error>
 
-=item X<last_error>B<last_error>
+=item B<last_error>
+X<last_error>
 
-=item X<print_error>B<print_error>
+=item B<print_error>
+X<print_error>
 
-=item X<print_error_cond>B<print_error_cond>
+=item B<print_error_cond>
+X<print_error_cond>
 
-=item X<print_output>B<print_output>
+=item B<print_output>
+X<print_output>
 
-=item X<set_error>B<set_error>
+=item B<set_error>
+X<set_error>
 
-=item X<clr_to_eol>B<clr_to_eol>
+=item B<clr_to_eol>
+X<clr_to_eol>
 
 =back
 
@@ -856,24 +913,24 @@ AMS-IX extensions on top of Term::ReadLine.
 
 =over
 
-=item X<yesno>B<yesno>
+=item B<yesno>
+X<yesno>
 
 =back
 
 =head1 SEE ALSO
 
-L<Term::ReadKey|Term::ReadKey>(3pm),
-L<Term::ReadLine|Term::ReadLine>(3pm),
-L<Term::ReadLine::Gnu|Term::ReadLine::Gnu>(3pm),
-L<perl(1)|perl>.
+L<Term::ReadKey>(3pm),
+L<Term::ReadLine>(3pm),
+L<Term::ReadLine::Gnu>(3pm).
 
 =head1 AUTHOR
 
-Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011.
+Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011-2015.
 
 =head1 COPYRIGHT
 
-Copyright 2011, AMS-IX B.V.
+Copyright 2011-2015, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
 =cut
