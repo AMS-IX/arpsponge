@@ -1,15 +1,13 @@
 #===============================================================================
 #
-#       Module:  M6::ReadLine
-#         File:  ReadLine.pm
+#       Module:  M6::CLI
 #
 #  Description:  parse/validate/completion for programs that use ReadLine.
 #
-#        Files:  Parser.pm
 #       Author:  Steven Bakker (SB), <steven.bakker@ams-ix.net>
-#      Created:  2011-04-21 13:28:04 CEST
+#      Created:  2011-04-21 13:28:04 CEST (as M6::ReadLine)
 #
-#   Copyright (c) 2011 AMS-IX B.V.; All rights reserved.
+#   Copyright (c) 2011-2015 AMS-IX B.V.; All rights reserved.
 #
 #   This module is free software; you can redistribute it and/or
 #   modify it under the same terms as Perl itself. See perldoc
@@ -23,16 +21,18 @@
 #
 #===============================================================================
 
-package M6::ReadLine;
+package M6::CLI;
 
 use Modern::Perl;
 
 use parent qw( Exporter );
 
+use Params::Check qw( check );
+use POSIX ( );
+
 use Term::ReadLine;
 use Term::ReadKey;
 use NetAddr::IP;
-use M6::ARPSponge::Util qw( :all );
 use Data::Dumper;
 use Scalar::Util qw( reftype );
 use FindBin;
@@ -120,26 +120,105 @@ our %TYPES = (
         },
     );
 
-# $word = match_prefix($input, \@words [, $silent]);
-sub match_prefix {
-    my ($input, $words, $silent) = @_;
+
+#
+# $word = match_unique_prefix($input, \@words [, $silent_err]);
+#
+sub match_unique_prefix {
+    my $input = lc shift;
+    my ($words, $silent_err) = @_;
 
     my $word;
     for my $w (sort @$words) {
-        if (substr(lc $w, 0, length($input)) eq lc $input) {
-            if (!defined $word) {
-                $word = $w;
-            }
-            else {
-                return print_error_cond(!$silent,
+        if (substr(lc $w, 0, length($input)) eq $input) {
+            if (defined $word) {
+                return print_error_cond(!$silent_err,
                         qq{"$input" is ambiguous: matches "$word" and "$w"}
                     );
             }
+            $word = $w;
         }
     }
     return clear_error($word);
 }
 
+
+sub _is_valid_num {
+    my $func = shift;
+    my $arg  = shift;
+    my $err_s;
+    my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
+
+    if (!defined $arg || length($arg) == 0) {
+        ${$opts{-err}} = 'not a valid number';
+        return;
+    }
+
+    my ($num, $unparsed) = $func->($arg);
+    if ($unparsed) {
+        ${$opts{-err}} = 'not a valid number';
+        return;
+    }
+
+    if ($opts{-inclusive}) {
+        if (defined $opts{-min} && $num < $opts{-min}) {
+            ${$opts{-err}} = 'number too small';
+            return;
+        }
+        if (defined $opts{-max} && $num > $opts{-max}) {
+            ${$opts{-err}} = 'number too large';
+            return;
+        }
+    }
+    else {
+        if (defined $opts{-min} && $num <= $opts{-min}) {
+            ${$opts{-err}} = 'number too small';
+            return;
+        }
+        if (defined $opts{-max} && $num >= $opts{-max}) {
+            ${$opts{-err}} = 'number too large';
+            return;
+        }
+    }
+    ${$opts{-err}} = '';
+    return $num;
+}
+
+
+sub is_valid_int   { return _is_valid_num(\&POSIX::strtol, @_) }
+sub is_valid_float { return _is_valid_num(\&POSIX::strtod, @_) }
+
+
+sub is_valid_ip {
+    my $arg = shift;
+    my $err_s;
+    my %opts = (-err => \$err_s, -network => undef, @_);
+
+    if (!defined $arg || length($arg) == 0) {
+        ${$opts{-err}} = q/"" is not a valid IPv4 address/;
+        return;
+    }
+
+    my $ip = NetAddr::IP->new($arg);
+    if (!$ip) {
+        ${$opts{-err}} = qq/"$arg" is not a valid IPv4 address/;
+        return;
+    }
+    
+    return $ip->addr() if !$opts{-network};
+   
+    if (my $net = NetAddr::IP->new($opts{-network})) {
+        return $ip->addr() if $net->contains($ip);
+        ${$opts{-err}} = qq/$arg is out of range /.$net->cidr();
+        return;
+    }
+    else {
+        ${$opts{-err}} = qq/** INTERNAL ** is_valid_ip(): -network /
+                       . qq/argument "$opts{-network}" is not valid/;
+        warn ${$opts{-err}};
+        return;
+    }
+}
 # $byte = check_int_arg(\%spec, $arg, 'byte');
 sub check_int_arg {
     my ($spec, $arg, $silent) = @_;
@@ -311,7 +390,7 @@ sub parse_words {
             }
             else {
                 return print_error("@$parsed: expected one of:\n",
-                                   fmt_text('', $words_str, undef, 4));
+                                   fmt_text($words_str, indent => 4));
                 #return print_error("@$parsed: expected one of:\n$words_str");
             }
         }
@@ -327,13 +406,13 @@ sub parse_words {
         elsif (@match > 1) {
             return print_error(
                         qq{ambibuous input "$$words[0]"; matches:\n},
-                        fmt_text('', join(" ", sort @match), undef, 4),
+                        fmt_text(join(' ', sort @match), indent => 4),
                     );
         }
         else {
             return print_error(
                         qq{invalid input "$$words[0]"; expected one of:\n},
-                        fmt_text('', $words_str, undef, 4)
+                        fmt_text($words_str, indent => 4)
                     );
         }
     }
@@ -352,6 +431,11 @@ sub parse_words {
         if (my $type = $TYPES{$arg_spec->{type}}) {
             my $validate = $type->{verify} // sub { $_[0] };
             eval { $arg_val = $validate->($arg_spec, $words->[0]) };
+            if (!defined $arg_val && $@) { 
+                return print_error(
+                    qq{@$parsed: internal error on parsing '$$words[0]': $@}
+                );
+            }
         }
         else {
             $arg_val = $words->[0];
@@ -494,30 +578,54 @@ sub clr_to_eol {
 }
 
 
-# $fmt = fmt_text($prefix, $text, $maxlen, $indent);
+# $fmt = fmt_text($text, [ opts ]);
 sub fmt_text {
-    my ($prefix, $text, $maxlen, $indent) = @_;
-    $maxlen //= term_width() - 4;
-    $indent //= 0;
+    my $text;
+
+    if (@_ % 2 == 1) { 
+        $text = shift;
+    }
+
+    my $opts = check({
+            prefix => { store => \(my $prefix = '') },
+            maxlen => { store => \(my $maxlen = term_width()-4) },
+            indent => { store => \(my $indent = 0) },
+            text   => { store => \$text },
+        }, {@_}, 1);
 
     if ($indent > length($prefix) && $prefix !~ /\n$/) {
+        # If the prefix is shorter than the indent, and there's no newline.
+        # So, padd it with spaces until it has the correct indent.
         $prefix .= ' ' x ($indent - length($prefix));
     }
 
     my $indent_text = ' ' x $indent;
     my @words = split(' ', $text);
-    my $pos = length($prefix);
+
     my $out = $prefix;
+    my $pos_in_line;
+    if ($out =~ /^(.+?)\z/m) {
+        $pos_in_line = length($1);
+    }
+    else {
+        $out .= $indent_text;
+        $pos_in_line = $indent;
+    }
+
     for my $w (@words) {
-        if ($pos + length($w) + 1 > $maxlen) {
+        if ($pos_in_line + length($w) + 1 > $maxlen) {
             $out .= "\n$indent_text";
-            $pos = $indent;
+            $pos_in_line = $indent;
         }
-        if ($pos>$indent) { $out .= ' '; $pos++ }
+        if ($pos_in_line > $indent) {
+            $out .= ' ';
+            $pos_in_line++;
+        }
         $out .= $w;
-        $pos += length($w);
+        $pos_in_line += length($w);
     }
     $out .= "\n";
+    return $out;
 }
 
 
@@ -642,6 +750,9 @@ sub _compile_branch {
     return _compile_syntax_element($curr, $spec, @rest);
 }
 
+# ===========================================================================
+# ERROR HANDLING
+# ===========================================================================
 
 # print_error_cond($bool, $msg, ...);
 #
@@ -655,7 +766,7 @@ sub print_error_cond {
     chomp($out);
 
     if ($cond) {
-        print STDERR $out, "\n";
+        say STDERR $out;
         $TERM && $TERM->on_new_line();
     }
     return set_error($out);
@@ -756,19 +867,19 @@ __END__
 
 =head1 NAME
 
-M6::ReadLine - AMS-IX extensions on top of Term::ReadLine
+M6::CLI - AMS-IX extensions on top of Term::ReadLine
 
 =head1 SYNOPSIS
 
  use FindBin;
- use M6::ReadLine qw( :all );
+ use M6::CLI qw( :all );
 
  my $prog = $FindBin::Script;
  init_readline(
             'history_lines' => 1000,
-            'completion'    => \&M6::ReadLine::complete_line,
+            'completion'    => \&M6::CLI::complete_line,
             'name'          => $prog,
-            'history_file'  => "$::ENV{HOME}/.${prog}_history";
+            'history_file'  => "$::ENV{HOME}/.${prog}_history",
         );
 
  my $syntax = compile_syntax({
@@ -785,9 +896,12 @@ M6::ReadLine - AMS-IX extensions on top of Term::ReadLine
     my $input = $TERM->readline('~> ');
     last if !defined $input;
 
+    my @parsed;
+    my %args;
+
     next if $input =~ /^\s*(?:#.*)?$/;
 
-    if (parse_line($line, \@parsed, \%args)) {
+    if (parse_line($input, \@parsed, \%args)) {
         print "@parsed\n";
     }
  }
@@ -856,8 +970,8 @@ X<check_ip_address_arg>
 =item B<check_mac_address_arg>
 X<check_mac_address_arg>
 
-=item B<match_prefix>
-X<match_prefix>
+=item B<match_unique_prefix>
+X<match_unique_prefix>
 
 =item B<parse_line>
 X<parse_line>
@@ -920,6 +1034,7 @@ X<yesno>
 
 =head1 SEE ALSO
 
+L<less>(1),
 L<Term::ReadKey>(3pm),
 L<Term::ReadLine>(3pm),
 L<Term::ReadLine::Gnu>(3pm).
