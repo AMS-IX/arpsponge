@@ -896,12 +896,9 @@ M6::CLI - AMS-IX extensions on top of Term::ReadLine
     my $input = $TERM->readline('~> ');
     last if !defined $input;
 
-    my @parsed;
-    my %args;
-
     next if $input =~ /^\s*(?:#.*)?$/;
 
-    if (parse_line($input, \@parsed, \%args)) {
+    if (parse_line($input, \(my @parsed), \(my %args))) {
         print "@parsed\n";
     }
  }
@@ -979,6 +976,15 @@ X<parse_line>
 =item B<parse_words>
 X<parse_words>
 
+=item B<is_valid_int>
+X<is_valid_int>
+
+=item B<is_valid_float>
+X<is_valid_float>
+
+=item B<is_valid_ip>
+X<is_valid_ip>
+
 =back
 
 =head2 Completion
@@ -999,6 +1005,9 @@ X<complete_words>
 =head2 Output / Error Handling
 
 =over
+
+=item B<fmt_text>
+X<fmt_text>
 
 =item B<clear_error>
 X<clear_error>
