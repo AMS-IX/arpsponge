@@ -122,8 +122,9 @@ sub hex_addr_in_net {
 }
 
 
-sub is_valid_int {
-    my $arg = shift;
+sub _is_valid_num {
+    my $func = shift;
+    my $arg  = shift;
     my $err_s;
     my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
 
@@ -132,7 +133,7 @@ sub is_valid_int {
         return;
     }
 
-    my ($num, $unparsed) = strtol($arg);
+    my ($num, $unparsed) = $func->($arg);
     if ($unparsed) {
         ${$opts{-err}} = 'not a valid number';
         return;
@@ -163,44 +164,8 @@ sub is_valid_int {
 }
 
 
-sub is_valid_float {
-    my $arg = shift;
-    my $err_s;
-    my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
-
-    if (!defined $arg || length($arg) == 0) {
-        ${$opts{-err}} = 'not a valid number';
-        return;
-    }
-
-    my ($num, $unparsed) = strtod($arg);
-    if ($unparsed) {
-        ${$opts{-err}} = 'not a valid number';
-        return;
-    }
-    elsif ($opts{-inclusive}) {
-        if (defined $opts{-min} && $num < $opts{-min}) {
-            ${$opts{-err}} = 'number too small';
-            return;
-        }
-        if (defined $opts{-max} && $num > $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
-            return;
-        }
-    }
-    else {
-        if (defined $opts{-min} && $num <= $opts{-min}) {
-            ${$opts{-err}} = 'number too small';
-            return;
-        }
-        if (defined $opts{-max} && $num >= $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
-            return;
-        }
-    }
-    ${$opts{-err}} = '';
-    return $num;
-}
+sub is_valid_int   { return _is_valid_num(\&POSIX::strtol, @_) }
+sub is_valid_float { return _is_valid_num(\&POSIX::strtod, @_) }
 
 
 sub is_valid_ip {
