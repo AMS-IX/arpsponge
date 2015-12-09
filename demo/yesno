@@ -1,0 +1,14 @@
+#!/usr/bin/perl
+
+use Modern::Perl;
+use lib qw( ../lib );
+
+use M6::CLI qw( yesno );
+
+my $question = 'Are you sure';
+
+while (1) {
+    my $answer = yesno($question, 'yNq');
+    say "ANSWER: $answer";
+    last if $answer < 0;
+}

@@ -1,0 +1,26 @@
+#!/usr/bin/perl
+
+use Modern::Perl;
+use lib qw( ../lib );
+
+use M6::CLI qw( fmt_text );
+
+my $prefix;
+
+my $text;
+
+$prefix = "The Challenge:\n";
+$text = "This is some text, that should be reflowed. In the year 2525, "
+      . "(if Man is stil alive), we'll all be eating candy bars and daddy "
+      . "long legs; these are delicious when fried with bull testicles."
+      ;
+
+$prefix = "MONKEY, n. ";
+$text = "An-arboreal-animal-which-makes itself at home in genealogical trees.";
+
+my $maxlen = @ARGV ? int(shift) : 72;
+my $indent = @ARGV ? int(shift) : length($prefix)+1;
+
+my $new = fmt_text($text, prefix => $prefix, indent => $indent, maxlen => $maxlen);
+
+print $new;
