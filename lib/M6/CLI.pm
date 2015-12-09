@@ -23,9 +23,10 @@
 
 package M6::CLI;
 
-use Modern::Perl;
-
 use parent qw( Exporter );
+
+use Modern::Perl;
+use Moo;
 
 use Params::Check qw( check );
 use POSIX ( );
@@ -36,6 +37,16 @@ use NetAddr::IP;
 use Data::Dumper;
 use Scalar::Util qw( reftype );
 use FindBin;
+ 
+has IN              => ( is => 'rw', writer => '_IN'  );
+has OUT             => ( is => 'rw', writer => '_OUT' );
+has term            => ( is => 'rw' );
+has history_file    => ( is => 'rw' );
+has ip_network      => ( is => 'rw' );
+has syntax          => ( is => 'rw' );
+has pager           => ( is => 'rw' );
+has error           => ( is => 'rw', writer => '_error' );
+has prompt          => ( is => 'rw', writer => '_TERM' );
 
 BEGIN {
     our $VERSION     = '1.00';
@@ -86,7 +97,6 @@ our $PAGER        = join(' ', qw(
                              --quit-if-one-screen
                     ));
 
-my $CLR_TO_EOL    = undef;
 my $ERROR         = undef;
 
 our %TYPES = (
@@ -147,40 +157,40 @@ sub _is_valid_num {
     my $func = shift;
     my $arg  = shift;
     my $err_s;
-    my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
+    my %opts = (err => \$err_s, min => undef, max => undef, inclusive => 1, @_);
 
     if (!defined $arg || length($arg) == 0) {
-        ${$opts{-err}} = 'not a valid number';
+        ${$opts{err}} = 'not a valid number';
         return;
     }
 
     my ($num, $unparsed) = $func->($arg);
     if ($unparsed) {
-        ${$opts{-err}} = 'not a valid number';
+        ${$opts{err}} = 'not a valid number';
         return;
     }
 
-    if ($opts{-inclusive}) {
-        if (defined $opts{-min} && $num < $opts{-min}) {
-            ${$opts{-err}} = 'number too small';
+    if ($opts{inclusive}) {
+        if (defined $opts{min} && $num < $opts{min}) {
+            ${$opts{err}} = 'number too small';
             return;
         }
-        if (defined $opts{-max} && $num > $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
+        if (defined $opts{max} && $num > $opts{max}) {
+            ${$opts{err}} = 'number too large';
             return;
         }
     }
     else {
-        if (defined $opts{-min} && $num <= $opts{-min}) {
-            ${$opts{-err}} = 'number too small';
+        if (defined $opts{min} && $num <= $opts{min}) {
+            ${$opts{err}} = 'number too small';
             return;
         }
-        if (defined $opts{-max} && $num >= $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
+        if (defined $opts{max} && $num >= $opts{max}) {
+            ${$opts{err}} = 'number too large';
             return;
         }
     }
-    ${$opts{-err}} = '';
+    ${$opts{err}} = '';
     return $num;
 }
 
@@ -188,46 +198,45 @@ sub _is_valid_num {
 sub is_valid_int   { return _is_valid_num(\&POSIX::strtol, @_) }
 sub is_valid_float { return _is_valid_num(\&POSIX::strtod, @_) }
 
-
 sub is_valid_ip {
     my $arg = shift;
     my $err_s;
-    my %opts = (-err => \$err_s, -network => undef, @_);
+    my %opts = (err => \$err_s, network => undef, @_);
 
     if (!defined $arg || length($arg) == 0) {
-        ${$opts{-err}} = q/"" is not a valid IPv4 address/;
+        ${$opts{err}} = q/"" is not a valid IPv4 address/;
         return;
     }
 
     my $ip = NetAddr::IP->new($arg);
     if (!$ip) {
-        ${$opts{-err}} = qq/"$arg" is not a valid IPv4 address/;
+        ${$opts{err}} = qq/"$arg" is not a valid IPv4 address/;
         return;
     }
     
-    return $ip->addr() if !$opts{-network};
+    return $ip->addr() if !$opts{network};
    
     if (my $net = NetAddr::IP->new($opts{-network})) {
         return $ip->addr() if $net->contains($ip);
-        ${$opts{-err}} = qq/$arg is out of range /.$net->cidr();
+        ${$opts{err}} = qq/$arg is out of range /.$net->cidr();
         return;
     }
     else {
-        ${$opts{-err}} = qq/** INTERNAL ** is_valid_ip(): -network /
-                       . qq/argument "$opts{-network}" is not valid/;
-        warn ${$opts{-err}};
+        ${$opts{err}} = qq/** INTERNAL ** is_valid_ip(): -network /
+                       . qq/argument "$opts{network}" is not valid/;
+        warn ${$opts{err}};
         return;
     }
 }
+
+
 # $byte = check_int_arg(\%spec, $arg, 'byte');
 sub check_int_arg {
     my ($spec, $arg, $silent) = @_;
-    my $min     = $spec->{min};
-    my $max     = $spec->{max};
     my $argname = $spec->{name} // 'num';
 
     my $err;
-    my $val = is_valid_int($arg, -min=>$min, -max=>$max, -err=>\$err);
+    my $val = is_valid_int($arg, %$spec, err=>\$err);
     if (defined $val) {
         return clear_error($val);
     }
@@ -237,12 +246,10 @@ sub check_int_arg {
 # $percentage = check_float_arg({min=>0, max=>100}, $arg, 'percentage');
 sub check_float_arg {
     my ($spec, $arg, $silent) = @_;
-    my $min     = $spec->{min};
-    my $max     = $spec->{max};
     my $argname = $spec->{name} // 'num';
 
     my $err;
-    my $val = is_valid_float($arg, -min=>$min, -max=>$max, -err=>\$err);
+    my $val = is_valid_float($arg, %$spec, err=>\$err);
     if (defined $val) {
         return clear_error($val);
     }
@@ -271,7 +278,7 @@ sub check_ip_address_arg {
     my $argname = $spec->{name} // 'ip';
 
     my $err;
-    $arg = is_valid_ip($arg, -network=>$IP_NETWORK->cidr, -err=>\$err);
+    $arg = is_valid_ip($arg, network=>$IP_NETWORK->cidr, err=>\$err);
     if (defined $arg) {
         return clear_error($arg);
     }
@@ -572,13 +579,14 @@ sub term_width {
     return $cols;
 }
 
+# $clrt_to_eol = clr_to_eol();
 sub clr_to_eol {
-    $CLR_TO_EOL //= readpipe('tput el 2>/dev/null');
+    state $CLR_TO_EOL = readpipe('tput el 2>/dev/null');
     return $CLR_TO_EOL;
 }
 
 
-# $fmt = fmt_text($text, [ opts ]);
+# $fmt = fmt_text( [text =>] $text, [ opt => val, ... ]);
 sub fmt_text {
     my $text;
 
@@ -593,10 +601,14 @@ sub fmt_text {
             text   => { store => \$text },
         }, {@_}, 1);
 
-    if ($indent > length($prefix) && $prefix !~ /\n$/) {
-        # If the prefix is shorter than the indent, and there's no newline.
-        # So, padd it with spaces until it has the correct indent.
-        $prefix .= ' ' x ($indent - length($prefix));
+    if ($prefix !~ /\n$/) {
+        # The prefix does not end in a newline.
+        my ($prefix_tail) = $prefix =~ /^(.*)\z/m;
+        if (length($prefix_tail) < $indent) {
+            # The prefix is shorter than the indent, so pad
+            # it with spaces until it has the correct length.
+            $prefix .= ' ' x ($indent - length($prefix_tail));
+        }
     }
 
     my $indent_text = ' ' x $indent;
@@ -612,12 +624,17 @@ sub fmt_text {
         $pos_in_line = $indent;
     }
 
+    # Push words onto $out, making sure each line doesn't run over
+    # $maxlen.
     for my $w (@words) {
         if ($pos_in_line + length($w) + 1 > $maxlen) {
+            # Next word would make the line run over $maxlen,
+            # so insert a newline.
             $out .= "\n$indent_text";
             $pos_in_line = $indent;
         }
-        if ($pos_in_line > $indent) {
+        if ($out =~ /\S+$/) {
+            # Always eparate words with a space.
             $out .= ' ';
             $pos_in_line++;
         }
@@ -833,6 +850,7 @@ sub print_output {
     return $ret;
 }
 
+# $answer = yesno($question, "Ynq");
 sub yesno {
     my ($question, $answers) = @_;
     my ($default) = $answers =~ /([A-Z])/;
@@ -846,11 +864,12 @@ sub yesno {
             if ($_ eq "\c[")  { $key = 'n' }
             elsif (/[\r\n ]/) { $key = $default }
         }
-        next if index(lc $answers, lc $key) < 0;
         foreach (lc $key) {
-            if    ($_ eq "y") { $answer = 1  }
-            elsif ($_ eq "n") { $answer = 0  }
-            elsif ($_ eq "q") { $answer = -1 }
+            if (index(lc $answers, $_) >= 0) {
+                if    ($_ eq "y") { $answer = +1  }
+                elsif ($_ eq "n") { $answer =  0  }
+                elsif ($_ eq "q") { $answer = -1 }
+            }
         }
         last if defined $answer;
     }
@@ -1006,8 +1025,75 @@ X<complete_words>
 
 =over
 
-=item B<fmt_text>
+=item B<fmt_text> ( I<text>, [ I<param> =E<gt> I<val>, ... ] )
 X<fmt_text>
+
+=item B<fmt_text> ( B<text> =E<gt> I<text>, [ I<param> =E<gt> I<val>, ... ] )
+
+Parameters: 
+
+=over
+
+=item B<prefix> =E<gt> I<string>
+
+=item B<maxlen> =E<gt> I<int>
+
+=item B<indent> =E<gt> I<int>
+
+=back
+
+Format I<text>, so that it wraps at B<maxlen> columns
+(default is terminal width minus 4), with the first line
+prefixed with B<prefix> and the body indented by B<indent>
+spaces.
+
+For non-empty prefixes, there is always a space between
+the prefix and the I<text>.
+
+The return value is the reflowed string, which is always
+terminated by a newline.
+
+Example:
+
+   fmt_text( ""
+    -prefix => 'MONKEY, n.',
+    -text   => 'An arboreal animal which makes itself'
+              .' at home in genealogical trees.'
+    -maxlen => 4,
+    -indent => 10,
+   );
+
+Result:
+
+    |0--------1---------2---------3|
+    |1--------0---------0---------0|
+    |MONKEY, n. An arboreal animal |
+    |    which makes itself at home|
+    |    in genealogical trees.    |
+
+Note that the lines in the resulting string are not guaranteed
+to stay within the B<maxlen> limit: if a single word exceeds
+the length limit, it is added on a (possibly indented) line on
+its own.
+
+Example:
+
+   fmt_text( ""
+    -prefix => 'MONKEY, n.',
+    -text   => 'An-arboreal-animal-which-makes itself'
+              .' at home in genealogical trees.'
+    -maxlen => 4,
+    -indent => 10,
+   );
+
+Result:
+
+    |0--------1---------2---------3|
+    |1--------0---------0---------0|
+    |MONKEY, n.                    |
+    |   An-arboreal-animal-which-makes
+    |   itself at home in          |
+    |   genealogical trees.        |
 
 =item B<clear_error>
 X<clear_error>
@@ -1030,14 +1116,42 @@ X<set_error>
 =item B<clr_to_eol>
 X<clr_to_eol>
 
+Return the string that will clear the current line on the terminal from the cursor
+position onwards, i.e. return the terminal's C<el> string.
+
 =back
 
 =head2 Miscellaneous
 
 =over
 
-=item B<yesno>
+=item B<yesno> ( I<question>, I<answer> )
 X<yesno>
+
+Ask I<question> and read a yes/no answer.
+
+The I<answers> string should contain a combination of the letters C<y>,
+C<n>, and C<q>, corresponding to resp. C<yes>, C<no>, C<quit>. If any
+of the letters is capitalised, it is taken to be the default answer
+if the user hits Enter or Space (if none given, the default is C<N>).
+
+The return value is an integer:
+
+=over
+
+=item C<+1>
+
+Yes.
+
+=item C<0>
+
+No.
+
+=item C<-1>
+
+Quit.
+
+=back
 
 =back
 
