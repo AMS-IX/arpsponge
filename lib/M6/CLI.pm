@@ -28,7 +28,7 @@ use parent qw( Exporter );
 use Modern::Perl;
 use Moo;
 
-use Carp qw( croak );
+use Carp qw( carp croak );
 use Data::Dumper;
 use FindBin;
 use NetAddr::IP;
@@ -38,11 +38,43 @@ use Scalar::Util qw( reftype blessed );
 use Term::ReadKey;
 use Term::ReadLine;
  
-my $PAGER        = join(' ', qw(
-                        less --no-lessopen --no-init
-                             --dumb  --quit-at-eof
-                             --quit-if-one-screen
-                    ));
+my $PAGER = join(' ', qw(
+    less --no-lessopen --no-init
+         --dumb  --quit-at-eof
+         --quit-if-one-screen
+));
+
+my %TYPES = (
+    'int' => {
+        'verify'   => \&check_int_arg,
+        'complete' => [],
+    },
+    'float' => {
+        'verify'   => \&check_float_arg,
+        'complete' => [],
+    },
+    'bool' => {
+        'verify'   => \&check_bool_arg,
+        'complete' => [ qw( true false on off yes no ) ],
+    },
+    'mac-address' => {
+        'verify'   => \&check_mac_address_arg,
+        'complete' => [],
+    },
+    'ip-address' => {
+        'verify'   => \&check_ip_address_arg,
+        'complete' => \&complete_ip_address_arg,
+    },
+    'string' => {
+        'verify'   => sub { return $_[0]->clear_error($_[2]) },
+        'complete' => []
+    },
+    'filename' => {
+        'verify'   => sub { return $_[0]->clear_error($_[2]) },
+        'complete' => \&complete_filename,
+    },
+);
+
 
 has IN         => ( is => 'ro', default => sub{ *STDIN } ),
 has OUT        => ( is => 'ro', default => sub{ *STDOUT } ),
@@ -77,13 +109,6 @@ around ip_network => sub {
     }
     return $orig->($self);
 };
-
-# Wrap around Term::ReadLine->readline() providing a default prompt.
-sub readline {
-    my $self = shift;
-    my $prompt = @_ ? shift : $self->prompt();
-    return $self->term->readline($prompt);
-}
 
 
 sub BUILD {
@@ -131,6 +156,52 @@ sub BUILD {
     return $self;
 }
 
+# ===========================================================================
+#
+#   TYPE FUNCTIONS
+#
+# ===========================================================================
+
+# register a user type.
+sub register_type {
+    my $self = shift;
+    my $name = lc shift;
+    my $definition = shift;
+
+    if (defined $TYPES{$name}) {
+        carp "register_type(): '$name' redefined"; 
+    }
+    if (ref $definition eq 'HASH') {
+        croak "register_type(): '$name': definition is not a HASH ref";
+    }
+    my @type_keys = sort keys %$definition;
+    state $valid_type_keys = {map { $_ => 1 } qw( verify complete )};
+    for my $t (@type_keys) {
+        if (!$valid_type_keys->{$t}) {
+            croak "register_type(): '$name' definition contains bad key '$t'";
+        }
+    }
+
+    $TYPES{$name} = $definition;
+    return;
+}
+
+
+sub get_type {
+    return $TYPES{lc $_[1]};
+}
+
+
+sub get_type_names {
+    return sort keys %TYPES;
+}
+
+
+# ===========================================================================
+#
+#   HISTORY FUNCTIONS
+#
+# ===========================================================================
 
 sub read_history {
     my $self  = shift;
@@ -165,79 +236,11 @@ sub write_history {
 }
 
 
-our %TYPES = (
-    'int' => {
-        'verify'   => \&check_int_arg,
-        'complete' => [],
-    },
-    'float' => {
-        'verify'   => \&check_float_arg,
-        'complete' => [],
-    },
-    'bool' => {
-        'verify'   => \&check_bool_arg,
-        'complete' => [ qw( true false on off yes no ) ],
-    },
-    'mac-address' => {
-        'verify'   => \&check_mac_address_arg,
-        'complete' => [],
-    },
-    'ip-address' => {
-        'verify'   => \&check_ip_address_arg,
-        'complete' => \&complete_ip_address_arg,
-    },
-    'string' => {
-        'verify'   => sub { return $_[0]->clear_error($_[2]) },
-        'complete' => []
-    },
-    'filename' => {
-        'verify'   => sub { return $_[0]->clear_error($_[2]) },
-        'complete' => \&complete_filename,
-    },
-);
-
-
+# ===========================================================================
 #
-# $word = $term->match_unique_prefix(
-#   $input,
-#   [words => ] { \@words | \%words }
-#   [, silent_err => $silent_err]
-#   [, err_prefix => $err_prefix]
-# );
+#   VALIDATION FUNCTIONS
 #
-sub match_unique_prefix {
-    my $self = shift;
-    my $input = lc shift;
-
-    my $words;
-
-    if (@_ % 2 == 1) { $words = shift }
-
-    my $opts = check({
-        silent_err => { store => \(my $silent_err = 0) },
-        err_prefix => { store => \(my $err_prefix = '') },
-        words      => { store => \$words },
-    }, {@_}, 1);
-
-    if (ref $words eq 'HASH') {
-        $words = [keys %$words];
-    }
-
-    my $word;
-    my @match = grep { substr($_, 0, length($input)) eq $input } sort @$words;
-    if (@match > 1) {
-        return $self->print_error_cond(!$silent_err,
-            qq{** $err_prefix"$input" is ambiguous; matches: }. join(', ', @match)
-        );
-    }
-    elsif (@match == 0) {
-        return $self->print_error_cond(!$silent_err,
-            qq{** $err_prefix"$input" invalid; expected: }.join(", ", sort @$words)
-        );
-    }
-    return $self->clear_error($match[0]);
-}
-
+# ===========================================================================
 
 sub _is_valid_num {
     my $self = shift;
@@ -282,6 +285,7 @@ sub _is_valid_num {
 }
 
 
+# (err => \$err_s, min => undef, max => undef, inclusive => 1)
 sub is_valid_int   { return shift->_is_valid_num(\&POSIX::strtol, @_) }
 sub is_valid_float { return shift->_is_valid_num(\&POSIX::strtod, @_) }
 
@@ -390,6 +394,58 @@ sub check_mac_address_arg {
     }
 }
 
+
+# ===========================================================================
+#
+#   INPUT FUNCTIONS
+#
+# ===========================================================================
+
+# Wrap around Term::ReadLine->readline() providing a default prompt.
+sub readline {
+    my $self = shift;
+    my $prompt = @_ ? shift : $self->prompt();
+    return $self->term->readline($prompt);
+}
+
+# $answer = yesno($question, "Ynq");
+sub yesno {
+    my $self = shift;
+
+    my ($question, $answers) = @_;
+    my ($default) = $answers =~ /([A-Z])/;
+    $default = 'N' if !defined $default;
+    ReadMode 4;
+    print "$question ($answers)? $default\b";
+    my $answer = undef;
+    my $key = '?';
+    while (defined ($key = ReadKey(0))) {
+        foreach ($key) {
+            if ($_ eq "\c[")  { $key = 'n' }
+            elsif (/[\r\n ]/) { $key = $default }
+        }
+        foreach (lc $key) {
+            if (index(lc $answers, $_) >= 0) {
+                if    ($_ eq "y") { $answer = +1  }
+                elsif ($_ eq "n") { $answer =  0  }
+                elsif ($_ eq "q") { $answer = -1 }
+            }
+        }
+        last if defined $answer;
+    }
+    ReadMode 0;
+    print "$key\n";
+    $self->term && $self->term->on_new_line();
+    return $answer;
+}
+
+
+# ===========================================================================
+#
+#   COMPLETION FUNCTIONS
+#
+# ===========================================================================
+
 sub complete_ip_address_arg {
     my $self = shift;
     my $partial = shift;
@@ -435,113 +491,36 @@ sub complete_filename {
     my $attribs = $self->term->Attribs;
     my @list;
     my $state = 0;
-    while (my $f = $attribs->{filename_completion_function}->($partial, $state)) {
+    my $func = $attribs->{filename_completion_function} or return;
+    while (my $func->($partial, $state)) {
         push @list, $f;
         $state = 1;
     }
     return @list;
 }
 
-# $ok = $self->parse_line($line, \@parsed, \%args);
+
+# @completions = complete_line($text, $line, $start);
 #
-#   Parse the input line in $line against $self->syntax (compiled syntax). All
-#   parsed, literal command words (i.e. neither argument nor option) are
-#   stored in @parsed. All arguments and options are stored in %args.
+#   $text  - (Partial) word to complete.
+#   $line  - Input line so far.
+#   $start - Position where the $text starts in $line.
 #
-#   Returns 1 on success, undef on failure.
-#
-sub parse_line {
-    my ($self, $line, $parsed, $args) = @_;
+sub complete_line {
+    my ($self, $text, $line, $start) = @_;
+
     chomp($line);
-    my @words = split(' ', $line);
-    $args->{'-options'} = [];
-    return $self->parse_words(\@words, { words => $self->syntax }, $parsed, $args);
-}
+    my $words = substr($line, 0, $start);
+    my @words = split(' ', $words);
+    my ($literal, $description) 
+            = $self->complete_words(\@words, $text, { words=>$self->syntax });
 
-# $ok = parse_words(\@words, $syntax, \@parsed, \%args);
-#
-#   Parse the words in @words against $syntax (compiled syntax). All
-#   parsed, literal command words (i.e. neither argument nor option) are
-#   stored in @parsed. All arguments and options are stored in %args.
-#
-#   Returns 1 on success, undef on failure.
-#
-sub parse_words {
-    my $self    = shift;
-    my $words   = shift;
-    my $syntax  = shift;
-    my $parsed  = shift;
-    my $args    = shift;
-
-    # Command line options (--something, -s), are stored
-    # in the '-options' array in %$args. They'll be parsed
-    # later on.
-    while (@$words && $$words[0] =~ /^-{1,2}./) {
-        push @{$args->{-options}}, shift @$words;
+    if (!@$literal && @$description) {
+        print "\n", map { "\t$_\n" } @$description;
+        $self->redraw;
     }
 
-    if (my $word_list = $syntax->{words}) {
-
-        if (!@$words) {
-            if (exists $word_list->{''}) {
-                return 1;
-            }
-            else {
-                return $self->print_error(
-                    "** @$parsed: too few arguments\n** expected one of: ",
-                    join(q{, }, sort grep { length $_ } keys %$word_list)
-                );
-            }
-        }
-        my $match = $self->match_unique_prefix(
-            $words->[0], $word_list,
-            silent_err => 0,
-            err_prefix => "@$parsed: "
-        ) or return;
-
-        if (defined $match) {
-            push @$parsed, $match;
-            shift @$words;
-            return $self->parse_words(
-                $words, $word_list->{$match}, $parsed, $args
-            );
-        }
-    }
-    elsif (my $arg_spec = $syntax->{arg}) {
-        my $arg_name = $arg_spec->{name};
-        $args->{$arg_name} = $arg_spec->{default};
-        if (!@$words) {
-            if ($arg_spec->{optional}) {
-                return $self->parse_words($words, $arg_spec, $parsed, $args);
-            }
-            else {
-                return $self->print_error("** @$parsed: missing <$arg_name> argument");
-            }
-        }
-        my $arg_val;
-        if (my $type = $TYPES{$arg_spec->{type}}) {
-            my $validate = $type->{verify} // sub { $_[0] };
-            eval { $arg_val = $validate->($self, $arg_spec, $words->[0]) };
-            if (!defined $arg_val && $@) { 
-                return $self->print_error(
-                    qq{** @$parsed: internal error on parsing '$$words[0]': $@}
-                );
-            }
-        }
-        else {
-            $arg_val = $words->[0];
-        }
-        return if ! defined $arg_val;
-        $args->{$arg_name} = $arg_val;
-        shift @$words;
-        return $self->parse_words($words, $arg_spec, $parsed, $args);
-    }
-    elsif (@$words) {
-        return $self->print_error(
-            qq{** @$parsed: expected end of line instead of "$$words[0]"\n}
-        );
-    }
-    return 1;
+    return @$literal;
 }
 
 
@@ -631,6 +610,163 @@ sub complete_words {
 }
 
 
+# ===========================================================================
+#
+#   PARSING FUNCTIONS
+#
+# ===========================================================================
+
+#
+# $word = $term->match_unique_prefix(
+#   $input,
+#   [words => ] { \@words | \%words }
+#   [, silent_err => $silent_err]
+#   [, err_prefix => $err_prefix]
+# );
+#
+sub match_unique_prefix {
+    my $self = shift;
+    my $input = lc shift;
+
+    my $words;
+
+    if (@_ % 2 == 1) { $words = shift }
+
+    my $opts = check({
+        silent_err => { store => \(my $silent_err = 0) },
+        err_prefix => { store => \(my $err_prefix = '') },
+        words      => { store => \$words },
+    }, {@_}, 1);
+
+    if (ref $words eq 'HASH') {
+        $words = [keys %$words];
+    }
+
+    my $word;
+    my @match = grep { substr($_, 0, length($input)) eq $input } sort @$words;
+    if (@match > 1) {
+        return $self->print_error_cond(!$silent_err,
+            qq{** $err_prefix"$input" is ambiguous; matches: }. join(', ', @match)
+        );
+    }
+    elsif (@match == 0) {
+        return $self->print_error_cond(!$silent_err,
+            qq{** $err_prefix"$input" invalid; expected: }.join(", ", sort @$words)
+        );
+    }
+    return $self->clear_error($match[0]);
+}
+
+#
+# $ok = $self->parse_line($line, \@parsed, \%args);
+#
+#   Parse the input line in $line against $self->syntax (compiled syntax). All
+#   parsed, literal command words (i.e. neither argument nor option) are
+#   stored in @parsed. All arguments and options are stored in %args.
+#
+#   Returns 1 on success, undef on failure.
+#
+sub parse_line {
+    my ($self, $line, $parsed, $args) = @_;
+    chomp($line);
+    my @words = split(' ', $line);
+    $args->{'-options'} = [];
+    return $self->_parse_words(\@words, { words => $self->syntax }, $parsed, $args);
+}
+
+# $ok = $self->_parse_words(\@words, $syntax, \@parsed, \%args);
+#
+#   Parse the words in @words against $syntax (compiled syntax). All
+#   parsed, literal command words (i.e. neither argument nor option) are
+#   stored in @parsed. All arguments and options are stored in %args.
+#
+#   Returns 1 on success, undef on failure.
+#
+sub _parse_words {
+    my $self    = shift;
+    my $words   = shift;
+    my $syntax  = shift;
+    my $parsed  = shift;
+    my $args    = shift;
+
+    # Command line options (--something, -s), are stored
+    # in the '-options' array in %$args. They'll be parsed
+    # later on.
+    while (@$words && $$words[0] =~ /^-{1,2}./) {
+        push @{$args->{-options}}, shift @$words;
+    }
+
+    if (my $word_list = $syntax->{words}) {
+
+        if (!@$words) {
+            if (exists $word_list->{''}) {
+                return 1;
+            }
+            else {
+                return $self->print_error(
+                    "** @$parsed: too few arguments\n** expected one of: ",
+                    join(q{, }, sort grep { length $_ } keys %$word_list)
+                );
+            }
+        }
+        my $match = $self->match_unique_prefix(
+            $words->[0], $word_list,
+            silent_err => 0,
+            err_prefix => "@$parsed: "
+        ) or return;
+
+        if (defined $match) {
+            push @$parsed, $match;
+            shift @$words;
+            return $self->_parse_words(
+                $words, $word_list->{$match}, $parsed, $args
+            );
+        }
+    }
+    elsif (my $arg_spec = $syntax->{arg}) {
+        my $arg_name = $arg_spec->{name};
+        $args->{$arg_name} = $arg_spec->{default};
+        if (!@$words) {
+            if ($arg_spec->{optional}) {
+                return $self->_parse_words($words, $arg_spec, $parsed, $args);
+            }
+            else {
+                return $self->print_error("** @$parsed: missing <$arg_name> argument");
+            }
+        }
+        my $arg_val;
+        if (my $validate = $arg_spec->{verify}) {
+            eval { $arg_val = $validate->($self, $arg_spec, $words->[0]) };
+            if (!defined $arg_val && $@) { 
+                return $self->print_error(
+                    qq{** @$parsed: internal error on parsing '$$words[0]': $@}
+                );
+            }
+        }
+        else {
+            $arg_val = $words->[0];
+        }
+        return if ! defined $arg_val;
+        $args->{$arg_name} = $arg_val;
+        shift @$words;
+        return $self->_parse_words($words, $arg_spec, $parsed, $args);
+    }
+    elsif (@$words) {
+        return $self->print_error(
+            qq{** @$parsed: expected end of line instead of "$$words[0]"\n}
+        );
+    }
+    return 1;
+}
+
+
+# ===========================================================================
+#
+#   MISCELLANEOUS FUNCTIONS
+#
+# ===========================================================================
+
+
 sub redraw {
     my $self = shift;
 
@@ -648,30 +784,6 @@ sub redraw {
 }
 
 
-# @completions = complete_line($text, $line, $start);
-#
-#   $text  - (Partial) word to complete.
-#   $line  - Input line so far.
-#   $start - Position where the $text starts in $line.
-#
-sub complete_line {
-    my ($self, $text, $line, $start) = @_;
-
-    chomp($line);
-    my $words = substr($line, 0, $start);
-    my @words = split(' ', $words);
-    my ($literal, $description) 
-            = $self->complete_words(\@words, $text, { words=>$self->syntax });
-
-    if (!@$literal && @$description) {
-        print "\n", map { "\t$_\n" } @$description;
-        $self->redraw;
-    }
-
-    return @$literal;
-}
-
-
 # $cols = $term->term_width()
 sub term_width {
     my $self = shift;
@@ -685,6 +797,13 @@ sub clr_to_eol {
     state $CLR_TO_EOL = readpipe('tput el 2>/dev/null');
     return $CLR_TO_EOL;
 }
+
+
+# ===========================================================================
+#
+#   OUTPUT FUNCTIONS
+#
+# ===========================================================================
 
 
 # $fmt = CLASS->fmt_text( [text =>] $text, [ opt => val, ... ]);
@@ -746,6 +865,32 @@ sub fmt_text {
     }
     $out .= "\n";
     return $out;
+}
+
+
+# print_output($msg, ...);
+#
+#   Print output, through pager if interactive.
+#
+sub print_output {
+    my $self = shift;
+    my $out = join('', @_);
+       $out .= "\n" if $out !~ /\n\Z/ && length($out);
+
+    my $ret = 1;
+    my $curr_fh = select;
+    if ($self->term && -t $curr_fh) {
+        local($::SIG{PIPE}) = 'IGNORE';
+        open my $pager, "|".$self->pager;
+        $pager->print($out);
+        close $pager;
+        $ret = $? == 0;
+        $self->term->on_new_line();
+    }
+    else {
+        $ret = print $out;
+    }
+    return $ret;
 }
 
 
@@ -816,7 +961,7 @@ sub _compile_branch {
         $a->{name}     = $varname;
         $a->{optional} = $optional;
         if ($a->{type}) {
-            if (my $tspec = $TYPES{$a->{type}}) {
+            if (my $tspec = $self->get_type($a->{type})) {
                 %$a = (%$tspec, %$a);
             }
             else {
@@ -885,64 +1030,6 @@ sub clear_error {
     return @_ == 1 ? $_[0] : @_;
 }
 
-
-# print_output($msg, ...);
-#
-#   Print output, through pager if interactive.
-#
-sub print_output {
-    my $self = shift;
-    my $out = join('', @_);
-       $out .= "\n" if $out !~ /\n\Z/ && length($out);
-
-    my $ret = 1;
-    my $curr_fh = select;
-    if ($self->term && -t $curr_fh) {
-        local($::SIG{PIPE}) = 'IGNORE';
-        open my $pager, "|".$self->pager;
-        $pager->print($out);
-        close $pager;
-        $ret = $? == 0;
-        $self->term->on_new_line();
-    }
-    else {
-        $ret = print $out;
-    }
-    return $ret;
-}
-
-
-# $answer = yesno($question, "Ynq");
-sub yesno {
-    my $self = shift;
-
-    my ($question, $answers) = @_;
-    my ($default) = $answers =~ /([A-Z])/;
-    $default = 'N' if !defined $default;
-    ReadMode 4;
-    print "$question ($answers)? $default\b";
-    my $answer = undef;
-    my $key = '?';
-    while (defined ($key = ReadKey(0))) {
-        foreach ($key) {
-            if ($_ eq "\c[")  { $key = 'n' }
-            elsif (/[\r\n ]/) { $key = $default }
-        }
-        foreach (lc $key) {
-            if (index(lc $answers, $_) >= 0) {
-                if    ($_ eq "y") { $answer = +1  }
-                elsif ($_ eq "n") { $answer =  0  }
-                elsif ($_ eq "q") { $answer = -1 }
-            }
-        }
-        last if defined $answer;
-    }
-    ReadMode 0;
-    print "$key\n";
-    $self->term && $self->term->on_new_line();
-    return $answer;
-}
-
 1;
 
 __END__
@@ -951,7 +1038,7 @@ __END__
 
 =head1 NAME
 
-M6::CLI - AMS-IX extensions on top of Term::ReadLine
+M6::CLI - CLI parser using Term::ReadLine
 
 =head1 SYNOPSIS
 
@@ -1050,9 +1137,6 @@ X<match_unique_prefix>
 
 =item B<parse_line>
 X<parse_line>
-
-=item B<parse_words>
-X<parse_words>
 
 =item B<is_valid_int>
 X<is_valid_int>
