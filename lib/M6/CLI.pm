@@ -35,6 +35,7 @@ use NetAddr::IP;
 use Params::Check qw( check );
 use POSIX ( );
 use Scalar::Util qw( reftype blessed );
+use Getopt::Long qw( GetOptionsFromArray );
 use Term::ReadKey;
 use Term::ReadLine;
  
@@ -76,15 +77,16 @@ my %TYPES = (
 );
 
 
-has IN         => ( is => 'ro', default => sub{ *STDIN } ),
-has OUT        => ( is => 'ro', default => sub{ *STDOUT } ),
-has name       => ( is => 'ro', default => sub{ $FindBin::Script } );
-has term       => ( is => 'rw', writer => '_set_term' );
-has ip_network => ( is => 'rw', default => sub { NetAddr::IP->new('0/0') } ),
-has syntax     => ( is => 'rw', writer  => '_set_syntax' );
-has pager      => ( is => 'rw', default => sub{$PAGER} );
-has error      => ( is => 'rw', writer  => '_set_error' );
-has prompt     => ( is => 'rw' );
+has IN          => ( is => 'ro', default => sub{ *STDIN } ),
+has OUT         => ( is => 'ro', default => sub{ *STDOUT } ),
+has name        => ( is => 'ro', default => sub{ $FindBin::Script } );
+has term        => ( is => 'rw', writer => '_set_term' );
+has ip_network  => ( is => 'rw', default => sub { NetAddr::IP->new('0/0') } ),
+has syntax      => ( is => 'rw', writer  => '_set_syntax' );
+has syntax_tree => ( is => 'rw', writer  => '_set_syntax_tree' );
+has pager       => ( is => 'rw', default => sub{$PAGER} );
+has error       => ( is => 'rw', writer  => '_set_error' );
+has prompt      => ( is => 'rw' );
 
 has history_file  => ( is => 'rw' );
 has history_lines => ( is => 'rw', default => sub {1000} );
@@ -492,7 +494,7 @@ sub complete_filename {
     my @list;
     my $state = 0;
     my $func = $attribs->{filename_completion_function} or return;
-    while (my $func->($partial, $state)) {
+    while (my $f = $func->($partial, $state)) {
         push @list, $f;
         $state = 1;
     }
@@ -512,8 +514,16 @@ sub complete_line {
     chomp($line);
     my $words = substr($line, 0, $start);
     my @words = split(' ', $words);
+
+    # Don't try to autocomplete options.
+    if ($text =~ /^-/) {
+        return ();
+    }
+
     my ($literal, $description) 
-            = $self->complete_words(\@words, $text, { words=>$self->syntax });
+            = $self->complete_words(
+                \@words, $text, { words=>$self->syntax_tree }
+            );
 
     if (!@$literal && @$description) {
         print "\n", map { "\t$_\n" } @$description;
@@ -539,6 +549,12 @@ sub complete_words {
     my $words      = shift;
     my $partial    = shift;
     my $syntax     = shift;
+
+    # Skip options in the input...
+    while (@$words && $words->[0] =~ /^--/) {
+        my $opt = shift @$words;
+        last if $opt eq '--';
+    }
 
     if (my $word_list = $syntax->{words}) {
         if (!@$words) {
@@ -660,9 +676,10 @@ sub match_unique_prefix {
 #
 # $ok = $self->parse_line($line, \@parsed, \%args);
 #
-#   Parse the input line in $line against $self->syntax (compiled syntax). All
-#   parsed, literal command words (i.e. neither argument nor option) are
-#   stored in @parsed. All arguments and options are stored in %args.
+#   Parse the input line in $line against $self->syntax_tree (compiled
+#   syntax). All parsed, literal command words (i.e. neither argument
+#   nor option) are stored in @parsed. All arguments and options are
+#   stored in %args.
 #
 #   Returns 1 on success, undef on failure.
 #
@@ -671,7 +688,9 @@ sub parse_line {
     chomp($line);
     my @words = split(' ', $line);
     $args->{'-options'} = [];
-    return $self->_parse_words(\@words, { words => $self->syntax }, $parsed, $args);
+    return $self->_parse_words(
+        \@words, { words => $self->syntax_tree }, $parsed, $args
+    );
 }
 
 # $ok = $self->_parse_words(\@words, $syntax, \@parsed, \%args);
@@ -762,9 +781,143 @@ sub _parse_words {
 
 # ===========================================================================
 #
+#   HELP FUNCTIONS
+#
+# ===========================================================================
+
+sub _display_help_pod {
+    my $self = shift;
+    my $maxlen = 72;
+    my $out = qq{=head1 COMMAND SUMMARY\n\n}
+            . qq{=over\n}
+            ;
+
+    my %help;
+    for my $cmd (keys %{$self->syntax}) {
+        my $text = $cmd;
+        $text =~ s/(^|\s)([a-z][\w\-]*)/$1B<$2>/g;
+        $text =~ s/\$(\S+)\?/[I<$1>]/g;
+        $text =~ s/\$(\S+)/I<$1>/g;
+        $text =~ s/(\S+)\|(\S+)/{B<$1>|B<$1>}/g;
+        $help{$text} = $self->syntax->{$cmd}{'?'};
+    }
+
+    for my $cmd (sort keys %help) {
+        $out .= qq{\n=item $cmd\n\n}
+              . $self->fmt_text(
+                    text => $help{$cmd},
+                    maxlen => $maxlen,
+                );
+
+              ;
+    }
+    $out .= "\n=back\n";
+    return $self->print_output($out);
+}
+
+
+sub display_help {
+    my $self = shift;
+    my $options;
+
+    if (@_ % 2 == 1) {
+        $options = shift;
+    }
+
+    my $opts = check({
+        err_prefix => { store => \(my $err_prefix = '') },
+        options    => { store => \$options },
+    }, {@_}, 1);
+
+    $self->get_options_from_array(
+        err_prefix => $err_prefix,
+        argv       => $options,
+        return     => 1,
+        options    => { pod => \(my $pod = 0) },
+    ) or return;
+
+    if ($pod) {
+        return $self->_display_help_pod();
+    }
+
+    my $maxlen = $self->term_width() - 4;
+    my $out = "=" x $maxlen;
+    my $head = uc " $0 command summary ";
+    substr($out, (length($out)-length($head))/2, length($head)) = $head;
+    $out .= "\n";
+
+    my %help;
+    my $indent = 0;
+    for my $cmd (keys %{$self->syntax}) {
+        my $text = $cmd;
+        $text =~ s/\$(\S+)\?/[<$1>]/g;
+        $text =~ s/\$(\S+)/<$1>/g;
+        $text =~ s/(\S+\|\S+)/\($1\)/g;
+        # Try to set the indent to the longest string, but don't
+        # overdo it.
+        if (length($text) > $indent) {
+            if (length($text) <= int($maxlen/2)) {
+                $indent = length($text);
+            }
+            else {
+                $text .= "\n";
+            }
+        }
+        $help{$text} = $self->syntax->{$cmd}{'?'} // '';
+    }
+
+    $indent = 2 if $indent < 2;
+    $indent += 2;
+
+    for my $cmd (sort keys %help) {
+        $out .= $self->fmt_text(
+                    prefix => $cmd,
+                    text   => $help{$cmd},
+                    maxlen => $maxlen,
+                    indent => $indent
+                );
+    }
+    return $self->print_output($out);
+}
+
+
+
+# ===========================================================================
+#
 #   MISCELLANEOUS FUNCTIONS
 #
 # ===========================================================================
+
+
+sub get_options_from_array {
+    my $self = shift;
+    my $opts = check({
+        argv       => { store => \(my $argv = []) },
+        err_prefix => { store => \(my $err_prefix = '') },
+        return     => { store => \(my $return = {}) },
+        options    => { store => \(my $spec = []) },
+    }, {@_}, 1);
+
+    if (!defined $argv) {
+        return $return;
+    }
+    elsif (reftype $argv eq 'ARRAY') {
+        local $::SIG{__WARN__} = sub {
+            $self->print_error("** $err_prefix", @_);
+        };
+
+        if (GetOptionsFromArray($argv, reftype $spec eq 'ARRAY' ? @$spec: %$spec))
+        {
+            return $return;
+        }
+        else {
+            return;
+        }
+    }
+    else {
+        return $return;
+    }
+}
 
 
 sub redraw {
@@ -787,7 +940,10 @@ sub redraw {
 # $cols = $term->term_width()
 sub term_width {
     my $self = shift;
-    my ($cols, $rows, $xpx, $ypx) = GetTerminalSize();
+    my $cols;
+    if (-t $self->term->IN || -t $self->term->OUT) {
+        ($cols, my $rows, my $xpx, my $ypx) = GetTerminalSize();
+    }
     return $cols || 80;
 }
 
@@ -913,7 +1069,8 @@ sub compile_syntax {
     while (my ($key, $spec) = each %$src) {
         $self->_compile_syntax_element($curr, $spec, split(' ', $key)) or return;
     }
-    $self->_set_syntax($curr->{words});
+    $self->_set_syntax_tree($curr->{words});
+    $self->_set_syntax($src);
     return $self->syntax;
 }
 
@@ -1080,25 +1237,62 @@ M6::CLI - CLI parser using Term::ReadLine
 
 =head1 DESCRIPTION
 
-AMS-IX extensions on top of Term::ReadLine.
+AMS-IX extensions on top of L<Term::ReadLine>, compatible with
+L<Term::ReadLine::Gnu> and L<Term::ReadLine::Perl>.
 
-=head1 VARIABLES
+The C<M6::CLI> class is I<not> a descendant of L<Term::ReadLine>,
+but rather wraps around it (the underlying L<Term::ReadLine> object
+can be accessed through the L<term|/term> method).
+
+This class adds the following features:
 
 =over
 
-=item I<$IN>
+=item *
 
-=item I<$OUT>
+Basic syntax parsing and argument validation.
 
-=item I<$PROMPT>
+=item *
 
-=item I<$PAGER>
+Context-sensitive completion.
+
+=item *
+
+Automatic help text generation/display.
+
+=item *
+
+Text formatting routines.
 
 =back
 
-=head1 FUNCTIONS
+=head1 CONSTRUCTOR
 
-=head2 Initialisation / Clean-up
+=over
+
+=item B<new> ( I<PARAM> =E<gt> I<VAL> )
+X<new>
+
+    TERM = M6::CLI->new(
+        IN            => *STDIN,
+        OUT           => *STDOUT,
+        name          => $FindBin::Script,
+        ip_network    => NetAddr::IP->new('0/0'),
+        pager         => 'less',
+        prompt        => "${FindBin::Script}> "
+        history_file  => "~/.${FindBin::Script}_history",
+        history_lines => 1000
+    );
+
+Create a new L<M6::CLI> object instance and return a reference to it.
+All parameters are optional. For a description of the parameters, see
+the corresponding accessor methods below.
+
+=back
+
+=head1 METHODS
+
+=head2 Accessors
 
 =over
 
@@ -1295,11 +1489,18 @@ Quit.
 
 =back
 
+=head1 BUGS AND LIMITATIONS
+
+=head2 Completion fails when input contains command line options
+
+Due to limitations in the syntax specification, options are not treated well when 
+
 =head1 SEE ALSO
 
 L<less>(1),
 L<Term::ReadKey>(3pm),
 L<Term::ReadLine>(3pm),
+L<Term::ReadLine::Perl>(3pm),
 L<Term::ReadLine::Gnu>(3pm).
 
 =head1 AUTHOR
