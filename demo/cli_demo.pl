@@ -15,7 +15,7 @@ my $syntax = $term->compile_syntax({
     'quit' => { '?' => 'Exit program.' },
     'help' => { '?' => 'Show command summary.' },
     'show status|performance|parameters|version|verbose|vitals' => {
-        '?' => 'show stuff',
+        '?' => 'Show stuff and nonsense.',
     },
     'ping $count? $delay? $fname?' => {
         '?'      => 'Send "ping" packets, display RTT.',
@@ -42,6 +42,12 @@ while (1) {
     if ($term->parse_line($input, \@parsed, \%args)) {
         print "@parsed\n";
         print Dumper(\%args);
+        if ($parsed[0] eq 'help') {
+            $term->display_help(
+                err_prefix => "$parsed[0]: ",
+                options    => $args{-options}
+            );
+        }
     }
 }
 
