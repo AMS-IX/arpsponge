@@ -1,7 +1,5 @@
 #!make
 #
-# $Id$
-#
 #  Copyright 2005-2016 AMS-IX B.V.
 #
 #  This is free software. It can be distributed under

@@ -1,5 +1,3 @@
-# @(#)$Id$
-#
 # Test M6::ARP::Queue with flood protection.
 #
 

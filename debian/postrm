@@ -1,7 +1,5 @@
 #!/bin/sh
 #
-# @(#)$Id$
-#
 
 if [ "$1" = purge ]; then
     update-rc.d arpsponge remove

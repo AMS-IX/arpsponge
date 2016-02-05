@@ -1,7 +1,5 @@
 #!/bin/sh
 #
-# $Id$
-#
 # rminstalldirs --- remove directory hierarchy
 #
 # Works (almost) similar to "rmdir -ps", except that the whole path

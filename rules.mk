@@ -1,7 +1,5 @@
 #
 #!make
-# $Id$
-#
 #   Copyright 2005-2016 AMS-IX B.V.; All rights reserved.
 #
 #   This module is free software; you can redistribute it and/or

@@ -1,7 +1,5 @@
 #!/bin/sh
 #
-# $Id$
-#
 # bsdinst.sh: BSD-like install program
 #
 # Not all BSD install options are supported, and one extra is added:
