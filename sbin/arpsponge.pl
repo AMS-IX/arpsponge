@@ -1985,7 +1985,7 @@ maintaining this since 2004.
 
 =head1 COPYRIGHT
 
-Copyright 2003-2014, AMS-IX B.V.
+Copyright 2003-2016, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
 =cut

@@ -4,7 +4,7 @@
 #
 # ARP Sponge Flags
 #
-#   Copyright (c) 2011 AMS-IX B.V.; All rights reserved.
+#   Copyright 2011-2016 AMS-IX B.V.; All rights reserved.
 #
 #   This module is free software; you can redistribute it and/or
 #   modify it under the same terms as Perl itself. See perldoc
@@ -200,7 +200,7 @@ sub update_flags_to_str {
 
 =head1 COPYRIGHT
 
-Copyright 2011, AMS-IX B.V.
+Copyright 2011-2016, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
 =cut

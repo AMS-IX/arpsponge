@@ -4,7 +4,7 @@
 #
 # Logging for the ARP Sponge.
 #
-#   Copyright (c) 2014 AMS-IX B.V.; All rights reserved.
+#   Copyright 2014-2016 AMS-IX B.V.; All rights reserved.
 #
 #   This module is free software; you can redistribute it and/or
 #   modify it under the same terms as Perl itself. See perldoc
@@ -255,7 +255,7 @@ sub event_mask_to_str {
 
 =head1 COPYRIGHT
 
-Copyright 2014, AMS-IX B.V.
+Copyright 2014-2016, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
 =cut

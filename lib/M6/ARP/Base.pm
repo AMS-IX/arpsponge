@@ -9,7 +9,7 @@
 #       Author:  Steven Bakker (SB), <steven.bakker@ams-ix.net>
 #      Created:  2010-10-07
 #
-#   Copyright (c) 2010-2011 AMS-IX B.V.; All rights reserved.
+#   Copyright 2010-2016 AMS-IX B.V.; All rights reserved.
 #
 #   This module is free software; you can redistribute it and/or
 #   modify it under the same terms as Perl itself. See perldoc
@@ -346,7 +346,7 @@ Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2010.
 
 =head1 COPYRIGHT
 
-Copyright 2010-2011, AMS-IX B.V.
+Copyright 2010-2016, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
 =cut
