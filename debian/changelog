@@ -1,3 +1,10 @@
+arpsponge (3.17.7) unstable; urgency=low
+
+  * Fix copyright notices
+  * Remove SVN keywords from misc. files
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Fri, 05 Feb 2016 11:40:05 +0100
+
 arpsponge (3.17.6) unstable; urgency=low
 
   * Get rid of $REVISION/svn keywords.
