@@ -17,3 +17,9 @@ man/aslogtail.pod
 sbin/arpsponge
 sbin/asctl
 sbin/aslogtail
+Build
+MYMETA.json
+MYMETA.yml
+_build/
+blib/
+cover_db/
