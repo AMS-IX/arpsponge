@@ -1193,7 +1193,7 @@ sub do_clear_ip {
     Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
 
     if ($ip eq 'all') {
-        return check_send_command($conn, 'clear_ip_all') or return;
+        return check_send_command($conn, 'clear_ip_all');
     }
 
     return expand_ip_run($ip,
