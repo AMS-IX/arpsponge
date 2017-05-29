@@ -1,3 +1,9 @@
+arpsponge (3.17.8) unstable; urgency=low
+
+  * Remove extraneous "or return".
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 29 May 2017 10:26:19 +0200
+
 arpsponge (3.17.7) unstable; urgency=low
 
   * Fix copyright notices
