@@ -1,12 +1,10 @@
-@(#)$Id$
-
 Overview of commands / communication between client and server.
 
 Basic (socket-level) Communications
 -----------------------------------
 
     LF    = line-feed (\n)
-    FF    = line-feed (\f)
+    FF    = form-feed (\f)
     TAB   = tab (\t)
 
 * Client sends single-line commands to server, terminated by LF.
