@@ -1,3 +1,10 @@
+arpsponge (3.17.9) unstable; urgency=low
+
+  * Fix README -> README.md
+  * Remove more SVN keywords
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 29 May 2017 10:37:26 +0200
+
 arpsponge (3.17.8) unstable; urgency=low
 
   * Remove extraneous "or return".
