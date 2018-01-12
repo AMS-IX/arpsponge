@@ -1,3 +1,17 @@
+arpsponge (3.17.10) unstable; urgency=low
+
+  * Remove dependency on "perl-modules"
+    Packages should depend on "perl", not on "perl-modules", as
+    explained in https://packages.debian.org/jessie/perl-modules.
+
+    The dependency on "perl-modules" broke installs on Debian 9,
+    where "perl-modules" has been replaced with "perl-modules-5.24".
+
+    (Reported by Rasmus Åberg <rasmus@sthix.net> from Stockholm
+    Internet eXchange.)
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Fri, 12 Jan 2018 18:22:31 +0100
+
 arpsponge (3.17.9) unstable; urgency=low
 
   * Fix README -> README.md
