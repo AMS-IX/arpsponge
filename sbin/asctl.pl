@@ -2012,7 +2012,13 @@ sub initialise {
             }
         }
         if (!$sockname) {
-            die "$0: cannot find sponge instance in $rundir\n";
+            my $err = "$0: cannot find sponge instance in $rundir\n";
+            if ($opt_test) {
+                warn "** WARN: $err";
+            }
+            else {
+                die $err;
+            }
         }
 
     }
