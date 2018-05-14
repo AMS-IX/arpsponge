@@ -30,7 +30,7 @@ use Modern::Perl;
 use Moo;
 use Types::Standard -types;
 
-use M6::ARP::Queue;
+use M6::ARPSponge::Queue;
 use M6::ARP::Event;
 use M6::ARP::Log;
 use M6::ARP::Const      qw( :all );
@@ -38,6 +38,7 @@ use M6::ARP::Util       qw( :all );
 use M6::ARP::NetPacket  qw( :all );
 
 use POSIX               qw( strftime );
+use IPC::Run            qw( run );
 use IO::Select;
 use File::Which         qw( which );
 
@@ -144,46 +145,102 @@ sub state_name { return state_to_string($_[1]) }
 #
 ###############################################################################
 
+###############################################################
+# $bool = $sponge->is_my_ip( $hex );
+#
+#   Return whether $hex is one of the host's IP addresses.
+###############################################################
 sub is_my_ip {
     $_[0]->_all_ip->{$_[1]}
 }
 
+###############################################################
+# $bool = $sponge->is_my_ip_s( $str );
+#
+#   Return whether $str is one of the host's IP addresses.
+###############################################################
 sub is_my_ip_s {
     return $_[0]->_all_ip->{ip2hex($_[1])}
 }
 
+###############################################################
+# $ip_str = $sponge->my_ip_s();
+#
+#   Return the sponge's IP address as a string.
+###############################################################
 sub my_ip_s {
-    return hex2ip(shift->my_ip)
+    return hex2ip(shift->my_ip);
 }
 
+###############################################################
+# $ip_str = $sponge->network_s();
+#
+#   Return the sponge's network address as a string.
+###############################################################
 sub network_s {
-    return hex2ip(shift->network)
+    return hex2ip(shift->network);
 }
 
+###############################################################
+# $mac_str = $sponge->my_mac_s();
+#
+#   Return the sponge's MAC address as a string.
+###############################################################
 sub my_mac_s  {
-    return hex2mac(shift->my_mac)
+    return hex2mac(shift->my_mac);
 }
 
+###############################################################
+# $atime = $sponge->state_atime( $hex_ip );
+#
+#   Return the access time for the state of $hex_ip.
+###############################################################
 sub state_atime {
-    return $_[0]->_state_atime->{$_[1]}
+    return $_[0]->_state_atime->{$_[1]};
 }
 
+###############################################################
+# $atime = $sponge->set_state_atime( $hex_ip, $atime );
+#
+#   Set the access time for the state of $hex_ip.
+###############################################################
 sub set_state_atime {
-    return $_[0]->_state_atime->{$_[1]} = $_[2]
+    return $_[0]->_state_atime->{$_[1]} = $_[2];
 }
 
+###############################################################
+# $mtime = $sponge->state_mtime( $hex_ip );
+#
+#   Return the modification time for the state of $hex_ip.
+###############################################################
 sub state_mtime {
     return $_[0]->_state_mtime->{$_[1]}
 }
 
+###############################################################
+# $mtime = $sponge->set_state_mtime( $hex_ip, $mtime );
+#
+#   Set the modification time for the state of $hex_ip.
+###############################################################
 sub set_state_mtime {
     return $_[0]->_state_mtime->{$_[1]} = $_[2]
 }
 
+###############################################################
+# $state = $sponge->get_state( $hex_ip );
+#
+#   Return the state for $hex_ip.
+###############################################################
 sub get_state {
     return $_[0]->state_table->{$_[1]}
 }
 
+###############################################################
+# $state = $sponge->get_state( $hex_ip );
+#
+#   Set the state for $hex_ip. Also sets the mtime and atime,
+#   and updates the "pending" table.
+###############################################################
 sub set_state {
     my ($self, $ip, $state, $time) = @_;
 
@@ -212,7 +269,7 @@ sub set_state {
 
 
 ###############################################################################
-# $sponge->init_all_state();
+# $sponge = $sponge->init_all_state();
 #
 #   Wipe all state info from the sponge. This includes all IP state info,
 #   all queue info, all timings, all ARP info.
@@ -281,18 +338,40 @@ sub get_mac {
     my $self = shift;
     my $dev = @_ ? shift @_ : $self->device;
 
-    my @mac;
-    if (my $ip_command = which('ip')) {
-        my $mac_list = `$ip_command addr show $dev 2>/dev/null`;
+    my (@mac, $err, $excode, $cmd);
+    if ($cmd = which('ip')) {
+        my $mac_list;
+        run [ $cmd, 'addr', 'show', $dev ],
+            '<' => \undef,
+            '>' => \(my $mac_list),
+            '2>' => \$err;
+
+        $excode = $?;
         @mac = $mac_list =~ m{^\s*link/ether ([a-f\d\:]+) }gmi;
     }
-    elsif (my $ifconfig_command = which('ifconfig')) {
-        my $mac_list = `$ifconfig_command $dev 2>/dev/null`;
+    elsif ($cmd = which('ifconfig')) {
+        run [ $cmd, $dev ],
+            '<' => \undef,
+            '>' => \(my $mac_list),
+            '2>' => \$err;
+
+        $excode = $?;
         @mac = $mac_list =~ m{\s(?:ether|hwaddr)\s+([a-f\d\:]+) }gmi;
     }
     else {
-        die "cannot determine MAC address: ",
+        die "cannot determine MAC address of $dev: ",
             "no 'ip' or 'ifconfig' command in the PATH";
+    }
+
+    $excode >>= 8;
+    if ($excode != 0) {
+        die "** [ERROR] cannot determine MAC address of $dev: ",
+            "$cmd exited with code $excode\n",
+            "$cmd: $err\n";
+    }
+    elsif (length $err) {
+        warn "** [WARN] issues determining MAC address of $dev\n",
+             "$cmd: $err\n";
     }
     return mac2hex(lc $mac[0]);
 }
@@ -305,21 +384,43 @@ sub get_mac {
 #
 ###############################################################################
 sub _get_all_ip_addr {
-    my @ip;
+    my (@ip, $err, $excode, $cmd);
 
-    if (my $ip_command = which('ip')) {
-        my $ip_list = `$ip_command addr show 2>/dev/null`;
+    if ($cmd = which('ip')) {
+        my $mac_list;
+        run [ $cmd, 'addr', 'show' ],
+            '<' => \undef,
+            '>' => \(my $ip_list),
+            '2>' => \$err;
+
+        $excode = $?;
         @ip = $ip_list =~ m{^\s*inet ([\d\.]+)/\d+ }gm;
     }
-    elsif (my $ifconfig_command = which('ifconfig')) {
-        my $ip_list = `$ifconfig_command -a 2>/dev/null`;
+    elsif ($cmd = which('ifconfig')) {
+        run [ $cmd, '-a' ],
+            '<' => \undef,
+            '>' => \(my $ip_list),
+            '2>' => \$err;
+
+        $excode = $?;
         @ip = $ip_list =~ m{^\s*inet (?:addr:)?([\d\.]+) }gm;
     }
     else {
-        die "cannot determine IP addresses: ",
+        die "cannot determine IP address: ",
             "no 'ip' or 'ifconfig' command in the PATH";
     }
-    return @ip;
+
+    $excode >>= 8;
+    if ($excode != 0) {
+        die "** [ERROR] cannot determine IP address: ",
+            "$cmd exited with code $excode\n",
+            "$cmd: $err\n";
+    }
+    elsif (length $err) {
+        warn "** [WARN] issues determining IP address\n", "$cmd: $err\n";
+    }
+
+    return ip2hex(lc ($ip[0] // '0.0.0.0'));
 }
 
 
@@ -334,12 +435,42 @@ sub _get_ip {
     my $self = shift;
     my $dev = @_ ? shift @_ : $self->device;
 
-    my $ip = `ifconfig $dev 2>/dev/null`;
+    if ($cmd = which('ip')) {
+        my $mac_list;
+        run [ $cmd, 'addr', 'show', $dev ],
+            '<' => \undef,
+            '>' => \(my $ip_list),
+            '2>' => \$err;
 
-    if ($ip !~ s/^.*inet (?:addr:)?([\d\.]+).*$/$1/s) {
-        $ip = '0.0.0.0';
+        $excode = $?;
+        @ip = $ip_list =~ m{^\s*inet ([\d\.]+)/\d+ }gm;
     }
-    return ip2hex($ip);
+    elsif ($cmd = which('ifconfig')) {
+        run [ $cmd, $dev ],
+            '<' => \undef,
+            '>' => \(my $ip_list),
+            '2>' => \$err;
+
+        $excode = $?;
+        @ip = $ip_list =~ m{^\s*inet (?:addr:)?([\d\.]+) }gm;
+    }
+    else {
+        die "cannot determine IP address of $dev: ",
+            "no 'ip' or 'ifconfig' command in the PATH";
+    }
+
+    $excode >>= 8;
+    if ($excode != 0) {
+        die "** [ERROR] cannot determine IP address of $dev: ",
+            "$cmd exited with code $excode\n",
+            "$cmd: $err\n";
+    }
+    elsif (length $err) {
+        warn "** [WARN] issues determining IP address of $dev\n",
+             "$cmd: $err\n";
+    }
+
+    return ip2hex(lc ($ip[0] // '0.0.0.0'));
 }
 
 
