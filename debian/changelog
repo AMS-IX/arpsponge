@@ -1,3 +1,18 @@
+arpsponge (3.17.11) unstable; urgency=low
+
+  [Steven Bakker <steven.bakker@ams-ix.net>]
+    * Don't die in test mode if socket fails.
+
+  [Marco d'Itri <md@linux.it>]
+    * Update the debconf compatibility level to 9
+      9 is the oldest non-deprecated level.
+      It is supported by oldoldstable so it should be safe enough.
+    * Fix typos in the sample configuration.
+      It's "/etc/default", not "/etc/defaults".
+    * Add a PERMISSIONS configuration variable.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 14 May 2018 17:18:46 +0200
+
 arpsponge (3.17.10) unstable; urgency=low
 
   * Remove dependency on "perl-modules"
