@@ -1,6 +1,7 @@
 arpsponge-*.tar.gz
 build-stamp
 configure-stamp
+debian/.debhelper/
 debian/arpsponge/
 debian/arpsponge.debhelper.log
 debian/arpsponge.substvars
