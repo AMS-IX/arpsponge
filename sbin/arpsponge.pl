@@ -1858,6 +1858,10 @@ How many seconds to spend in learning mode.
 
 The argument to C<--pending>.
 
+=item I<PERMISSIONS>
+
+The argument to C<--permissions>.
+
 =item I<QUEUE_DEPTH> (integer)
 
 The argument to C<--queuedepth>.

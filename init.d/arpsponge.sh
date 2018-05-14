@@ -32,6 +32,7 @@ export  AGE \
         LEARNING \
         LOG_MASK \
         PENDING \
+        PERMISSIONS \
         PROBERATE \
         QUEUE_DEPTH \
         RATE \
@@ -108,6 +109,7 @@ start_sponge() {
         [ -n "${PROBERATE}" ]       && opts="$opts --proberate=${PROBERATE}"
         [ -n "${AGE}" ]             && opts="$opts --age=${AGE}"
         [ -n "${LOGMASK}" ]         && opts="$opts --logmask=${LOGMASK}"
+        [ -n "${PERMISSIONS}" ]     && opts="$opts --permissions=${PERMISSIONS}"
 
         if [ -n "${ARP_UPDATE_METHOD}" ]; then
             opts="$opts --arp-update-method=${ARP_UPDATE_METHOD}"
