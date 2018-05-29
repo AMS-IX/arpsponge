@@ -73,9 +73,6 @@ BEGIN {
 # Constants
 # ===========================================================================
 # We don't redefine all of NetPacket's constants.
-#
-# More constants; these depend on constants above, so
-# have to be declared separately afterwards.
 use constant {
     # Ethernet types.
     ETH_TYPE_IP         => 0x0800,
@@ -93,6 +90,8 @@ use constant {
     ARP_PLEN_IPv4       => 4,
 };
 
+# More constants; these depend on constants above, so
+# have to be declared separately.
 use constant {
     # Values for fields in ARP packets related to IPv4.
     ARP_PROTO_IP        => ETH_TYPE_IPv4,
