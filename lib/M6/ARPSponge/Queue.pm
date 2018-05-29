@@ -20,6 +20,20 @@
 ###############################################################################
 package M6::ARPSponge::Queue;
 
+# Implementation notes:
+#
+# The entire structure is implemented as a hash, with each value
+# an ARRAY ref.
+#
+# The idea is this ARRAY is a circular buffer. Values are added at the tail
+# until the maximum size is reached, at which point we shift the head off
+# of the ARRAY whenever a new item gets added. In theory, an ARRAY and two
+# index positions (head, tail) would also serve, without the need for
+# push/shift. In practice (and benchmark tests), this is hardly more efficient
+# than push/shift. Perl's implementation of ARRAY structures seems to already
+# use the [head, tail, vector] method under the hood, making
+# push/pop/shift/unshift operations very efficient.
+
 use Modern::Perl;
 use Moo;
 use Types::Standard -types;
@@ -230,7 +244,8 @@ The object holds a collection of circular buffers that are accessed by
 unique keys (IP address strings in the typical usage scenario). Pairs
 of source IP and timestamp data added to a queue until its size reaches
 the maximum depth, at which point newly added values cause the oldest
-values to be shifted off the queue.
+values to be shifted off the queue, thus effectively implementing a
+circular buffer.
 
 =head1 IP ADDRESS REPRESENTATION
 
