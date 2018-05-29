@@ -2,7 +2,7 @@
 #
 # ARP Sponge network packet routines.
 #
-#   Copyright (c) 2011-2015 AMS-IX B.V.; All rights reserved.
+#   Copyright (c) 2011-2018 AMS-IX B.V.; All rights reserved.
 #
 #   This module is free software; you can redistribute it and/or
 #   modify it under the same terms as Perl itself. See perldoc
@@ -650,5 +650,5 @@ Steven Bakker at AMS-IX (steven.bakker AT ams-ix.net).
 
 =head1 COPYRIGHT
 
-Copyright 2011, AMS-IX B.V.
+Copyright 2015, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
