@@ -33,7 +33,7 @@ BEGIN {
     our @func = qw(
         init_log
         print_log
-        print_log_level
+        print_log_prio
         log_emerg
         log_alert
         log_crit
@@ -45,7 +45,7 @@ BEGIN {
         log_debug
         log_verbosity log_verbose log_sverbose
         log_threshold pass_log_threshold
-        is_valid_log_level log_level_to_string
+        is_valid_log_prio log_prio_to_string
         add_notify remove_notify print_notify
         get_log_buffer clear_log_buffer log_buffer_size
     );
@@ -82,9 +82,9 @@ our $Verbose        = 0;
 our $Syslog_Ident   = $FindBin::Script;
 
 #############################################################################
-our $Default_Level  = LOG_NOTICE;
+our $Default_Priority  = LOG_NOTICE;
 
-our %STR_TO_LOGLEVEL = (
+our %STR_TO_LOG_PRIO = (
     'emerg'   => LOG_EMERG,
     'alert'   => LOG_ALERT,
     'crit'    => LOG_CRIT,
@@ -95,7 +95,7 @@ our %STR_TO_LOGLEVEL = (
     'debug'   => LOG_DEBUG,
 );
 
-our %LOGLEVEL_TO_STR = reverse %STR_TO_LOGLEVEL;
+our %LOG_PRIO_TO_STR = reverse %STR_TO_LOG_PRIO;
 
 #############################################################################
 
@@ -147,14 +147,14 @@ sub clear_log_buffer {
     @Log_Buffer = ();
 }
 
-sub log_emerg   { print_log_level(LOG_EMERG,    @_) }
-sub log_alert   { print_log_level(LOG_ALERT,    @_) }
-sub log_crit    { print_log_level(LOG_CRIT,     @_) }
-sub log_err     { print_log_level(LOG_ERR,      @_) }
-sub log_warning { print_log_level(LOG_WARNING,  @_) }
-sub log_notice  { print_log_level(LOG_NOTICE,   @_) }
-sub log_info    { print_log_level(LOG_INFO,     @_) }
-sub log_debug   { print_log_level(LOG_DEBUG,    @_) }
+sub log_emerg   { print_log_prio(LOG_EMERG,    @_) }
+sub log_alert   { print_log_prio(LOG_ALERT,    @_) }
+sub log_crit    { print_log_prio(LOG_CRIT,     @_) }
+sub log_err     { print_log_prio(LOG_ERR,      @_) }
+sub log_warning { print_log_prio(LOG_WARNING,  @_) }
+sub log_notice  { print_log_prio(LOG_NOTICE,   @_) }
+sub log_info    { print_log_prio(LOG_INFO,     @_) }
+sub log_debug   { print_log_prio(LOG_DEBUG,    @_) }
 
 ###############################################################################
 # add_notify($fh);
@@ -197,17 +197,17 @@ sub print_notify($@) {
     my $format = shift;
     my $msg = sprintf($format, @_);
     for my $fh ($Notify->can_write(0)) {
-        $fh->send_log($msg);
+        $fh->print("LOG|$msg");
     }
 }
 
 ###############################################################################
-# print_log_level($level, $format, ...);
+# print_log_prio($prio, $format, ...);
 ###############################################################################
-sub print_log_level($$@) {
-    my ($level, $format, @args) = @_;
+sub print_log_prio($$@) {
+    my ($prio, $format, @args) = @_;
 
-    return if $level > $Log_Threshold;
+    return if $prio > $Log_Threshold;
 
     # Add message to circular log buffer.
     foreach (split(/\n/, sprintf($format, @args))) {
@@ -224,7 +224,7 @@ sub print_log_level($$@) {
         print STDOUT map { "$head $_\n" } split(/\n/, sprintf($format, @args));
     }
     else {
-        syslog($level, $format, @args);
+        syslog($prio, $format, @args);
     }
     print_notify($format, @args);
 }
@@ -237,7 +237,7 @@ sub print_log_level($$@) {
 ###############################################################################
 sub print_log {
     my ($format, @args) = @_;
-    print_log_level($Default_Level, $format, @args);
+    print_log_prio($Default_Priority, $format, @args);
 }
 
 ###############################################################################
@@ -287,29 +287,29 @@ sub log_sverbose($@) {
     }
 }
 
-sub is_valid_log_level {
+sub is_valid_log_prio {
     my $arg = shift;
     my $err_s;
     my %opts = (-err => \$err_s, @_);
 
-    if (defined (my $level = $STR_TO_LOGLEVEL{lc $arg}) ) {
-        return $level;
+    if (defined (my $prio = $STR_TO_LOG_PRIO{lc $arg}) ) {
+        return $prio;
     }
 
-    ${$opts{-err}} = q/"$arg" is not a valid syslog level/;
+    ${$opts{-err}} = q/"$arg" is not a valid syslog priority/;
     return;
 }
 
-sub log_level_to_string {
-    my $level = int(shift);
+sub log_prio_to_string {
+    my $prio = int(shift);
 
-    if ($level > LOG_DEBUG()) {
-        $level = LOG_DEBUG();
+    if ($prio > LOG_DEBUG()) {
+        $prio = LOG_DEBUG();
     }
-    elsif ($level < LOG_EMERG()) {
-        $level = LOG_EMERG();
+    elsif ($prio < LOG_EMERG()) {
+        $prio = LOG_EMERG();
     }
-    return $LOGLEVEL_TO_STR{$level};
+    return $LOG_PRIO_TO_STR{$prio};
 }
 
 1;
@@ -330,7 +330,7 @@ M6::ARPSponge::Log - log buffer and notification for M6::ARPSponge
  add_notify( $fh_1 );
  add_notify( $fh_2 );
 
- # Log at default level (LOG_NOTICE)
+ # Log at default prio (LOG_NOTICE)
  print_log('going to read %s', $filename);
 
  # Log an error (LOG_ERR)
@@ -344,7 +344,7 @@ M6::ARPSponge::Log - log buffer and notification for M6::ARPSponge
  log_info('INFO: entering phase %d', $phase);
     # Log threshold is now LOG_DEBUG, so this will log something.
 
- say "LOG_DEBUG is ", log_level_to_string(LOG_DEBUG);
+ say "LOG_DEBUG is ", log_prio_to_string(LOG_DEBUG);
     # -> LOG_DEBUG is 7
 
  # Print verbose messages to STDOUT.
@@ -365,15 +365,19 @@ M6::ARPSponge::Log - log buffer and notification for M6::ARPSponge
 
 =head1 DESCRIPTION
 
+Provide convenient logging functions for the L<arpsponge>(8)
+that send information to F<STDOUT>, L<syslog>(8), and the
+L<M6::ARPSponge::Socket::Server>(3p) socket connections.
+
 =head2 Basic Logging
 
 =head2 Notifying Clients
 
 =head2 Log History Buffer
 
-=head1 LOG LEVEL MACROS
+=head1 LOG PRIORITY MACROS
 
-The symbolic log level macros can be imported with the C<:macros> or
+The symbolic log priority macros can be imported with the C<:macros> or
 C<:all> tag, and are as follows:
 
 =over
@@ -412,8 +416,8 @@ B<LOG_DEBUG> (7)
 
 =back
 
-These are symbolic representations of (syslog) logging levels and identical
-to those of L<Sys::Syslog>(3p).
+These are symbolic representations of (syslog) logging priorities and
+identical to those of L<Sys::Syslog>(3p).
 
 =head1 FUNCTIONS
 
@@ -430,103 +434,85 @@ The default is C<$FindBin::Script>.
 The function initialises the L<Sys::Syslog> module, the circular
 log message buffer, and the notification handles.
 
-=item X<is_valid_log_level>B<is_valid_log_level> ( I<ARG>
-[, B<-err> =E<gt> I<REF>] )
-X<is_valid_log_level>
+=item B<is_valid_log_prio> ( I<ARG> [, B<-err> =E<gt> I<REF>] )
+X<is_valid_log_prio>
 
-Check whether I<ARG> represents a valid syslog level.
+Check whether I<ARG> represents a valid syslog priority and return
+its numerical value, or return I<undef>.
 
 If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
 contain a diagnostic.
 
-=item B<log_level_to_string> ( I<LOGLEVEL> )
-X<log_level_to_string>
+=item B<log_prio_to_string> ( I<PRIO> )
+X<log_prio_to_string>
 
-Return the string representation of the numerical I<LOGLEVEL>.
+Return the string representation of the numerical I<PRIO>.
 
 =item B<log_threshold> ( [ I<NUM> ] )
 X<log_threshold>
 
 Get or set the logging threshold. Default is C<LOG_NOTICE>.
 Messages of that priority or higher will get logged. Note that
-a I<higher priority> is represented by a L<lower level>. That is,
-C<LOG_EMERG> is the highest priority, represented by the number 0,
-while C<LOG_DEBUG> is the lowest priority, represented by the number 7.
+a I<higher priority> is represented by a I<lower priority number>.
+That is, C<LOG_EMERG> is the highest priority, represented by the
+number 0, while C<LOG_DEBUG> is the lowest priority, represented by
+the number 7.
 
 =item B<pass_log_threshold> ( [ I<NUM> ] )
 X<pass_log_threshold>
 
-To get around the confusing logic of priority/log level, this
+To get around the confusing logic of priority/numeric ordering, this
 boolean function tells whether I<NUM> passes the logging threshold,
 i.e., if C<pass_log_threshold(LOG_NOTICE)> is true, then C<log_notice()>
 will log a message.
 
-=item B<log_emerg>
+=item B<log_emerg> I<FMT>, I<ARG>, ...
 X<log_emerg>
 
-...
-
-=item B<log_alert>
+=item B<log_alert> I<FMT>, I<ARG>, ...
 X<log_alert>
 
-...
-
-=item B<log_crit>
+=item B<log_crit> I<FMT>, I<ARG>, ...
 X<log_crit>
 
-...
-
-=item B<log_err>
+=item B<log_err> I<FMT>, I<ARG>, ...
 X<log_err>
 
-...
-
-=item B<log_warning>
+=item B<log_warning> I<FMT>, I<ARG>, ...
 X<log_warning>
 
-...
-
-=item B<log_notice>
+=item B<log_notice> I<FMT>, I<ARG>, ...
 X<log_notice>
 
-...
-
-=item B<log_info>
+=item B<log_info> I<FMT>, I<ARG>, ...
 X<log_info>
 
-...
-
-=item B<log_debug>
+=item B<log_debug> I<FMT>, I<ARG>, ...
 X<log_debug>
 
-...
+Using C<sprintf()>-like formatting, send log messages
+with the given priority. These are fairly simple wrappers
+around L<print_log_prio()|/print_log_prio>:
 
-=item B<print_log_level> I<LEVEL>, I<FMT>, I<ARG>, ...
-X<print_log_level>
+    log_err 'read error: %s', $!;
+    print_log_prio LOG_ERR, 'read error: %s', $!;
+
+=item B<print_log_prio> I<PRIO>, I<FMT>, I<ARG>, ...
+X<print_log_prio>
 
 The function used by the L<print_log()|/print_log>,
-L<log_info()|/log_info>, etc. functions to check
+L<log_info()|/log_info>, etc. functions to
 do any actual logging and client notification.
 
-=item B<print_log>
+=item B<print_log> I<FMT>, I<ARG>, ...
 X<print_log>
 
-...
+Log a message at the default priority (I<LOG_NOTICE>).
 
-=item B<log_fatal>
+=item B<log_fatal> I<FMT>, I<ARG>, ...
 X<log_fatal>
 
-...
-
-=item B<is_valid_log_level>
-X<is_valid_log_level>
-
-...
-
-=item B<log_level_to_string>
-X<log_level_to_string>
-
-...
+Log a critical error and call C<die()> with that message.
 
 =back
 
@@ -565,22 +551,37 @@ Equivalent to:
 
 =head2 Client Notifications
 
+Clients (see L<asctl>(1)) connecting over the control socket can receive
+log events as well. This is done by adding 
+L<M6::ARPSponge::Socket::Server>(3p) handles for client connections
+with L<add_notify()|/add_notify>. When the program calls one of the
+logging functions above, the message is also sent to all registered
+client connections.
+
 =over
 
 =item B<add_notify> ( I<FH> )
 X<add_notify>
 
-...
+Add I<FH> to the list of clients to be notified of log messages.
+I<FH> should be a valid
+L<M6::ARPSponge::Socket::Server>(3p) handle.
 
 =item B<remove_notify> ( I<FH> )
 X<remove_notify>
 
-...
+Remove I<FH> from the list of clients to be notified of log messages.
+I<FH> should be a valid
+L<M6::ARPSponge::Socket::Server>(3p) handle.
 
 =item B<print_notify> I<FMT>, I<ARG>, ...
 X<print_notify>
 
-...
+Send a log message to all registered clients, but only if they are
+writeable (this means that clients that could miss log messages). This is
+done by formatting the I<FMT> and I<ARG> arguments using C<sprintf()>,
+prefixing it with C<LOG|>, and sending the result to the client using
+the handle's C<print> method.
 
 =back
 
@@ -609,6 +610,7 @@ X<clear_log_buffer>
 
 L<FindBin>(3p),
 L<M6::ARPSponge>(3p),
+L<M6::ARPSponge::Socket::Server>(3p),
 L<Sys::Syslog>(3p).
 
 =head1 COPYRIGHT
