@@ -55,13 +55,6 @@ BEGIN {
         LOG_WARNING LOG_NOTICE LOG_INFO LOG_DEBUG
     );
 
-    our @vars = qw(
-        $FACILITY
-        $LOGOPT
-        $Debug
-        $Verbose
-    );
-
     our %EXPORT_TAGS = (
         'standard' => \@func,
         'macros'   => \@macros,
@@ -73,18 +66,8 @@ BEGIN {
     our @EXPORT    = @{ $EXPORT_TAGS{'standard'} };
 }
 
-our $FACILITY  = 'user';
-our $LOGOPT    = 'pid';
-
 #############################################################################
-our $Debug          = 0;
-our $Verbose        = 0;
-our $Syslog_Ident   = $FindBin::Script;
-
-#############################################################################
-our $Default_Priority  = LOG_NOTICE;
-
-our %STR_TO_LOG_PRIO = (
+my %STR_TO_LOG_PRIO = (
     'emerg'   => LOG_EMERG,
     'alert'   => LOG_ALERT,
     'crit'    => LOG_CRIT,
@@ -95,7 +78,14 @@ our %STR_TO_LOG_PRIO = (
     'debug'   => LOG_DEBUG,
 );
 
-our %LOG_PRIO_TO_STR = reverse %STR_TO_LOG_PRIO;
+my %LOG_PRIO_TO_STR = reverse %STR_TO_LOG_PRIO;
+
+#############################################################################
+my $Verbose           = 0;
+my $Default_Priority  = LOG_NOTICE;
+my $Syslog_Ident      = $FindBin::Script;
+my $Syslog_Facility   = 'user';
+my $Syslog_Options    = 'pid';
 
 #############################################################################
 
@@ -118,11 +108,22 @@ sub __log_getset {
     return $$ref;
 }
 
+sub __log_getset_reopen {
+    my $ref = shift;
+    my $old = __log_getset($ref, @_);
+    
+    if ($$ref ne $old) {
+        closelog;
+        openlog(syslog_ident, syslog_options, syslog_facility);
+    }
+    return $old;
+}
+
 sub init_log {
-    $Syslog_Ident = shift @_ if @_;
-    openlog($Syslog_Ident, $LOGOPT, $FACILITY);
+    syslog_ident(shift @_) if @_;
+    openlog(syslog_ident, syslog_options, syslog_facility);
     $Notify = IO::Select->new();
-    @Log_Buffer = ();
+    clear_log_buffer();
     return 1;
 }
 
@@ -135,26 +136,25 @@ sub log_buffer_size {
     return $r;
 }
 
-sub log_verbosity  { return __log_getset(\$Verbose, @_) }
-sub log_threshold   { return __log_getset(\$Log_Threshold, @_) }
-sub pass_log_threshold    { return $_[0] <= $Log_Threshold }
+sub syslog_facility { return __log_getset_reopen(\$Syslog_Facility, @_) }
+sub syslog_ident    { return __log_getset_reopen(\$Syslog_Ident, @_) }
+sub syslog_options  { return __log_getset_reopen(\$Syslog_Options, @_) }
 
-sub get_log_buffer {
-    return \@Log_Buffer;
-}
+sub log_verbosity       { return __log_getset(\$Verbose, @_) }
+sub log_threshold       { return __log_getset(\$Log_Threshold, @_) }
+sub pass_log_threshold  { return $_[0] <= $Log_Threshold }
 
-sub clear_log_buffer {
-    @Log_Buffer = ();
-}
+sub get_log_buffer      { return \@Log_Buffer }
+sub clear_log_buffer    { @Log_Buffer = () }
 
-sub log_emerg   { print_log_prio(LOG_EMERG,    @_) }
-sub log_alert   { print_log_prio(LOG_ALERT,    @_) }
-sub log_crit    { print_log_prio(LOG_CRIT,     @_) }
-sub log_err     { print_log_prio(LOG_ERR,      @_) }
-sub log_warning { print_log_prio(LOG_WARNING,  @_) }
-sub log_notice  { print_log_prio(LOG_NOTICE,   @_) }
-sub log_info    { print_log_prio(LOG_INFO,     @_) }
-sub log_debug   { print_log_prio(LOG_DEBUG,    @_) }
+sub log_emerg           { print_log_prio(LOG_EMERG,    @_) }
+sub log_alert           { print_log_prio(LOG_ALERT,    @_) }
+sub log_crit            { print_log_prio(LOG_CRIT,     @_) }
+sub log_err             { print_log_prio(LOG_ERR,      @_) }
+sub log_warning         { print_log_prio(LOG_WARNING,  @_) }
+sub log_notice          { print_log_prio(LOG_NOTICE,   @_) }
+sub log_info            { print_log_prio(LOG_INFO,     @_) }
+sub log_debug           { print_log_prio(LOG_DEBUG,    @_) }
 
 ###############################################################################
 # add_notify($fh);
@@ -371,7 +371,38 @@ L<M6::ARPSponge::Socket::Server>(3p) socket connections.
 
 =head2 Basic Logging
 
+Basic logging is as easy as:
+
+    use M6::ARPSponge::Log;
+
+    init_log('program');
+    print_log("A simple message");
+    log_debug("A debug message for pid %d", $$);
+    log_err("an error message: %s", $!);
+
+    if ($> != 0) {
+        log_fatal("must run as root"); # Will die() as well.
+    }
+
+    exit 0; # Syslog connection is automatically closed.
+
 =head2 Notifying Clients
+
+In addition to sending log messages to L<syslog>(8), the logging
+functions can also print log messages to arbitrary file handles.
+
+To enable this, the file handles need to be registered with
+L<add_notify()|/add_notify>.
+
+    init_log();
+    add_notify($fh_1);
+    add_notify($fh_2);
+    print_log("A log message");
+
+The log message above will be sent to I<$fh_1> and I<$fh_2> (provided
+the file handles don't currently block), each prefixed with C<LOG|>, so
+a client process listening on e.g. the I<$fh_1> socket will receive
+C<LOG|A log message\n>.
 
 =head2 Log History Buffer
 
@@ -587,27 +618,74 @@ the handle's C<print> method.
 
 =head2 Circular Log Buffer
 
+In addition to sending messages to L<syslog>(8) and client sockets, the
+logging functions add these messages to a circular history buffer, so
+clients can query them.
+
 =over
 
 =item B<log_buffer_size> ( [ I<NUM> ] )
 X<log_buffer_size>
 
-Get or set the size of the circular log buffer.
+Get or set the size of the circular log buffer. If the buffer
+size is reduced from its original size, then the buffer will
+be immediately truncated to the correct size.
 
 =item B<get_log_buffer>
 X<get_log_buffer>
 
-...
+Return an ARRAY reference pointing to the circular log buffer. The log events
+are ordered from oldest to most recent.
 
 =item B<clear_log_buffer>
 X<clear_log_buffer>
 
-...
+Clear the circular log buffer.
+
+=back
+
+=head2 Miscellaneous
+
+=over
+
+=item B<syslog_facility> ( [ I<FACILITY> ] )
+X<syslog_facility>
+
+Get or set the facility for syslog messages. Default is C<user>.
+Can be set to a string (C<user>, C<auth>) or a number (8, 32).
+If changed from the current value, the L<syslog>(8) connection will
+be re-opened.
+
+If the value is changed, the old value is returned.
+
+=item B<syslog_ident> ( [ I<IDENT> ] )
+X<syslog_ident>
+
+Get or set the "ident" tag for syslog messages. Default is the
+value of L<FindBin::Script|FindBin>.
+
+If changed from the current value, the L<syslog>(8) connection will
+be re-opened.
+
+If the value is changed, the old value is returned.
+
+=item B<syslog_options> ( [ I<OPTIONS> ] )
+X<syslog_options>
+
+Get or set the syslog options for the syslog connection. Default
+value is C<pid>. See also L<Sys::Syslog>(3p) for valid options.
+
+If changed from the current value, the L<syslog>(8) connection will
+be re-opened.
+
+If the value is changed, the old value is returned.
 
 =back
 
 =head1 SEE ALSO
 
+L<asctl>(1),
+L<arpsponge>(8),
 L<FindBin>(3p),
 L<M6::ARPSponge>(3p),
 L<M6::ARPSponge::Socket::Server>(3p),
@@ -617,7 +695,3 @@ L<Sys::Syslog>(3p).
 
 Copyright 2011, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
-
-=cut
-
-1;
