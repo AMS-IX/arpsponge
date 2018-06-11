@@ -1,10 +1,22 @@
+Wed May 30 16:44:30 CEST 2018
+
+    Busy on "M6::ARPSponge::Log".
+
+---
+
 * Use Moo for object building.
 * Re-work event loop.
 
 Current:
  - Rename M6::ARP:* to M6::ARPSponge::*
- - Split off "State".
+
+TODO:
+    control socket "server" will need to overload print
+    to catch "LOG|xxx" messages.
 
 Need to work further on ARPSponge.pm:
 
  - Create "StateTable" and "ARPTable" classes.
+
+Tests TODO:
+ - M6::ARPSpong::Log
