@@ -140,7 +140,7 @@ start_sponge() {
 
         if [ "$mode" = "re-init" ] && [ -f "${rundir}/status" ]
         then
-            ${BINDIR}/asctl -c load status "${rundir}/status"
+            ${BINDIR}/asctl --device="${DEVICE}" -c load status "${rundir}/status"
         fi
     )
 }
