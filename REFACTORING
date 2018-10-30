@@ -20,3 +20,31 @@ Need to work further on ARPSponge.pm:
 
 Tests TODO:
  - M6::ARPSpong::Log
+
+---
+
+Client/Server communication:
+
+Client Handle = Socket + Unsent Data.
+
+Socket is set to non-blocking.
+
+Writing on the client handle
+----------------------------
+A write to the client will be added to the unsent data, and an attempt to
+write to the socket is made.
+
+Attempting socket writes
+------------------------
+Data is written to the socket, but if the no. of bytes written is less than the
+buffer size, the socket FD is removed from the select read mask, and added to
+the select write mask. Conversely, if all data is transferred, the socket FD
+is removed from the select write mask, and added to the select read mask.
+
+
+Event loop
+----------
+
+In the event loop, we look for client handles. Writeable handles will result
+in another round of attempted socket writes, readable handles will result in
+the fetching of a command.
