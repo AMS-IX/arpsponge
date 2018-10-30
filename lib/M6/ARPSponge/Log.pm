@@ -32,8 +32,8 @@ BEGIN {
 
     our @func = qw(
         init_log
-        print_log
-        print_log_prio
+        log_print
+        log_print_prio
         log_emerg
         log_alert
         log_crit
@@ -147,14 +147,14 @@ sub pass_log_threshold  { return $_[0] <= $Log_Threshold }
 sub get_log_buffer      { return \@Log_Buffer }
 sub clear_log_buffer    { @Log_Buffer = () }
 
-sub log_emerg           { print_log_prio(LOG_EMERG,    @_) }
-sub log_alert           { print_log_prio(LOG_ALERT,    @_) }
-sub log_crit            { print_log_prio(LOG_CRIT,     @_) }
-sub log_err             { print_log_prio(LOG_ERR,      @_) }
-sub log_warning         { print_log_prio(LOG_WARNING,  @_) }
-sub log_notice          { print_log_prio(LOG_NOTICE,   @_) }
-sub log_info            { print_log_prio(LOG_INFO,     @_) }
-sub log_debug           { print_log_prio(LOG_DEBUG,    @_) }
+sub log_emerg           { log_print_prio(LOG_EMERG,    @_) }
+sub log_alert           { log_print_prio(LOG_ALERT,    @_) }
+sub log_crit            { log_print_prio(LOG_CRIT,     @_) }
+sub log_err             { log_print_prio(LOG_ERR,      @_) }
+sub log_warning         { log_print_prio(LOG_WARNING,  @_) }
+sub log_notice          { log_print_prio(LOG_NOTICE,   @_) }
+sub log_info            { log_print_prio(LOG_INFO,     @_) }
+sub log_debug           { log_print_prio(LOG_DEBUG,    @_) }
 
 ###############################################################################
 # add_notify($fh);
@@ -197,14 +197,14 @@ sub print_notify($@) {
     my $format = shift;
     my $msg = sprintf($format, @_);
     for my $fh ($Notify->can_write(0)) {
-        $fh->print("LOG|$msg");
+        $fh->send_log($msg);
     }
 }
 
 ###############################################################################
-# print_log_prio($prio, $format, ...);
+# log_print_prio($prio, $format, ...);
 ###############################################################################
-sub print_log_prio($$@) {
+sub log_print_prio($$@) {
     my ($prio, $format, @args) = @_;
 
     return if $prio > $Log_Threshold;
@@ -230,14 +230,14 @@ sub print_log_prio($$@) {
 }
 
 ###############################################################################
-# print_log($format, ...);
+# log_print($format, ...);
 #
 #   Log $format, ... to syslog. Syntax is identical to that of printf().
 #   Prints to STDOUT if verbose or dummy.
 ###############################################################################
-sub print_log {
+sub log_print {
     my ($format, @args) = @_;
-    print_log_prio($Default_Priority, $format, @args);
+    log_print_prio($Default_Priority, $format, @args);
 }
 
 ###############################################################################
@@ -331,7 +331,7 @@ M6::ARPSponge::Log - log buffer and notification for M6::ARPSponge
  add_notify( $fh_2 );
 
  # Log at default prio (LOG_NOTICE)
- print_log('going to read %s', $filename);
+ log_print('going to read %s', $filename);
 
  # Log an error (LOG_ERR)
  log_err('cannot read %s: %s', $filename, $!);
@@ -376,7 +376,7 @@ Basic logging is as easy as:
     use M6::ARPSponge::Log;
 
     init_log('program');
-    print_log("A simple message");
+    log_print("A simple message");
     log_debug("A debug message for pid %d", $$);
     log_err("an error message: %s", $!);
 
@@ -397,7 +397,7 @@ L<add_notify()|/add_notify>.
     init_log();
     add_notify($fh_1);
     add_notify($fh_2);
-    print_log("A log message");
+    log_print("A log message");
 
 The log message above will be sent to I<$fh_1> and I<$fh_2> (provided
 the file handles don't currently block), each prefixed with C<LOG|>, so
@@ -523,20 +523,20 @@ X<log_debug>
 
 Using C<sprintf()>-like formatting, send log messages
 with the given priority. These are fairly simple wrappers
-around L<print_log_prio()|/print_log_prio>:
+around L<log_print_prio()|/log_print_prio>:
 
     log_err 'read error: %s', $!;
-    print_log_prio LOG_ERR, 'read error: %s', $!;
+    log_print_prio LOG_ERR, 'read error: %s', $!;
 
-=item B<print_log_prio> I<PRIO>, I<FMT>, I<ARG>, ...
-X<print_log_prio>
+=item B<log_print_prio> I<PRIO>, I<FMT>, I<ARG>, ...
+X<log_print_prio>
 
-The function used by the L<print_log()|/print_log>,
+The function used by the L<log_print()|/log_print>,
 L<log_info()|/log_info>, etc. functions to
 do any actual logging and client notification.
 
-=item B<print_log> I<FMT>, I<ARG>, ...
-X<print_log>
+=item B<log_print> I<FMT>, I<ARG>, ...
+X<log_print>
 
 Log a message at the default priority (I<LOG_NOTICE>).
 
@@ -609,10 +609,10 @@ L<M6::ARPSponge::Socket::Server>(3p) handle.
 X<print_notify>
 
 Send a log message to all registered clients, but only if they are
-writeable (this means that clients that could miss log messages). This is
+writeable (this means that clients could miss log messages). This is
 done by formatting the I<FMT> and I<ARG> arguments using C<sprintf()>,
-prefixing it with C<LOG|>, and sending the result to the client using
-the handle's C<print> method.
+and calling L<send_log()|M6::ARPSponge::Control::Server/send_log> on
+each notify handle.
 
 =back
 
