@@ -15,7 +15,7 @@ Wish list for future enhancements:
 
 * setuid() to unprivileged user after opening relevant streams.
 
-* use ithreads for better real-time behaviour:
+* use POE or IO::ASync for better real-time behaviour:
 	
 	- process
 	- learner
