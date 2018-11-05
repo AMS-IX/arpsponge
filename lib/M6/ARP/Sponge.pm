@@ -286,7 +286,7 @@ sub get_ip {
     if (ref $dev) { $dev = $dev->device }
     my $ip = `ifconfig $dev 2>/dev/null`;
 
-    if ($ip !~ s/^.*inet addr:(\S+).*$/$1/s) {
+    if ($ip !~ s/^.*inet (?:addr:)?(\S+).*$/$1/s) {
         $ip = '0.0.0.0';
     }
     return ip2hex($ip);
