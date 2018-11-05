@@ -67,7 +67,14 @@ DOCPREFIX            = $(DIRPREFIX)/share
 
 # Where to install perl scripts, jobs, library files and manual pages.
 BINDIR               = $(BINPREFIX)/sbin
+
+# FreeBSD
+LIBROOT              = $(DIRPREFIX)/lib/perl5/site_perl
+# Fedora/RedHat
+LIBROOT              = $(DIRPREFIX)/lib/perl5
+# Debian
 LIBROOT              = $(DIRPREFIX)/lib/site_perl
+
 INSTLIB              = $(LIBROOT)
 MANDIR               = $(DIRPREFIX)/man
 DOCDIR               = $(DOCPREFIX)/doc/$(NAME)-$(RELEASE)
