@@ -19,6 +19,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use FindBin;
+use Config;
 
 use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
                   pcap_get_selectable_fd pcap_setnonblock );
@@ -78,7 +79,8 @@ my $DFL_SOCK_PERMS       = '@DFL_SOCK_PERMS@';
 # So, if we cycle 100 packets, that would cost us about 0.5 seconds
 # on a saturated interface, leaving enough interactive response...
 #
-my $MAX_PKT_PER_CYCLE    = 100;
+my $MAX_PKT_PER_CYCLE   = 100;
+my $PCAP_TIMEOUT        = 5;
 
 $::USAGE=<<EOF;
 Usage: $PROG [options] IPADDR/PREFIXLEN dev IFNAME
@@ -316,7 +318,7 @@ sub Main {
                 $sponge->device, # capture device
                 512,             # snaplen
                 1,               # promiscuous
-                0,               # timeout (we're handling that ourselves)
+                $PCAP_TIMEOUT,   # timeout in ms for a pcap_dispatch
                 \$err,           # error diagnostic
         );
 
