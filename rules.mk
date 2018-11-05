@@ -67,6 +67,8 @@ perlit= $(PERL) -p -e \
 		    s!\@DFL_PROBERATE@!$(DFL_PROBERATE)!g;	\
 		    s!\@DFL_LEARN@!$(DFL_LEARN)!g;	\
 		    s!\@DFL_LOGLEVEL@!$(DFL_LOGLEVEL)!g;	\
+			\
+		    s!\@ETC_DEFAULT@!$(ETC_DEFAULT)!g;	\
 		    "
 
 .SUFFIXES:	.al .pm .pmrsc .pl \

@@ -43,8 +43,8 @@ export  AGE \
         SWEEP_SKIP_ALIVE
 
 # Defaults for all sponges.
-if test -f /etc/default/${PROG}/defaults ; then
-    . /etc/default/${PROG}/defaults
+if test -f @ETC_DEFAULT@/${PROG}/defaults ; then
+    . @ETC_DEFAULT@/${PROG}/defaults
 fi
 
 
@@ -147,7 +147,7 @@ start_sponge() {
 
 
 start() {
-    SPONGES=$(find "/etc/default/${PROG}" \
+    SPONGES=$(find "@ETC_DEFAULT@/${PROG}" \
                 -maxdepth 1 -type f -name 'eth*' 2>/dev/null)
     if [ -n "${SPONGES}" ]
     then
