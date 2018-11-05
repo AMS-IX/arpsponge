@@ -22,10 +22,38 @@
 #			MANDATORY CONFIG SECTION
 # ----------------------------------------------------------------------------
 
-# Where's perl on your system?
-PERL                 = /usr/bin/perl
+#### OS Specific
 
-IFCONFIG             = /sbin/ifconfig
+## FreeBSD
+# Where's perl on your system?
+#PERL				= /usr/local/bin/perl
+#LIBROOT			= $(DIRPREFIX)/lib/perl5/site_perl
+#IFCONFIG			= /sbin/ifconfig
+#OWNER				= root
+#GROUP				= wheel
+#DFL_SOCK_GROUP		= wheel
+#ETC_DEFAULT		= /etc/defaults
+
+
+## Fedora/RedHat
+#PERL				= /usr/bin/perl
+#LIBROOT			= $(DIRPREFIX)/lib/perl5
+#IFCONFIG			= /sbin/ifconfig
+#OWNER				= root
+#GROUP				= root
+#DFL_SOCK_GROUP		= wheel
+#ETC_DEFAULT		= /etc/default
+
+## Debian
+PERL				= /usr/bin/perl
+LIBROOT				= $(DIRPREFIX)/lib/site_perl
+IFCONFIG			= /sbin/ifconfig
+GROUP				= root
+#DFL_SOCK_GROUP		= wheel
+ETC_DEFAULT			= /etc/default
+
+DFL_SOCK_GROUP		= noc
+
 DFL_RATE             = 50
 DFL_QUEUEDEPTH       = 1000
 DFL_ARP_AGE          = 600
@@ -36,15 +64,13 @@ DFL_INIT             = ALIVE
 DFL_LEARN            = 5
 DFL_LOGLEVEL         = info
 
-DFL_SOCK_PERMS       = root:noc:0660
+DFL_SOCK_PERMS       = root:$(DFL_SOCK_GROUP):0660
 SPONGE_VAR           = /var/run/$(NAME)
 
 # ----------------------------
 # --- Installation details ---
 # ----------------------------
 
-OWNER                = root
-GROUP                = root
 MODE                 = 644
 BINMODE              = 755
 
@@ -68,12 +94,6 @@ DOCPREFIX            = $(DIRPREFIX)/share
 # Where to install perl scripts, jobs, library files and manual pages.
 BINDIR               = $(BINPREFIX)/sbin
 
-# FreeBSD
-LIBROOT              = $(DIRPREFIX)/lib/perl5/site_perl
-# Fedora/RedHat
-LIBROOT              = $(DIRPREFIX)/lib/perl5
-# Debian
-LIBROOT              = $(DIRPREFIX)/lib/site_perl
 
 INSTLIB              = $(LIBROOT)
 MANDIR               = $(DIRPREFIX)/man
