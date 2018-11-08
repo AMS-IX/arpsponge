@@ -65,17 +65,14 @@ __PACKAGE__->mk_accessors(qw(
 # $val = $sponge->user($attr);
 # $oldval = $sponge->user($attr, $newval);
 sub user {
-    my $self = shift;
+    my ($self, $attr, $newval) = @_;
     my $user = $self->{'user'};
 
-    return $user if @_ == 0;
+    return $user if @_ == 1 || !defined $attr;
+    return $user->{$attr} if @_ < 3;
 
-    my $attr = shift;
     my $oldval = $user->{$attr};
-    if (@_) {
-        my $val = shift;
-        $user->{$attr} = $val;
-    }
+    $user->{$attr} = $newval;
     return $oldval;
 }
 
@@ -87,17 +84,17 @@ sub state_name { return state_to_string($_[1]) }
 #
 ###############################################################################
 
-sub queue            { shift->{'queue'} }
-sub device           { shift->{'device'} }
-sub phys_device      { shift->{'phys_device'} }
-sub pending          { shift->{'pending'} }
+sub queue            { $_[0]->{'queue'} }
+sub device           { $_[0]->{'device'} }
+sub phys_device      { $_[0]->{'phys_device'} }
+sub pending          { $_[0]->{'pending'} }
 
 sub is_my_ip         { $_[0]->{'ip_all'}->{$_[1]} }
 sub is_my_ip_s       { $_[0]->{'ip_all'}->{ip2hex($_[1])} }
 
-sub my_ip_s          { return hex2ip(shift->my_ip)   }
-sub network_s        { return hex2ip(shift->network) }
-sub my_mac_s         { return hex2mac(shift->my_mac) }
+sub my_ip_s          { return hex2ip($_[0]->my_ip)   }
+sub network_s        { return hex2ip($_[0]->network) }
+sub my_mac_s         { return hex2mac($_[0]->my_mac) }
 
 sub state_atime      { $_[0]->{state_atime}->{$_[1]} }
 sub set_state_atime  { $_[0]->{state_atime}->{$_[1]} = $_[2] }
@@ -105,7 +102,7 @@ sub set_state_atime  { $_[0]->{state_atime}->{$_[1]} = $_[2] }
 sub state_mtime      { $_[0]->{state_mtime}->{$_[1]} }
 sub set_state_mtime  { $_[0]->{state_mtime}->{$_[1]} = $_[2] }
 
-sub state_table      { shift->{state} }
+sub state_table      { $_[0]->{state} }
 sub get_state        { $_[0]->{state}->{$_[1]} }
 
 sub set_state    {
@@ -116,20 +113,18 @@ sub set_state    {
         $self->{state_mtime}->{$ip} = $self->{state_atime}->{$ip} = $time;
         $self->{state}->{$ip} = $state;
         if ($state >= PENDING(0)) {
-            $self->{'pending'}->{$ip} = $state;
+            return $self->{'pending'}->{$ip} = $state;
         }
-        else {
-            delete $self->{'pending'}->{$ip};
-        }
-    }
-    else {
-        delete $self->{state_mtime}->{$ip};
-        delete $self->{state_atime}->{$ip};
-        delete $self->{state}->{$ip};
         delete $self->{'pending'}->{$ip};
-        $self->queue->clear($ip);
+        return $state;
     }
-    return $state;
+
+    delete $self->{state_mtime}->{$ip};
+    delete $self->{state_atime}->{$ip};
+    delete $self->{state}->{$ip};
+    delete $self->{'pending'}->{$ip};
+    $self->queue->clear($ip);
+    return;
 }
 
 ###############################################################################
@@ -139,16 +134,16 @@ sub set_state    {
 #
 ###############################################################################
 sub new {
-    my $type = shift;
+    my ($type, @args) = @_;
 
     my $self = {
             'arp_update_flags'  => ARP_UPDATE_ALL,
             'queuedepth'        => $M6::ARP::Queue::DFL_DEPTH,
         };
 
-    while (@_ >= 2) {
-        my $k = shift @_;
-        my $v = shift @_;
+    while (@args >= 2) {
+        my $k = shift @args;
+        my $v = shift @args;
         $k =~ s/^-//;
         $self->{lc $k} = $v;
     
@@ -185,7 +180,7 @@ sub new {
 #
 ###############################################################################
 sub init_all_state {
-    my $self = shift;
+    my ($self) = @_;
 
     $self->{pending}     = {};
     $self->{state}       = {};
@@ -213,24 +208,19 @@ sub init_all_state {
 #
 ###############################################################################
 sub arp_table {
-    my $self = shift;
+    my ($self, $ip, $mac, $time) = @_;
 
-    return $self->{'arp_table'} if @_ == 0;
+    return $self->{'arp_table'} if @_ == 1;
 
-    my $ip        = shift;
     my $arp_table = $self->{'arp_table'};
 
-    if (@_) {
-        my $mac = shift;
-        my $time = @_ ? shift : time;
+    if (@_ >= 3) {
         if (defined $mac && $mac ne $ETH_ADDR_NONE) {
-            $self->{'arp_table'}->{$ip} = [ $mac, $time ];
+            return $arp_table->{$ip} = [ $mac, $time // time ];
         }
-        else {
-            delete $self->{'arp_table'}->{$ip};
-        }
+        delete $self->{'arp_table'}->{$ip};
     }
-    return $self->{'arp_table'}->{$ip} ? @{$self->{'arp_table'}->{$ip}} : ();
+    return $arp_table->{$ip} ? @{$self->{'arp_table'}->{$ip}} : ();
 }
 
 ###############################################################################
