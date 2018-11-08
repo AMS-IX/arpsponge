@@ -326,7 +326,7 @@ sub Main {
         log_fatal("cannot capture on %s: %s", $sponge->device, $err);
     }
 
-    if (pcap_setnonblock($pcap_h, 0, \$err) < 0) {
+    if (pcap_setnonblock($pcap_h, 1, \$err) < 0) {
         log_fatal("cannot capture in non-blocking mode: %s", $err);
     }
 
