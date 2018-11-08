@@ -33,8 +33,7 @@ our $MAXLOGLINES = 1024;      # Max no. of log lines to keep in buffer.
 sub error { return $Error };
 
 sub _set_error {
-    shift @_;
-    $Error = join('', @_);
+    $Error = join('', @_[1..$#_]);
     return;
 }
 
