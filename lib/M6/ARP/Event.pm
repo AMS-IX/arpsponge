@@ -101,10 +101,10 @@ our $Default_Mask = EVENT_ALL();
 my $Event_Mask    = EVENT_ALL();
 
 sub __event_getset {
-    my $ref = shift;
-    if (@_) {
+    my $ref = $_[0];
+    if (@_ > 1) {
         my $old = $$ref;
-        $$ref = shift;
+        $$ref = $_[1];
         return $old;
     }
     return $$ref;
@@ -116,14 +116,14 @@ sub event_values    { return sort keys %EVENT_MASK_TO_STR }
 sub event_mask      { return __event_getset(\$Event_Mask, @_) }
 sub is_event_mask   { return ($_[0] & $Event_Mask) != 0 }
 
-sub event_emerg   { event_log(LOG_EMERG,    shift, @_) }
-sub event_alert   { event_log(LOG_ALERT,    shift, @_) }
-sub event_crit    { event_log(LOG_CRIT,     shift, @_) }
-sub event_err     { event_log(LOG_ERR,      shift, @_) }
-sub event_warning { event_log(LOG_WARNING,  shift, @_) }
-sub event_notice  { event_log(LOG_NOTICE,   shift, @_) }
-sub event_info    { event_log(LOG_INFO,     shift, @_) }
-sub event_debug   { event_log(LOG_DEBUG,    shift, @_) }
+sub event_emerg   { event_log(LOG_EMERG,    $_[0], @_[1..$#_]) }
+sub event_alert   { event_log(LOG_ALERT,    $_[0], @_[1..$#_]) }
+sub event_crit    { event_log(LOG_CRIT,     $_[0], @_[1..$#_]) }
+sub event_err     { event_log(LOG_ERR,      $_[0], @_[1..$#_]) }
+sub event_warning { event_log(LOG_WARNING,  $_[0], @_[1..$#_]) }
+sub event_notice  { event_log(LOG_NOTICE,   $_[0], @_[1..$#_]) }
+sub event_info    { event_log(LOG_INFO,     $_[0], @_[1..$#_]) }
+sub event_debug   { event_log(LOG_DEBUG,    $_[0], @_[1..$#_]) }
 
 =item B<event_log> ( I<LOGLEVEL>, I<EVENT>, I<FMT> [, I<ARG>, ... ] )
 X<event_log>
@@ -156,9 +156,9 @@ contain a diagnostic.
 =cut
 
 sub is_valid_event_mask {
-    my $arg = shift;
+    my ($arg) = @_;
     my $err_s;
-    my %opts = (-err => \$err_s, @_);
+    my %opts = (-err => \$err_s, @_[1..$#_]);
 
     if (defined (my $level = $STR_TO_EVENT_MASK{lc $arg}) ) {
         return $level;
@@ -179,7 +179,7 @@ up the compound I<MASK>.
 =cut
 
 sub event_mask_split {
-    my $mask = int(shift);
+    my $mask = int($_[0]);
     return sort grep { $_ & $mask } keys %EVENT_MASK_TO_STR;
 }
 
@@ -197,9 +197,9 @@ contain a diagnostic.
 =cut
 
 sub parse_event_mask {
-    my $arg = shift;
+    my $arg = $_[0];
     my $err_s;
-    my %opts = (-err => \$err_s, @_);
+    my %opts = (-err => \$err_s, @_[1..$#_]);
 
     return event_mask() if ! defined $arg;
     my $mask;
@@ -220,18 +220,16 @@ sub parse_event_mask {
             $negate = !$negate;
         }
 
-        if (exists $STR_TO_EVENT_MASK{$event}) {
-            if ($negate) {
-                $mask &= ~ int($STR_TO_EVENT_MASK{$event});
-            }
-            else {
-                $mask |= $STR_TO_EVENT_MASK{$event};
-            }
-        }
-        else {
+        if (!exists $STR_TO_EVENT_MASK{$event}) {
             ${$opts{-err}} = qq/"$event" is not a valid event name/;
             return;
         }
+
+        if ($negate) {
+            $mask &= ~ int($STR_TO_EVENT_MASK{$event});
+            next;
+        }
+        $mask |= $STR_TO_EVENT_MASK{$event};
     }
     return $mask;
 }
@@ -245,7 +243,7 @@ them.
 =cut
 
 sub event_mask_to_str {
-    my $mask = shift;
+    my ($mask) = @_;
 
     return if !$mask;
 
