@@ -107,7 +107,7 @@ Returns a reference to the newly created object.
 sub new {
 	my ($type, $max_depth) = @_;
 
-	my $max_depth //= $DFL_DEPTH;
+	$max_depth //= $DFL_DEPTH;
 
 	$type = ref $type if ref $type;
 	bless {'max_depth' => $max_depth, q=>{}}, $type;
