@@ -415,8 +415,7 @@ sub create_control_socket {
 #
 ###############################################################################
 sub handle_input {
-    my $sponge     = shift;
-    my $next_alarm = shift;
+    my ($sponge, $next_alarm) = @_;
 
     my $pcap_h     = $sponge->pcap_handle;
     my $pcap_fd    = $sponge->user('pcap_fd');
@@ -511,7 +510,7 @@ sub handle_input {
 #
 ###############################################################################
 sub packet_capture_loop {
-    my $sponge = shift;
+    my ($sponge) = @_;
 
     # Prepare the bit vector for the select() calls.
     $sponge->user('select', IO::Select->new(
@@ -537,7 +536,7 @@ sub packet_capture_loop {
 #####   HANDLING CONTROL INPUT   ##############################################
 
 sub get_status_info_s {
-    my $sponge = shift;
+    my ($sponge) = @_;
 
     my $now = time;
     my $start_time = $sponge->user('start_time');
@@ -578,7 +577,7 @@ sub get_status_info_s {
 }
 
 sub get_ip_state_table_s {
-    my $sponge = shift;
+    my ($sponge) = @_;
 
     my $fh = IO::String->new;
     $fh->print("<STATE>\n");
@@ -624,7 +623,7 @@ sub get_ip_state_table_s {
 }
 
 sub get_arp_table_s {
-    my $sponge = shift;
+    my ($sponge) = @_;
 
     my $fh = IO::String->new;
 
@@ -694,7 +693,7 @@ sub reset_timer {
 #
 ###############################################################################
 sub do_timer($) {
-    my $sponge = shift;
+    my ($sponge) = @_;
 
     my $learning = $sponge->user('learning');
     if ($learning > 0) {
@@ -742,8 +741,7 @@ sub do_timer($) {
 #
 ###############################################################################
 sub init_state {
-    my $sponge = shift;
-    my $state  = shift;
+    my ($sponge, $state) = @_;
 
     my $lo = $sponge->user('net_lo');
     my $hi = $sponge->user('net_hi');
@@ -760,7 +758,7 @@ sub init_state {
 #
 ###############################################################################
 sub do_learn($) {
-    my $sponge = shift;
+    my ($sponge) = @_;
 
     log_verbose(1, "LEARN: ",
                 int($sponge->user('learning')), " secs left\n");
@@ -777,8 +775,7 @@ sub do_learn($) {
 #
 ###############################################################################
 sub do_sweep {
-    my $sponge    = shift;
-    my %opts      = @_;
+    my ($sponge, %opts) = @_;
 
     my $interval   = $opts{'sweep_sec'}  // $sponge->user('sweep_sec');
     my $threshold  = $opts{'sweep_age'}  // $sponge->user('sweep_age');
@@ -1051,8 +1048,8 @@ sub process_pkt {
 #
 ###############################################################################
 sub start_daemon($$) {
-    my $sponge  = shift;
-    my $pidfile = shift;
+    my ($sponge, $pidfile) = @_;
+
     if (-f $pidfile) {
         open(PID, "<$pidfile"); chomp(my $pid = <PID>); close PID;
         if ($pid) {
@@ -1101,8 +1098,7 @@ sub start_daemon($$) {
 #
 ###############################################################################
 sub process_signal {
-    my $sponge = shift;
-    my $name = shift;
+    my ($sponge, $name) = @_;
 
     log_crit("Received %s signal -- exiting", $name);
     exit(1);
@@ -1118,8 +1114,7 @@ sub process_signal {
 #   Write status information to the 'statusfile'.
 #
 sub do_status {
-    my $signal = shift;
-    my $sponge = shift;
+    my ($signal, $sponge) = @_;
     my $fname = $sponge->user('statusfile');
     my $start_time = $sponge->user('start_time');
 
