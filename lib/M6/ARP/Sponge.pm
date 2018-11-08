@@ -263,9 +263,8 @@ sub get_ip_all {
     my @ip;
 
     open(IFCONFIG, 'ifconfig -a 2>/dev/null|');
-    local($_);
-    while (<IFCONFIG>) {
-        if (/^.*inet addr:(\S+)/) {
+    while (my $l = <IFCONFIG>) {
+        if ($l =~ /^.*inet (?:addr:)?(\S+)/) {
             push @ip, ip2hex($1);
         }
     }
