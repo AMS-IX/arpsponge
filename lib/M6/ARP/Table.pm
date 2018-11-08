@@ -64,10 +64,9 @@ Create a new object instance and return a reference to it.
 =cut
 
 sub new {
-	my $type = shift;
-	my $max_depth = shift;
+	my ($type, $max_depth) = @_;
 
-	if (ref $type) { $type = ref $type }
+    $type = ref $type if ref $type;
 	bless { arp => {}, rarp => {} }, $type;
 }
 
