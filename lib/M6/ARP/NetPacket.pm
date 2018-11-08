@@ -247,15 +247,13 @@ Payload data of the Ethernet frame.
 =cut
 
 sub decode_ethernet {
-    my $pkt = shift;
-    my $self = {};
+    my ($pkt) = @_;
+    return {} if !defined $pkt;
 
-    if (defined $pkt) {
-        # Much faster than the "Nn" + sprintf() trick.
-        ($self->{dest_mac}, $self->{src_mac}, $self->{type}, $self->{data})
-            = unpack('H12H12na*', $pkt);
-    }
-    return $self;
+    my %self = ();
+    # Much faster than the "Nn" + sprintf() trick.
+    @self{'dest_mac','src_mac','type','data'} = unpack('H12H12na*', $pkt);
+    return \%self;
 }
 
 ###############################################################################
@@ -290,12 +288,9 @@ Payload data of the Ethernet frame.
 =cut
 
 sub encode_ethernet {
-    my $self = shift;
+    my ($self) = @_;
 
-    return pack('H12H12na*', 
-            $self->{dest_mac}, $self->{src_mac},
-            $self->{type}, $self->{data}
-        );
+    return pack( 'H12H12na*', @{$self}{qw( dest_mac src_mac type data )} );
 }
 
 ###############################################################################
@@ -374,35 +369,35 @@ Payload data of the IP datagram.
 =cut
 
 sub decode_ipv4 {
-    my $pkt = shift;
+    my ($pkt) = @_;
 
     return {} if ! defined $pkt;
 
-    my $self = {};
+    my %self;
 
     # Unpack IP addresses directly as "H8".
-    (my $tmp, $self->{tos}, $self->{len}, $self->{id}, $self->{foffset},
-              $self->{ttl}, $self->{proto}, $self->{cksum},
-              $self->{src_ip}, $self->{dest_ip}, $self->{options})
-        = unpack('CCnnnCCnH8H8a*', $pkt);
+    (
+        my $tmp,
+        @self{qw(tos len id foffset ttl proto cksum src_ip dest_ip options)}
+    ) = unpack('CCnnnCCnH8H8a*', $pkt);
 
     # Extract bit fields
-    $self->{ver} = ($tmp & 0xf0) >> 4;
-    $self->{hlen} = $tmp & 0x0f;
+    $self{ver} = ($tmp & 0xf0) >> 4;
+    $self{hlen} = $tmp & 0x0f;
 
-    $self->{flags} = $self->{foffset} >> 13;
-    $self->{foffset} = ($self->{foffset} & 0x1fff) << 3;
+    $self{flags} = $self{foffset} >> 13;
+    $self{foffset} = ($self{foffset} & 0x1fff) << 3;
 
     # Decode variable length header options and remaining data in field
 
     # Option length is number of 32 bit words
-    my $olen = $self->{hlen}*4 - 20;
+    my $olen = $self{hlen}*4 - 20;
        $olen = 0 if $olen < 0;  # Check for bad hlen
 
-    ($self->{options}, $self->{data})
-        = unpack("a${olen}a*", $self->{options});
+    @self{qw(options data)}
+        = unpack("a${olen}a*", $self{options});
 
-    return $self;
+    return \%self;
 }
 
 ###############################################################################
@@ -471,29 +466,27 @@ don't get nonsense.
 =cut
 
 sub decode_arp {
-    my $pkt = shift;
+    my ($pkt) = @_;
     return {} if !defined $pkt;
 
-    my $self = {};
+    my %self;
 
-    #($self->{htype}, $self->{proto}, $self->{hlen}, $self->{plen},
-    #    $self->{opcode}, $self->{sha}, $self->{spa}, $self->{tha},
-    #    $self->{tpa}) =
-    #        unpack('nnCCnH12H8H12H8' , $pkt);
+    # @self{qw( htype proto hlen plen opcode sha spa tha tpa )}
+    #   = unpack('nnCCnH12H8H12H8', $pkt);
 
-    # Ninetynine out of a hundred times hlen is 6 and plen is 4 (IP over ethernet),
+    # 99 out of 100 times hlen is 6 and plen is 4 (IP over ethernet),
     # but just in case:
-    ($self->{htype}, $self->{proto}, $self->{hlen}, $self->{plen},
-     $self->{opcode}, my $payload)
-            = unpack('nnCCna*' , $pkt);
+    (
+        @self{qw( htype proto hlen plen opcode )},
+        my $payload
+    ) = unpack('nnCCna*', $pkt);
         
     # Take the long way home.
-    my $spec = 'H'.($self->{hlen}*2).'H'.($self->{plen}*2);
-    ($self->{sha}, $self->{spa}, $self->{tha}, $self->{tpa})
-            = unpack($spec.$spec, $payload);
+    my $spec = 'H'.($self{hlen}*2).'H'.($self{plen}*2);
+    @self{qw( sha spa tha tpa )} = unpack($spec.$spec, $payload);
 
-    $self->{data} = undef;
-    return $self;
+    $self{data} = undef;
+    return \%self;
 }
 
 ###############################################################################
@@ -559,7 +552,7 @@ in practice (and our use case), we only see IP over Ethernet.
 =cut
 
 sub encode_arp {
-    my $self = shift;
+    my ($self) = @_;
 
     $self->{htype} //= $ARP_HTYPE_ETHERNET;
     $self->{proto} //= $ARP_PROTO_IPv4;
@@ -569,10 +562,8 @@ sub encode_arp {
 
     my $spec = 'H'.($self->{hlen}*2).'H'.($self->{plen}*2);
     return pack("nnCCn$spec$spec",
-            $self->{htype}, $self->{proto}, $self->{hlen}, $self->{plen},
-            $self->{opcode}, 
-            $self->{sha}, $self->{spa}, $self->{tha}, $self->{tpa}
-        );
+        @{$self}{qw( htype proto hlen plen opcode sha spa tha tpa )}
+    );
 }
 
 ###############################################################################
