@@ -105,11 +105,11 @@ Returns a reference to the newly created object.
 =cut
 
 sub new {
-	my $type = shift;
+	my ($type, $max_depth) = @_;
 
-	my $max_depth = @_ ? shift : $DFL_DEPTH;
+	my $max_depth //= $DFL_DEPTH;
 
-	if (ref $type) { $type = ref $type }
+	$type = ref $type if ref $type;
 	bless {'max_depth' => $max_depth, q=>{}}, $type;
 }
 
@@ -206,7 +206,7 @@ Return the maximum depth of the queues.
 
 =cut
 
-sub max_depth { shift->{'max_depth'} }
+sub max_depth { $_[0]->{'max_depth'} }
 
 =item X<is_full>B<is_full> ( I<IP> )
 
