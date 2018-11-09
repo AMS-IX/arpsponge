@@ -97,7 +97,7 @@ Example: int2ip(3250751620) returns "193.194.136.132".
 =cut
 
 sub int2ip {
-	hex2ip(sprintf("%08x", shift @_));
+	hex2ip(sprintf("%08x", $_[0]));
 };
 
 ###############################################################################
@@ -111,7 +111,7 @@ Example: ip2int("193.194.136.132") returns "3250751620".
 =cut
 
 sub ip2int {
-	hex(ip2hex(shift @_));
+	hex(ip2hex($_[0]));
 };
 
 ###############################################################################
@@ -125,7 +125,7 @@ Example: hex2ip("c1c28884") returns "193.194.136.132".
 =cut
 
 sub hex2ip {
-	my $hex = shift;
+	my ($hex) = @_;
 
 	$hex =~ /(..)(..)(..)(..)/;
 	my $ip = sprintf("%d.%d.%d.%d", hex($1), hex($2), hex($3), hex($4));
@@ -144,7 +144,7 @@ returns "c1c28884".
 =cut
 
 sub ip2hex {
-	return sprintf("%02x%02x%02x%02x", split(/\./, shift));
+	return sprintf("%02x%02x%02x%02x", split(/\./, $_[0]));
 };
 
 ###############################################################################
@@ -159,7 +159,7 @@ returns "a1:b2:03:04:e5:f6"
 =cut
 
 sub hex2mac {
-	my $hex = substr("000000000000".(shift @_), -12);
+	my $hex = substr("000000000000$_[0]", -12);
 	$hex =~ /(..)(..)(..)(..)(..)(..)/;
 	return sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
 			hex($1), hex($2), hex($3), hex($4), hex($5), hex($6));
@@ -179,12 +179,12 @@ returns "a1b20304e5f6".
 
 sub mac2hex {
     return if !@_ or !defined $_[0];
-	my @mac = split(/[\s\.\-:\-]/, shift);
+	my @mac = split(/[\s\.\-:\-]/, $_[0]);
 	return undef if 12 % int(@mac);
 	my $digits = int(12 / int(@mac));
 	my $hex;
-	my $pref = "0" x $digits;
-	foreach (@mac) { $hex .= substr($pref.$_, -$digits) }
+	my $pref = '000000000000';
+	foreach my $grp (@mac) { $hex .= substr($pref.$grp, -$digits) }
 	return lc $hex;
 };
 
@@ -290,9 +290,15 @@ Example:
 =cut
 
 sub is_valid_int {
-    my $arg = shift;
+    my ($arg, @opt) = @_;
     my $err_s;
-    my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
+    my %opts = (
+        -err => \$err_s,
+        -min => undef,
+        -max => undef,
+        -inclusive => 1,
+        @opt,
+    );
 
     if (!defined $arg || length($arg) == 0) {
         ${$opts{-err}} = 'not a valid number';
@@ -304,26 +310,22 @@ sub is_valid_int {
         ${$opts{-err}} = 'not a valid number';
         return;
     }
-    elsif ($opts{-inclusive}) {
-        if (defined $opts{-min} && $num < $opts{-min}) {
+
+    if (defined(my $min = $opts{-min})) {
+        my $min_ok = $opts{-inclusive} ? $num >= $min : $num > $min;
+        if (!$min_ok) {
             ${$opts{-err}} = 'number too small';
             return;
         }
-        if (defined $opts{-max} && $num > $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
+    }
+    if (defined(my $max = $opts{-max})) {
+        my $max_ok = $opts{-inclusive} ? $num <= $max : $num < $max;
+        if (!$max_ok) {
+            ${$opts{-err}} = 'number too larg';
             return;
         }
     }
-    else {
-        if (defined $opts{-min} && $num <= $opts{-min}) {
-            ${$opts{-err}} = 'number too small';
-            return;
-        }
-        if (defined $opts{-max} && $num >= $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
-            return;
-        }
-    }
+
     ${$opts{-err}} = '';
     return $num;
 }
@@ -372,9 +374,15 @@ Example:
 =cut
 
 sub is_valid_float {
-    my $arg = shift;
+    my ($arg, @opt) = @_;
     my $err_s;
-    my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
+    my %opts = (
+        -err => \$err_s,
+        -min => undef,
+        -max => undef,
+        -inclusive => 1,
+        @opt,
+    );
 
     if (!defined $arg || length($arg) == 0) {
         ${$opts{-err}} = 'not a valid number';
@@ -386,26 +394,22 @@ sub is_valid_float {
         ${$opts{-err}} = 'not a valid number';
         return;
     }
-    elsif ($opts{-inclusive}) {
-        if (defined $opts{-min} && $num < $opts{-min}) {
+
+    if (defined(my $min = $opts{-min})) {
+        my $min_ok = $opts{-inclusive} ? $num >= $min : $num > $min;
+        if (!$min_ok) {
             ${$opts{-err}} = 'number too small';
             return;
         }
-        if (defined $opts{-max} && $num > $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
+    }
+    if (defined(my $max = $opts{-max})) {
+        my $max_ok = $opts{-inclusive} ? $num <= $max : $num < $max;
+        if (!$max_ok) {
+            ${$opts{-err}} = 'number too larg';
             return;
         }
     }
-    else {
-        if (defined $opts{-min} && $num <= $opts{-min}) {
-            ${$opts{-err}} = 'number too small';
-            return;
-        }
-        if (defined $opts{-max} && $num >= $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
-            return;
-        }
-    }
+
     ${$opts{-err}} = '';
     return $num;
 }
@@ -428,9 +432,9 @@ contain a diagnostic.
 =cut
 
 sub is_valid_ip {
-    my $arg = shift;
+    my ($arg, @opt) = @_;
     my $err_s;
-    my %opts = (-err => \$err_s, -network => undef, @_);
+    my %opts = (-err => \$err_s, -network => undef, @opt);
 
     if (!defined $arg || length($arg) == 0) {
         ${$opts{-err}} = q/"" is not a valid IPv4 address/;
@@ -450,12 +454,10 @@ sub is_valid_ip {
         ${$opts{-err}} = qq/$arg is out of range /.$net->cidr();
         return;
     }
-    else {
-        ${$opts{-err}} = qq/** INTERNAL ** is_valid_ip(): -network /
-                       . qq/argument "$opts{-network}" is not valid/;
-        warn ${$opts{-err}};
-        return;
-    }
+    ${$opts{-err}} = qq/** INTERNAL ** is_valid_ip(): -network /
+                   . qq/argument "$opts{-network}" is not valid/;
+    warn ${$opts{-err}};
+    return;
 }
 
 ###############################################################################
@@ -475,9 +477,9 @@ returns "2011-03-23@15:41:18"
 =cut
 
 sub format_time {
-	my $time = shift;
-    my $separator = @_ ? shift : '@';
+	my ($time, $separator) = @_;
     if (defined $time && $time > 0) {
+        $separator //= '@';
         return strftime("%Y-%m-%d${separator}%H:%M:%S", localtime($time));
     }
     return 'never';
@@ -498,15 +500,13 @@ returns "1 day 4h49m5s ago"
 =cut
 
 sub relative_time {
-	my $time = shift;
-    my $with_direction = @_ ? shift : 1;
-    my $now  = time;
-
+	my $time = $_[0];
     return 'never' if !$time;
 
-    my $direction = $time > $now ? 'from now' : 'ago';
-    my $diff = abs(time - $time);
+    my $with_direction = @_ > 1 ? $_[1] : 1;
+    my $now  = time;
 
+    my $diff = abs(time - $time);
     my $day = int($diff / (24*3600));
     $diff %= 24*3600;
 
@@ -519,6 +519,7 @@ sub relative_time {
     $str .= strftime("%H:%M:%S", gmtime($diff));
     
     if ($with_direction) {
+        my $direction = $time > $now ? 'from now' : 'ago';
         $str .= " $direction";
     }
     return $str;
