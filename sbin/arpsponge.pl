@@ -125,25 +125,25 @@ EOF
 
 ###############################################################################
 
-my $wrote_pid      = 0;
-my $pidfile        = undef;
-my $control_socket = undef;
-my $block_sigset   = POSIX::SigSet->new(SIGUSR1, SIGHUP, SIGALRM);
-my $timer_cycle    = 1.0;
+my $Wrote_Pid      = 0;
+my $Pid_File        = undef;
+my $Control_Socket = undef;
+my $Block_Sigset   = POSIX::SigSet->new(SIGUSR1, SIGHUP, SIGALRM);
+my $Timer_Cycle    = 1.0;
 
 # Keep track of how many errors we've seen and when we logged the
 # last error. This is used to suppress too much logging.
-my $last_err       = 0;
-my $err_count      = 0;
+my $Last_Error       = 0;
+my $Error_Count      = 0;
 
 # ============================================================================
 END {
-    if (defined $wrote_pid && $$ == $wrote_pid) {
-        print STDERR "$$ unlinking $pidfile\n";
-        unlink($pidfile);
-        if (defined $control_socket && -e $control_socket) {
-            print STDERR "$$ unlinking $control_socket\n";
-            unlink($control_socket);
+    if (defined $Wrote_Pid && $$ == $Wrote_Pid) {
+        print STDERR "$$ unlinking $Pid_File\n";
+        unlink($Pid_File);
+        if (defined $Control_Socket && -e $Control_Socket) {
+            print STDERR "$$ unlinking $Control_Socket\n";
+            unlink($Control_Socket);
         }
     }
 }
@@ -163,7 +163,7 @@ sub Main {
     GetOptions(
         'age=i'               => \(my $age              = $DFL_ARP_AGE),
         'arp-update-method=s' => \(my $arp_update_methods),
-        'control=s'           => \$control_socket,
+        'control=s'           => \$Control_Socket,
         'daemon!'             => \(my $daemon),
         'dummy!'              => \(my $dummy),
         'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
@@ -176,7 +176,7 @@ sub Main {
         'man'                 => \(my $man),
         'pending=i'           => \(my $pending          = $DFL_PENDING),
         'permissions=s'       => \(my $permissions      = $DFL_SOCK_PERMS),
-        'pidfile=s'           => \$pidfile,
+        'pidfile=s'           => \$Pid_File,
         'proberate=i'         => \(my $proberate        = $DFL_PROBERATE),
         'queuedepth=i'        => \(my $queuedepth       = $DFL_QUEUEDEPTH),
         'rate=f'              => \(my $rate             = $DFL_RATE),
@@ -249,7 +249,7 @@ sub Main {
     }
 
     if ($daemon) {
-        $pidfile //= "$rundir/pid";
+        $Pid_File //= "$rundir/pid";
     }
 
     ####################################################################
@@ -308,8 +308,8 @@ sub Main {
     ####################################################################
 
     # Create the control socket.
-    $control_socket //= "$rundir/control";
-    my $control_fh = create_control_socket($sponge, $control_socket, $permissions);
+    $Control_Socket //= "$rundir/control";
+    my $control_fh = create_control_socket($sponge, $Control_Socket, $permissions);
 
     ####################################################################
 
@@ -351,7 +351,7 @@ sub Main {
                     $sponge->device, $sponge->my_ip_s, $sponge->my_mac_s);
 
     # If we have to run in daemon mode, do so.
-    start_daemon($sponge, $pidfile) if $daemon;
+    start_daemon($sponge, $Pid_File) if $daemon;
 
     ####################################################################
 
@@ -380,7 +380,7 @@ sub create_control_socket {
         }
     }
 
-    my $control_fh = M6::ARP::Control::Server->create_server($control_socket)
+    my $control_fh = M6::ARP::Control::Server->create_server($Control_Socket)
                         or log_fatal "%s", M6::ARP::Control->error;
 
     $sponge->user('control', $control_fh);
@@ -397,13 +397,13 @@ sub create_control_socket {
     my $sock_gid = getgrnam($sock_group)
         // log_fatal qq{$PROG: unknown group "$sock_group"\n};
 
-    chown($sock_uid, $sock_gid, $control_socket)
+    chown($sock_uid, $sock_gid, $Control_Socket)
         or log_err(qq{chown %s:%s %s: %s},
-                    $sock_owner, $sock_group, $control_socket, $!);
+                    $sock_owner, $sock_group, $Control_Socket, $!);
 
-    chmod($sock_perms, $control_socket)
+    chmod($sock_perms, $Control_Socket)
         or log_err(qq{chmod %04o %s: %s},
-                    $sock_perms, $control_socket, $!);
+                    $sock_perms, $Control_Socket, $!);
 
     return $control_fh;
 }
@@ -451,20 +451,20 @@ sub handle_input {
 
         $now = time; # Update time.
 
-        if ($err_count > 1 && $now > $last_err + 15) {
+        if ($Error_Count > 1 && $now > $Last_Error + 15) {
             # We've seen multiple select errors in the last 15 seconds.
             # Only the first was logged. Log the number of repetitions.
-            event_err(EVENT_IO, "select error repeated %d time(s)", $err_count-1);
-            $err_count = 0;
+            event_err(EVENT_IO, "select error repeated %d time(s)", $Error_Count-1);
+            $Error_Count = 0;
         }
 
         if (@ready == 0) {
             # A signal or another error.
             if ($! == EINTR) { # Ignore EINTR errors; they are expected.
-                $err_count++;
-                if ($err_count == 1) { # Suppress multiple errors.
+                $Error_Count++;
+                if ($Error_Count == 1) { # Suppress multiple errors.
                     event_err(EVENT_IO, "error in select(): %s", $!);
-                    $last_err = $now;
+                    $Last_Error = $now;
                 }
             }
             next;
@@ -473,30 +473,31 @@ sub handle_input {
         for my $ready_fh (@ready) {
             my $ready_fd = $ready_fh->fileno;
             if ($ready_fd == $pcap_fd) { # [4]
-                sigprocmask(SIG_BLOCK, $block_sigset);
+                sigprocmask(SIG_BLOCK, $Block_Sigset);
                 pcap_dispatch($pcap_h, $MAX_PKT_PER_CYCLE, \&process_pkt, $sponge);
-                sigprocmask(SIG_UNBLOCK, $block_sigset);
+                sigprocmask(SIG_UNBLOCK, $Block_Sigset);
+                next;
             }
-            elsif ($ready_fd == $control_fd) {
+            if ($ready_fd == $control_fd) {
                 if (my $client = $control_fh->accept()) {
                     $select->add($client);
                     add_notify($client);
                     event_info(EVENT_CTL,
                         "[client %d] connected", $client->fileno);
+                    next;
                 }
-                else {
-                    log_fatal(
-                        "cannot accept control connection: %s",
-                        $control_fh->error
-                    );
-                }
+                log_fatal(
+                    "cannot accept control connection: %s",
+                    $control_fh->error
+                );
             }
-            elsif (!$ready_fh->handle_command($sponge)) {
+            if (!$ready_fh->handle_command($sponge)) {
                 $select->remove($ready_fh);
                 remove_notify($ready_fh);
                 event_info(EVENT_CTL,
                     "[client %d] disconnected", $ready_fh->fileno);
                 $ready_fh->close;
+                next;
             }
         }
     }
@@ -650,7 +651,7 @@ sub get_arp_table_s {
 # ($now, $next_alarm) = reset_timer($sponge, $prev_alarm)
 #
 #    Calculate when we need to run our timer trigger again.
-#    Normally, this is $prev_alarm + $timer_cycle, but if that
+#    Normally, this is $prev_alarm + $Timer_Cycle, but if that
 #    has already passed (which can happen if the timer trigger
 #    is slow), we need to adjust our cycle.
 #
@@ -662,10 +663,7 @@ sub reset_timer {
 
     # Keep the intervals as steady as possible by keying off
     # of the previous alarm time if possible.
-    if ($next_alarm + $timer_cycle > $now) {
-        $next_alarm += $timer_cycle; # [1]
-    }
-    else {
+    if ($now >= $next_alarm + $Timer_Cycle) {
         # We've been dragging our feet. Rather than setting
         # a new alarm time that's already in the past, adjust
         # to offset from current time. This is not elegant,
@@ -674,14 +672,12 @@ sub reset_timer {
         my $caller = (caller(1))[3];
         event_warning(EVENT_STATE,
             "$caller - timer event LAG: %s; %s",
-            strftime("planned=%H:%M:%S",
-                    localtime($next_alarm+$timer_cycle)),
-            strftime("adjusted=%H:%M:%S",
-                    localtime($now+$timer_cycle)),
+            strftime("planned=%H:%M:%S", localtime($next_alarm+$Timer_Cycle)),
+            strftime("adjusted=%H:%M:%S", localtime($now+$Timer_Cycle)),
         );
-        $next_alarm = $now + $timer_cycle; # [1]
+        $next_alarm = $now;
     }
-    return ($now, $next_alarm);
+    return ($now, $next_alarm + $Timer_Cycle);
 }
 
 ###############################################################################
@@ -702,36 +698,36 @@ sub do_timer($) {
         if ($learning-1 == 0) {
             event_notice(EVENT_STATE, "exiting learning state");
         }
+        return;
     }
-    else {
-        my $pending  = $sponge->pending;
-        my $sleep    = $sponge->user('probesleep');
+    my $pending  = $sponge->pending;
+    my $sleep    = $sponge->user('probesleep');
 
-        log_verbose(2, "Probing pending addresses...\n");
-        my $n = 0;
-        for my $ip (sort keys %$pending) {
-            if ($$pending{$ip} > PENDING($sponge->max_pending)) {
-                $sponge->set_dead($ip);
-            }
-            else {
-                $sponge->send_probe($ip);
-                $sponge->incr_pending($ip);
-                log_verbose(2, "probed $ip, state=",
-                                        $sponge->get_state($ip), "\n");
-                handle_input($sponge, time+$sleep);
-            }
-            $n++;
+    log_verbose(2, "Probing pending addresses...\n");
+    my $n = 0;
+    for my $ip (sort keys %$pending) {
+        $n++;
+        if ($$pending{$ip} > PENDING($sponge->max_pending)) {
+            $sponge->set_dead($ip);
+            next;
         }
-        if ($n > 1 || log_is_verbose() > 1) {
-            event_notice(EVENT_STATE, "%d pending IPs probed", $n);
-        }
-
-        my $next_sweep = $sponge->user('next_sweep');
-        if ($next_sweep && time >= int($next_sweep)) {
-            do_sweep($sponge);
-            $sponge->user('next_sweep', time+$sponge->user('sweep_sec'));
-        }
+        $sponge->send_probe($ip);
+        $sponge->incr_pending($ip);
+        log_verbose(2, "probed $ip, state=",
+                                $sponge->get_state($ip), "\n");
+        handle_input($sponge, time+$sleep);
     }
+
+    if ($n > 1 || log_is_verbose() > 1) {
+        event_notice(EVENT_STATE, "%d pending IPs probed", $n);
+    }
+
+    my $next_sweep = $sponge->user('next_sweep');
+    if ($next_sweep && time >= int($next_sweep)) {
+        do_sweep($sponge);
+        $sponge->user('next_sweep', time+$sponge->user('sweep_sec'));
+    }
+    return;
 }
 
 ###############################################################################
@@ -842,13 +838,12 @@ sub update_state {
 
     if ($sponge->get_state($src_ip) != STATIC) {
         $sponge->set_alive($src_ip, $src_mac);
+        return;
     }
-    else {
-        event_warning(EVENT_STATIC,
-            "traffic from STATIC sponged IP: src.mac=%s src.ip=%s",
-            hex2mac($src_mac), hex2ip($src_ip),
-        );
-    }
+    event_warning(EVENT_STATIC,
+        "traffic from STATIC sponged IP: src.mac=%s src.ip=%s",
+        hex2mac($src_mac), hex2ip($src_ip),
+    );
 }
 
 ###############################################################################
@@ -871,7 +866,7 @@ sub process_pkt {
     # Self-generated packets are not relevant.
     return if $src_mac eq $sponge->my_mac;
 
-    # Always "unsponge" the source IP address!
+    # Always "unsponge" the source IP address on any IP packet.
     if ($eth_obj->{type} == $ETH_TYPE_IP) {
         my $ip_obj  = decode_ipv4($eth_obj->{data});
         my $src_ip  = $ip_obj->{src_ip};
@@ -909,9 +904,8 @@ sub process_pkt {
         }
         return;
     }
-    else {
-        return if $eth_obj->{type} != $ETH_TYPE_ARP;
-    }
+
+    return if $eth_obj->{type} != $ETH_TYPE_ARP;
 
     # From this point on, we have an ARP packet.
 
@@ -940,18 +934,14 @@ sub process_pkt {
 
     if ( ! $sponge->is_my_network($dst_ip) ) {
         # We only store/sponge ARPs for our "local" IP addresses.
-
         event_warning(EVENT_ALIEN,
             "misplaced ARP: src.mac=%s arp.spa=%s arp.tpa=%s",
             hex2mac($src_mac),
             hex2ip($src_ip),
             hex2ip($dst_ip),
         );
-
-        return; # b-bye...
+        return;
     }
-
-    my $state = $sponge->get_state($dst_ip);
 
     if ($sponge->is_my_ip($dst_ip)) {
         # ARPs for our IPs require no action (handled by the kernel),
@@ -963,7 +953,8 @@ sub process_pkt {
         $sponge->set_alive($dst_ip, $sponge->my_mac);
         return;
     }
-    elsif ($src_ip eq $NULL_IP) {
+
+    if ($src_ip eq $NULL_IP) {
         # DHCP duplicate IP detection.
         # See RFC 2131, p38, bottom.
         event_notice(EVENT_SPONGE,
@@ -974,7 +965,8 @@ sub process_pkt {
         # Mmmh, don't let go completely yet... If all is well,
         # we'll soon start seeing "real" traffic from this
         # address...
-        if (defined $state && $sponge->get_state($dst_ip) != ALIVE) {
+        my $state = $sponge->get_state($dst_ip);
+        if (defined $state && $state != ALIVE) {
             $sponge->set_pending($dst_ip, 0);
         }
         return;
@@ -983,6 +975,7 @@ sub process_pkt {
     if (log_is_verbose() >= 2) {
         log_sverbose(2, "ARP WHO HAS %s TELL %s ",
                           hex2ip($dst_ip), hex2ip($src_ip));
+        my $state = $sponge->get_state($dst_ip);
         if ($state <= DEAD) {
             my $age = time - $sponge->state_mtime($dst_ip);
             log_sverbose(2, "[sponged=yes; %d secs ago]\n", $age);
@@ -999,68 +992,77 @@ sub process_pkt {
 
     $sponge->queue->add($dst_ip, $src_ip, time);
 
-    if (defined $state) {
-        if ($state == ALIVE) {
-            if ($sponge->queue->is_full($dst_ip) &&
-                $sponge->queue->rate($dst_ip) > $sponge->max_rate)
-            {
-                if (my $fprate = $sponge->flood_protection) {
-                    # Instead of just moving to pending, reduce the queue
-                    # by removing flooding sources, then check again...
-                    my $d1 = $sponge->queue->depth($dst_ip);
-                    my $r1 = $sponge->queue->rate($dst_ip);
-                    my $d2 = $sponge->queue->reduce($dst_ip, $fprate);
-                    my $r2 = $sponge->queue->rate($dst_ip);
-                    event_notice(EVENT_SPONGE,
-                            "%s queue reduced: [depth,rate] = "
-                            ."[%d,%0.1f] -> [%d,%0.1f]",
-                            hex2ip($dst_ip), $d1, $r1, $d2, $r2
-                        );
-                    if ($sponge->queue->is_full($dst_ip) &&
-                        $r2 > $sponge->max_rate)
-                    {
-                        $state = $sponge->set_pending($dst_ip, 0);
-                    }
-                }
-                else {
-                    $state = $sponge->set_pending($dst_ip, 0);
-                }
-            }
-        }
+    my $state = $sponge->get_state($dst_ip);
 
-        # PENDING states are handled by the do_timer() routine.
-        
-        if ($state <= DEAD) {
-            $sponge->send_reply($dst_ip, $arp_obj);
-        }
-    }
-    else {
+    if (!defined $state) {
         # State is not defined (yet), so make it pending.
         $state = $sponge->set_pending($dst_ip, 0);
+        return;
     }
+
+    # Reply for a dead address.
+    if ($state <= DEAD) {
+        $sponge->send_reply($dst_ip, $arp_obj);
+        return;
+    }
+
+    # PENDING states are handled by the do_timer() routine.
+    # So from here on out we are only interested in ALIVE
+    # addresses with a full queue and a rate greater than
+    # the max rate.
+    return if $state != ALIVE;
+    return if ! $sponge->queue->is_full($dst_ip);
+    return if $sponge->queue->rate($dst_ip) <= $sponge->max_rate;
+
+    # Check for flood protection.
+    my $fp_rate = $sponge->flood_protection;
+    if (!$fp_rate) {
+        # No flood protection, so just set address to pending.
+        $state = $sponge->set_pending($dst_ip, 0);
+    }
+
+    # In case of flood protection, reduce the queue
+    # by removing flooding sources, then check again...
+    my $d1 = $sponge->queue->depth($dst_ip);
+    my $r1 = $sponge->queue->rate($dst_ip);
+    my $d2 = $sponge->queue->reduce($dst_ip, $fp_rate);
+    my $r2 = $sponge->queue->rate($dst_ip);
+    event_notice(EVENT_SPONGE,
+            "%s queue reduced: [depth,rate] = "
+            ."[%d,%0.1f] -> [%d,%0.1f]",
+            hex2ip($dst_ip), $d1, $r1, $d2, $r2
+        );
+    if ($sponge->queue->is_full($dst_ip) &&
+        $r2 > $sponge->max_rate)
+    {
+        $state = $sponge->set_pending($dst_ip, 0);
+    }
+
+    
+    return;
 }
 
 ###############################################################################
-# start_daemon($sponge, $pidfile);
+# start_daemon($sponge, $Pid_File);
 #
 #   Fork off into the background, i.e. run as a daemon.
 #   Create a PID file as well.
 #
 ###############################################################################
 sub start_daemon($$) {
-    my ($sponge, $pidfile) = @_;
+    my ($sponge, $Pid_File) = @_;
 
-    if (-f $pidfile) {
-        open(PID, "<$pidfile"); chomp(my $pid = <PID>); close PID;
+    if (-f $Pid_File) {
+        open(PID, "<$Pid_File"); chomp(my $pid = <PID>); close PID;
         if ($pid) {
             chomp(my $proc = `ps h -p $pid -o args`);
             if ($proc =~ /$PROG/) {
                 log_fatal("already running (pid = $pid)\n");
             }
         }
-        print STDERR "$PROG: WARNING: removing stale PID file $pidfile\n";
-        log_warning("removing stale PID file %s", $pidfile);
-        unlink $pidfile;
+        print STDERR "$PROG: WARNING: removing stale PID file $Pid_File\n";
+        log_warning("removing stale PID file %s", $Pid_File);
+        unlink $Pid_File;
     }
 
     if (my $pid = fork) {
@@ -1071,15 +1073,12 @@ sub start_daemon($$) {
     }
 
     # Child (daemon) process.
-    if (open(PID, ">$pidfile")) {
-        print PID $$, "\n";
-        $wrote_pid = $$;
-        close PID;
-    }
-    else {
-        my $err = $!;
-        log_fatal("cannot write pid to %s: %s", $pidfile, $err);
-    }
+    open my $pid_fh, '>', $Pid_File
+        or log_fatal("cannot write pid to %s: %s", $Pid_File, $!);
+
+    print $pid_fh $$, "\n";
+    $Wrote_Pid = $$;
+    close $pid_fh;
 
     # Close the standard file descriptors.
     close STDOUT;
