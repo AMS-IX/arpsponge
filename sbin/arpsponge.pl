@@ -601,21 +601,24 @@ sub get_ip_state_table_s {
         my $rate  = $queue->rate($ip);
         my $stamp = $sponge->state_mtime($ip);
 
-        if ($state == DEAD) {
-            $ndead++;
-        }
-        elsif ($state == ALIVE) {
-            $nalive++;
-        }
-        elsif ($state >= PENDING(0)) {
-            $npending++;
-        }
-
         $fh->print(
             sprintf("%-17s %-12s %7d %8.3f     %s\n", hex2ip($ip),
                     $sponge->state_name($state), $depth, $rate,
                     format_time($stamp)
-            ));
+        ));
+
+        if ($state == DEAD) {
+            $ndead++;
+            next;
+        }
+        if ($state == ALIVE) {
+            $nalive++;
+            next;
+        }
+        if ($state >= PENDING(0)) {
+            $npending++;
+            next;
+        }
     }
     $fh->print("</STATE>\n");
     return (
@@ -814,8 +817,9 @@ sub do_sweep {
             $sponge->set_state_mtime($ip, time);
             $nprobe++;
             handle_input($sponge, time+$sleep);
+            next;
         }
-        elsif ($verbose>1) {
+        if ($verbose>1) {
             log_sverbose(1, "SKIP PROBE %s (%d < %d)\n",
                             hex2ip($ip), $age, $threshold);
         }
