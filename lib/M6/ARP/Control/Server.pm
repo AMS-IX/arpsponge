@@ -707,7 +707,7 @@ sub _cmd_inform {
 sub _cmd_probe {
     my ($self, $sponge, $cmd, $ip) = @_;
 
-    if (@args != 1 ) {
+    if (!defined $ip) {
         return $self->send_error("$cmd <IP>");
     }
 
