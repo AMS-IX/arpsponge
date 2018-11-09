@@ -33,7 +33,7 @@ BEGIN {
 sub error { return M6::ARP::Control->error() };
 
 sub _set_error {
-    my ($self, $args) = @_;
+    my ($self, @args) = @_;
     return M6::ARP::Control->_set_error(@args);
 }
 
