@@ -109,17 +109,15 @@ END {
 }
 
 sub __log_getset {
-    my $ref = shift;
-    if (@_) {
-        my $old = $$ref;
-        $$ref = shift;
-        return $old;
-    }
-    return $$ref;
+    my $ref = $_[0];
+    return $$ref if @_ == 1;
+    my $old = $$ref;
+    $$ref = $_[1];
+    return $old;
 }
 
 sub init_log {
-    $Syslog_Ident = @_ ? shift : $0;
+    $Syslog_Ident = @_ ? $_[0] : $0;
     $Syslog_Ident =~ s|.*/||;
     openlog($Syslog_Ident, $LOGOPT, $FACILITY);
     $Notify = IO::Select->new();
@@ -158,7 +156,7 @@ sub log_debug   { print_log_level(LOG_DEBUG,    @_) }
 #
 ###############################################################################
 sub add_notify {
-    my $fh = shift;
+    my ($fh) = @_;
     $Notify->add($fh);
     return $fh;
 }
@@ -173,7 +171,7 @@ sub add_notify {
 #
 ###############################################################################
 sub remove_notify {
-    my $fh = shift;
+    my ($fh) = @_;
     $Notify->remove($fh);
     return $fh;
 }
@@ -186,8 +184,7 @@ sub remove_notify {
 sub print_notify($@) {
     $Notify || return;
 
-    my $format = shift;
-    my $msg = sprintf($format, @_);
+    my $msg = sprintf(@_);
     for my $fh ($Notify->can_write(0)) {
         $fh->send_log($msg);
     }
@@ -209,15 +206,16 @@ sub print_log_level {
         }
     }
 
-    if ($Verbose > 0) {
-        my $head = strftime("%Y-%m-%d %H:%M:%S ", localtime(time))
-                 . $Syslog_Ident . "[$$]:";
-        print STDOUT map { "$head $_\n" } split(/\n/, sprintf($format, @args));
-    }
-    else {
-        syslog($level, $format, @args);
-    }
     print_notify($format, @args);
+
+    if ($Verbose <= 0) {
+        syslog($level, $format, @args);
+        return;
+    }
+    my $head = strftime("%Y-%m-%d %H:%M:%S ", localtime(time))
+             . $Syslog_Ident . "[$$]:";
+    print STDOUT map { "$head $_\n" } split(/\n/, sprintf($format, @args));
+    return;
 }
 
 ###############################################################################
@@ -290,9 +288,9 @@ contain a diagnostic.
 =cut
 
 sub is_valid_log_level {
-    my $arg = shift;
+    my ($arg, %opts) = @_;
     my $err_s;
-    my %opts = (-err => \$err_s, @_);
+    $opts{-err} //= $err_s;
 
     if (defined (my $level = $STR_TO_LOGLEVEL{lc $arg}) ) {
         return $level;
@@ -309,13 +307,13 @@ Return the string representation of the numerical I<LOGLEVEL>.
 =cut
 
 sub log_level_to_string {
-    my $level = int(shift);
+    my $level = int($_[0]);
 
     if ($level > LOG_DEBUG()) {
-        $level = LOG_DEBUG();
+        return $LOGLEVEL_TO_STR{LOG_DEBUG()};
     }
-    elsif ($level < LOG_EMERG()) {
-        $level = LOG_EMERG();
+    if ($level < LOG_EMERG()) {
+        return $LOGLEVEL_TO_STR{LOC_EMERG()};
     }
     return $LOGLEVEL_TO_STR{$level};
 }

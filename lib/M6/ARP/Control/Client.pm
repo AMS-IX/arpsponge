@@ -34,14 +34,12 @@ use M6::ARP::Control;
 #   $MAXLOGLINES lines.
 #
 sub _log_buffer {
-    my $self = shift;
-    if (@_) {
-        ${*$self}{'m6_arp_control_client_log_buffer'} = shift;
+    my $self = $_[0];
+    if (@_ > 1) {
+        ${*$self}{'m6_arp_control_client_log_buffer'} = $_[1];
         return $self;
     }
-    else {
-        return ${*$self}{'m6_arp_control_client_log_buffer'};
-    }
+    return ${*$self}{'m6_arp_control_client_log_buffer'};
 }
 
 # $leftover = $handle->_parse_log_buffer($data [, \@logbuffer]);
@@ -51,17 +49,11 @@ sub _log_buffer {
 #   of $data.
 #
 sub _parse_log_buffer {
-    my $self = shift;
-    my $data = shift;
+    my ($self, $data, $log) = @_;
 
-    my ($log, $maxloglines);
-
-    if (@_) {
-        $log         = shift;
-        $maxloglines = 0;
-    }
-    else {
-        $log         = $self->_log_buffer;
+    my $maxloglines = 0;
+    if (!$log) {
+        $log = $self->_log_buffer;
         $maxloglines = $M6::ARP::Control::MAXLOGLINES;
     }
 
@@ -81,8 +73,8 @@ sub _parse_log_buffer {
 #   any other log information you can get if it is available.
 #
 sub get_log_buffer {
-    my $self = shift;
-    my %args = (-order => +1, @_);
+    my ($self, @args) = @_;
+    my %args = (-order => +1, @args);
 
     # Tease out log data from the socket.
     my $buf = $self->_parse_log_buffer($self->_get_data(0));
@@ -115,14 +107,13 @@ sub clear_log_buffer {
 #   but can be overridden with "-blocking => 0".
 #
 sub read_log_data {
-    my $self = shift;
-    my %args = (-blocking => 1, @_);
+    my ($self, @args) = @_;
+    my %args = (-blocking => 1, @args);
 
-    my $blocking = $args{-blocking};
     my @lines;
 
     # Tease out log data from the socket.
-    my $buf = $self->_parse_log_buffer($self->_get_data($blocking), \@lines);
+    my $buf = $self->_parse_log_buffer($self->_get_data($args{-blocking}), \@lines);
 
     # Anything else is weird. Tag it as such.
     if (length $buf) {
@@ -141,7 +132,7 @@ sub read_log_data {
 #   otherwise. Note that the response string may be empty.
 #
 sub _get_response {
-    my $self     = shift;
+    my ($self)   = @_;
     my $response = '';
     my $buf      = '';
     my $ok       = undef;
@@ -177,10 +168,8 @@ sub new {
     if (defined $self->_get_response) {
         return $self;
     }
-    else {
-        print STDERR "__PACKAGE__ new: _get_response returned undef\n";
-        return;
-    }
+    print STDERR "__PACKAGE__ new: _get_response returned undef\n";
+    return;
 }
 
 # $reply = $handle->send_command($command);
@@ -191,8 +180,8 @@ sub new {
 #   be lost.
 #
 sub send_command {
-    my $self = shift;
-    my $command = join(' ', split(' ', join('', @_)))."\n";
+    my ($self, @args) = @_;
+    my $command = join(' ', split(' ', join('', @args)))."\n";
 
     $self->_send_data($command) || return;
     return $self->_get_response;

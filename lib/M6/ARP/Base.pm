@@ -90,8 +90,8 @@ sub init { return shift }
 # 1: $obj->parse_named_args();
 # 2: $obj->parse_named_args( undef );
 # 3: $obj->parse_named_args( [ undef ] );
-# 5: $obj->parse_named_args( [ key => val, ... ] );
-# 4: $obj->parse_named_args( [ { key => val, ... } ] );
+# 4: $obj->parse_named_args( [ key => val, ... ] );
+# 5: $obj->parse_named_args( [ { key => val, ... } ] );
 # 6: $obj->parse_named_args( { key => val, ... } );
 #
 # Optional parameter "$valid_ref" is either { key => 1, ... } or [ key, ... ]
@@ -106,14 +106,16 @@ sub parse_named_args {
     if (! defined $args_ref) {
         return {};                              # 2
     }
-    elsif (reftype $args_ref eq 'HASH') {
-        1;                                      # 6
-    }
-    elsif (reftype $args_ref eq 'ARRAY') {
+
+    if (reftype $args_ref ne 'HASH') {
+        if (reftype $args_ref ne 'ARRAY') {
+            confess( qq{_named_args: parameter #0 ("$args_ref") not a HASH or},
+                     qq{ ARRAY ref: $args_ref\n} );
+        }
         if (!defined $args_ref->[0]) {
             return {};                          # 3
         }
-        elsif (@$args_ref % 2 == 0) {
+        if (@$args_ref % 2 == 0) {
             $args_ref = { @$args_ref };         # 4
         }
         elsif (@$args_ref == 1 && reftype $args_ref->[0] eq 'HASH') {
@@ -124,10 +126,8 @@ sub parse_named_args {
                     "   ", join(", ", @$args_ref), "\n");
         }
     }
-    else {
-        confess( qq{_named_args: parameter #0 ("$args_ref") not a HASH or},
-                 qq{ ARRAY ref: $args_ref\n} );
-    }
+
+    # default case: it's a hashref               # 6
 
     my %attr;
 
@@ -158,11 +158,9 @@ sub _define_accessor {
 
     my $sub = "sub ${class}::$name {\n"
             . " if (\@_ < 2) { return \$_[0]->{'$key'} }\n"
-            . " else {\n"
-            . "  my \$s = shift;\n"
-            . "  \$s->{'$key'} = shift;\n"
-            . "  return \$s;\n"
-            . " }\n"
+            . " my \$s = \$_[0];\n"
+            . " \$s->{'$key'} = \$_[1];\n"
+            . " return \$s;\n"
             . "}\n"
             . ";1\n"
           ;

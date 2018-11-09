@@ -207,9 +207,15 @@ sub parse_event_mask {
         my $negate = 0;
         my $cumulative = 0;
 
-        if ($event =~ s/^([\!\+])//) {
+        my $first_char = substr($event, 0, 1);
+        if ($first_char eq '!') {
+            substr($event, 0, 1) = '';
+            $negate = 1;
             $mask //= event_mask();
-            $negate = 1 if $1 eq '!';
+        }
+        elsif ($first_char eq '+') {
+            substr($event, 0, 1) = '';
+            $mask //= event_mask();
         }
         else {
             $mask //= EVENT_NONE;

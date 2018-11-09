@@ -56,11 +56,10 @@ my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
 #   Convenience wrapper around new().
 #
 sub create_server {
-    my $type = shift @_;
-       $type = ref $type || $type;
+    my ($type, $socketname, $maxclients) = @_;
+    $type = ref $type || $type;
 
-    my $socketname = shift;
-    my $maxclients = @_ ? shift : 5;
+    $maxclients //= 5;
 
     # Fill in some harmless defaults...
     my $self = $type->new(
@@ -78,10 +77,9 @@ sub create_server {
 #   Convenience wrapper around new().
 #
 sub new {
-    my $type = shift @_;
-       $type = ref $type || $type;
+    my ($type, %args) = @_;
+    $type = ref $type || $type;
 
-    my %args = @_;
     my $self = $type->SUPER::new(%args) or return $type->_set_error($!);
 
     $self->blocking(0); # Make sure we never hang as a server.
@@ -89,13 +87,13 @@ sub new {
 }
 
 sub _log_ctl {
-    my $self = shift;
-    event_notice(EVENT_CTL, @_);
+    my ($self, @args) = @_;
+    event_notice(EVENT_CTL, @args);
 }
 
 sub _log_crit {
-    my $self = shift;
-    event_crit(EVENT_CTL, @_);
+    my ($self, @args) = @_;
+    event_crit(EVENT_CTL, @args);
 }
 
 # my $conn = $obj->accept();
@@ -103,7 +101,7 @@ sub _log_crit {
 #   Wrapper around accept. Sends a prompt to the client.
 #
 sub accept {
-    my $self = shift;
+    my ($self) = @_;
 
     my $socket = $self->SUPER::accept() or return $self->_set_error($!);
     
@@ -113,30 +111,27 @@ sub accept {
 }
 
 sub get_command {
-    my $self = shift;
-    return $self->_get_data();
+    return $_[0]->_get_data();
 }
 
 sub send_response {
-    my $self = shift;
-    my $response = join('', @_);
-       $response .= "\n" if $response !~ /\n\Z/;
+    my ($self, @args) = @_;
+    my $response = join('', @args);
+    $response .= "\n" if $response !~ /\n\Z/;
     return $self->_send_data("$response\014READY\n");
 }
 
 sub send_ok {
-    my $self = shift;
-    my $response = join('', @_);
-       chomp($response);
-       $response .= "\n" if length($response);
+    my ($self, @args) = @_;
+    chomp(my $response = join('', @args));
+    $response .= "\n" if length($response);
     return $self->send_response("${response}[OK]\n");
 }
 
 sub send_error {
-    my $self = shift;
-    my $response = join('', @_);
-       chomp($response);
-       $response .= "\n" if length($response);
+    my ($self, @args) = @_;
+    chomp(my $response = join('', @args));
+    $response .= "\n" if length($response);
     return $self->send_response("${response}[ERR]\n");
 }
 
@@ -146,9 +141,8 @@ sub send_error {
 #   and the server PID.
 #
 sub send_log {
-    my $self = shift;
-    my $log  = join('', @_);
-    chomp($log);
+    my ($self, @args) = @_;
+    chomp(my $log  = join('', @args));
     my $tstamp = time;
     my @log = map { "\014LOG\t$tstamp\t$$\t$_\n" } split(/\n/, $log);
     return $self->_send_data(@log);
@@ -175,12 +169,14 @@ sub handle_command {
         $self->send_error(qq/unknown command "$cmd"/);
         return; # Signal caller to disconnect misbehaving client.
     }
-    elsif (!$self->can($sub_name)) {
+    if (!$self->can($sub_name)) {
         # We forgot to implement something.
         $self->_log_crit("FIXME: $cmd -> $sub_name not implemented!");
         return $self->send_error("FIXME: $cmd not implemented!");
     }
+
     my $retval = eval '$self->'.$sub_name.'($sponge, $cmd, @args)';
+
     if ($@) {
         $self->send_log("INTERNAL ERROR: $@");
         $self->send_error("INTERNAL ERROR: $@");
@@ -336,8 +332,9 @@ sub _cmd_get_ip {
     if (@args >1 ) {
         return $self->send_error("$cmd [<IP>]");
     }
-    elsif (@args) {
-        $ip = shift @args;
+
+    if (@args) {
+        $ip = $args[0];
         if (!$sponge->is_my_network($ip)) {
             return $self->send_error(hex2ip($ip), ": address out of range");
         }
@@ -352,8 +349,8 @@ sub _cmd_get_arp {
     if (@args >1 ) {
         return $self->send_error("$cmd [<IP>]");
     }
-    elsif (@args) {
-        $ip = shift @args;
+    if (@args) {
+        $ip = $args[0];
         if (!$sponge->is_my_network($ip)) {
             return $self->send_error(hex2ip($ip), ": address out of range");
         }
@@ -368,7 +365,7 @@ sub _cmd_clear_arp {
         return $self->send_error("$cmd <IP>");
     }
 
-    my $ip = shift @args;
+    my $ip = $args[0];
     if (!$sponge->is_my_network($ip)) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
@@ -395,7 +392,7 @@ sub _cmd_clear_ip {
         return $self->send_error("$cmd <IP>");
     }
 
-    my $ip = shift @args;
+    my $ip = $args[0];
     if (!$sponge->is_my_network($ip)) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
@@ -412,8 +409,8 @@ sub _cmd_set_pending {
     if (@args == 0 || @args > 2) {
         return $self->send_error("$cmd <IP> [<STATE>]");
     }
-    my $ip = shift @args;
-    my $state = @args ? shift @args : 0;
+    my $ip = $args[0];
+    my $state = @args > 1 ? $args[1] : 0;
     if ( ! $sponge->is_my_network($ip) ) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
@@ -433,7 +430,7 @@ sub _cmd_set_dead {
     if (@args != 1) {
         return $self->send_error("$cmd <IP>");
     }
-    my $ip = shift @args;
+    my $ip = $args[0];
     if ( ! $sponge->is_my_network($ip) ) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
@@ -453,14 +450,14 @@ sub _cmd_set_alive {
     if (@args < 1 || @args > 2) {
         return $self->send_error("$cmd <IP> [<MAC>]");
     }
-    my $ip = shift @args;
+    my $ip = $args[0];
     if ( ! $sponge->is_my_network($ip) ) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
     my $mac;
     my $old_s = $sponge->state_name($sponge->get_state($ip));
-    if (@args) {
-        ($mac) = $sponge->set_alive($ip, shift @args);
+    if (@args > 1) {
+        ($mac) = $sponge->set_alive($ip, $args[0]);
     }
     else {
         ($mac) = $sponge->set_alive($ip);
@@ -673,7 +670,7 @@ sub _cmd_inform {
     if (!$sponge->is_my_network($ip1)) {
         return $self->send_error(hex2ip($ip1), ": address out of range");
     }
-    elsif (!$sponge->is_my_network($ip2)) {
+    if (!$sponge->is_my_network($ip2)) {
         return $self->send_error(hex2ip($ip2), ": address out of range");
     }
 
@@ -698,22 +695,21 @@ sub _cmd_inform {
     }
 
     $sponge->send_arp_update(
-                        sha => $mac2, spa => $ip2,
-                        tha => $mac1, tpa => $ip1,
-                        tag => '[asctl] ',
-                    );
+        sha => $mac2, spa => $ip2,
+        tha => $mac1, tpa => $ip1,
+        tag => '[asctl] ',
+    );
     return $self->send_ok(
-            "sha=$mac2\nspa=$ip2\ntha=$mac1\ntpa=$ip1\nmsg=update sent"
-        );
+        "sha=$mac2\nspa=$ip2\ntha=$mac1\ntpa=$ip1\nmsg=update sent"
+    );
 }
 
 sub _cmd_probe {
-    my ($self, $sponge, $cmd, @args) = @_;
+    my ($self, $sponge, $cmd, $ip) = @_;
 
     if (@args != 1 ) {
         return $self->send_error("$cmd <IP>");
     }
-    my $ip = shift @args;
 
     if (!$sponge->is_my_network($ip)) {
         return $self->send_error(hex2ip($ip), ": address out of range");

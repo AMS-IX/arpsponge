@@ -488,7 +488,8 @@ sub send_reply {
                            $src_ip_s, $dst_ip_s, $dst_mac_s);
         return;
     }
-    elsif (log_is_verbose) {
+
+    if (log_is_verbose) {
         my $dst_mac_s = hex2mac($arp_obj->{sha});
         my $dst_ip_s  = hex2ip($arp_obj->{spa});
         my $src_ip_s  = hex2ip($src_ip);
@@ -534,37 +535,39 @@ sub set_alive {
 
     return if ! $self->is_my_network($ip);
 
-    my @arp = $self->arp_table($ip);
+    my @old_arp = $self->arp_table($ip);
+    my $old_state = $self->get_state($ip);
 
-    $mac //= $arp[0] // $ETH_ADDR_NONE;
+    $mac //= $old_arp[0] // $ETH_ADDR_NONE;
 
-    if ($self->get_state($ip) == DEAD) {
-        event_notice(EVENT_SPONGE,
-            "unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
-    }
-    elsif ($self->get_state($ip) >= PENDING(0)) {
-        event_notice(EVENT_SPONGE,
-            "clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
-    }
-    elsif (log_is_verbose && $self->queue->depth($ip) > 0) {
+    if (log_is_verbose) {
+        if (!@old_arp) {
+            log_sverbose(1, "learned: ip=%s mac=%s old=none\n",
+                               hex2ip($ip), hex2mac($mac));
+        }
+        elsif ($old_arp[0] ne $mac) {
+            log_sverbose(1, "learned: ip=%s mac=%s old=%s\n",
+                              hex2ip($ip), hex2mac($mac), hex2mac($old_arp[0]));
+        }
         log_sverbose(1,
             "clearing: ip=%s mac=%s\n", hex2ip($ip), hex2mac($mac));
     }
 
     $self->queue->clear($ip);
     $self->set_state($ip, ALIVE);
-
-    if (log_is_verbose) {
-        if (!@arp) {
-            log_sverbose(1, "learned: ip=%s mac=%s old=none\n",
-                               hex2ip($ip), hex2mac($mac));
-        }
-        elsif ($arp[0] ne $mac) {
-            log_sverbose(1, "learned: ip=%s mac=%s old=%s\n",
-                              hex2ip($ip), hex2mac($mac), hex2mac($arp[0]));
-        }
-    }
     $self->arp_table($ip, $mac, time);
+
+    if ($old_state == DEAD) {
+        event_notice(EVENT_SPONGE,
+            "unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+        return;
+    }
+
+    if ($old_state >= PENDING(0)) {
+        event_notice(EVENT_SPONGE,
+            "clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+        return;
+    }
 }
 
 1;

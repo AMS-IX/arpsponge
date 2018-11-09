@@ -33,8 +33,8 @@ BEGIN {
 sub error { return M6::ARP::Control->error() };
 
 sub _set_error {
-    shift @_;
-    return M6::ARP::Control->_set_error(@_);
+    my ($self, $args) = @_;
+    return M6::ARP::Control->_set_error(@args);
 }
 
 # $handle = $handle->_send_data("something\n", ...);
@@ -50,8 +50,8 @@ sub _set_error {
 #       $handle->_send_data("hello")->_send_data(" world\n");
 #
 sub _send_data {
-    my $self = shift;
-    my $data = join('', @_);
+    my ($self, @args) = @_;
+    my $data = join('', @args);
 
     local($::SIG{PIPE}) = 'IGNORE';
 
@@ -81,8 +81,9 @@ sub _send_data {
 #       $data = $handle->_get_data($blocking);
 #
 sub _get_data {
-    my $self = shift;
-    my $blocking = @_ ? int(shift) : 0;
+    my ($self, $blocking) = @_;
+
+    $blocking //= 0;
 
     my $buf;
     my $old_blocking = $self->blocking($blocking);
