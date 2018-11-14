@@ -19,40 +19,52 @@
 #
 
 # ----------------------------------------------------------------------------
-#			MANDATORY CONFIG SECTION
+#   MANDATORY CONFIG SECTION
 # ----------------------------------------------------------------------------
 
-#### OS Specific
+#### OS Specific - pick one, uncomment the others.
+#DISTRO := freebsd
+#DISTRO := fedora
+#DISTRO := redhat
+#DISTRO := ubuntu
+DISTRO = debian
 
-## FreeBSD
-# Where's perl on your system?
-#PERL				= /usr/local/bin/perl
-#LIBROOT			= $(DIRPREFIX)/lib/perl5/site_perl
-#IFCONFIG			= /sbin/ifconfig
-#OWNER				= root
-#GROUP				= wheel
-#DFL_SOCK_GROUP		= wheel
-#ETC_DEFAULT		= /etc/defaults
+ifeq (${DISTRO}, freebsd)
+  OS                      = bsd
+  DISTRO_FLAVOR           = freebsd
+  PERL                    = /usr/local/bin/perl
+  LIBROOT                 = $(DIRPREFIX)/lib/perl5/site_perl
+  IFCONFIG                = /sbin/ifconfig
+  OWNER                   = root
+  GROUP                   = wheel
+  DFL_SOCK_GROUP          = wheel
+  ETC_DEFAULT             = /etc/defaults
+else ifneq (, $(filter ${DISTRO},fedora redhat))
+  OS                      = linux
+  DISTRO_FLAVOR           = redhat
+else ifneq (,$(filter ${DISTRO},debian ubuntu))
+  OS                      = linux
+  DISTRO_FLAVOR           = debian
+else
+  $(error unknown DISTRO "${DISTRO}")
+endif
 
+ifeq (${OS}, linux)
+  PERL                    = /usr/bin/perl
+  LIBROOT                 = $(DIRPREFIX)/lib/perl5
+  IFCONFIG                = /sbin/ifconfig
+  OWNER                   = root
+  GROUP                   = root
+  DFL_SOCK_GROUP          = wheel
+  ETC_DEFAULT             = /etc/default
+  ifeq (${DISTRO_FLAVOR},debian)
+    LIBROOT               = $(DIRPREFIX)/lib/site_perl
+  endif
+endif
 
-## Fedora/RedHat
-#PERL				= /usr/bin/perl
-#LIBROOT			= $(DIRPREFIX)/lib/perl5
-#IFCONFIG			= /sbin/ifconfig
-#OWNER				= root
-#GROUP				= root
-#DFL_SOCK_GROUP		= wheel
-#ETC_DEFAULT		= /etc/default
-
-## Debian
-PERL				= /usr/bin/perl
-LIBROOT				= $(DIRPREFIX)/lib/site_perl
-IFCONFIG			= /sbin/ifconfig
-GROUP				= root
-#DFL_SOCK_GROUP		= wheel
-ETC_DEFAULT			= /etc/default
-
+# ---------------------------------------------------------------------------
 DFL_SOCK_GROUP		= noc
+# ---------------------------------------------------------------------------
 
 DFL_RATE             = 50
 DFL_QUEUEDEPTH       = 1000
@@ -75,10 +87,10 @@ MODE                 = 644
 BINMODE              = 755
 
 # ----------------------------------------------------------------------------
-#				END MANDATORY SECTION
+#               END MANDATORY SECTION
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
-#					OPTIONAL SECTION
+#               OPTIONAL SECTION
 # ----------------------------------------------------------------------------
 
 # ------------------------------------------------------
@@ -104,7 +116,7 @@ SECTION              = 8
 FILESECTION          = 4
 
 # ----------------------------------------------------------------------------
-#				END OPTIONAL SECTION
+#               END OPTIONAL SECTION
 # ----------------------------------------------------------------------------
 
 # Don't change this.  This is for people with a brain damaged csh(1).
