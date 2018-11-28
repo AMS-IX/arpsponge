@@ -22,7 +22,7 @@
 #   MANDATORY CONFIG SECTION
 # ----------------------------------------------------------------------------
 
-#### OS Specific - pick one, uncomment the others.
+#### OS Specific - pick one, comment out the others.
 #DISTRO := freebsd
 #DISTRO := fedora
 #DISTRO := redhat
@@ -63,7 +63,13 @@ ifeq (${OS}, linux)
 endif
 
 # ---------------------------------------------------------------------------
+# OVERRIDES
+# ---------------------------------------------------------------------------
+
 DFL_SOCK_GROUP		= noc
+
+# ---------------------------------------------------------------------------
+# SPONGE DEFAULTS
 # ---------------------------------------------------------------------------
 
 DFL_RATE             = 50
@@ -87,9 +93,6 @@ MODE                 = 644
 BINMODE              = 755
 
 # ----------------------------------------------------------------------------
-#               END MANDATORY SECTION
-# ----------------------------------------------------------------------------
-# ----------------------------------------------------------------------------
 #               OPTIONAL SECTION
 # ----------------------------------------------------------------------------
 
@@ -105,7 +108,6 @@ DOCPREFIX            = $(DIRPREFIX)/share
 
 # Where to install perl scripts, jobs, library files and manual pages.
 BINDIR               = $(BINPREFIX)/sbin
-
 
 INSTLIB              = $(LIBROOT)
 MANDIR               = $(DIRPREFIX)/man

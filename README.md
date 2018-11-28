@@ -40,37 +40,44 @@ Depending on your O/S distribution and version of Perl, some or all of these may
 
 ### DEBIAN
 
-  1. Optionally edit config.mk (see below)
+  1. Edit config.mk (see below)
   2. Run `make dpkg`
   3. `dpkg --install *.deb`
 
 ### OTHER SYSTEMS
 
-  1. Look at the start of `config.mk` and set correct values for:
+  1. Look at the start of `config.mk` and pick the correct value for `DISTRO`; this will pick sane defaults for the variables below.
+  2. Override (or delete) `DFL_SOCK_GROUP` in the `OVERRIDES` section.
+  3. Make sure the following variables are set correctly, either by the `DISTRO` selection or by overriding them.
+    * `PERL`
+    * `IFCONFIG`
+    * `SPONGE_VAR`
+  4. If you want, you can override any of the variables below:
+    * `DIRPREFIX`
+    * `BINPREFIX`
+    * `DOCPREFIX`
+    * `BINDIR`
+    * `LIBROOT`
+    * `INSTLIB`
+    * `MANDIR`
+    * `DOCDIR`
+    * `SECTION`
+    * `FILESECTION`
+  5. run `make` (or `gmake` on BSD).
 
-    * (MUST be set correctly)
-
-      * PERL         (/usr/bin/perl)
-      * IFCONFIG     (/sbin/ifconfig)
-      * SPONGE_VAR   (/var/run/arpsponge)
-
-    * (MAY be changed)
-
-      * IDIRPREFIX
-      * BINPREFIX
-      * DOCPREFIX
-      * BINDIR
-      * LIBROOT
-      * INSTLIB
-      * MANDIR
-      * DOCDIR
-      * SECTION
-      * FILESECTION
-
-  2. run `make`
-
-  3. run `make install`
+  6. run `make install` (`gmake install` on BSD).
 
 ## Documentation
 
 See the `arpsponge` man page, or `perldoc arpsponge`.
+
+# FreeBSD Notes
+
+Installing dependencies:
+
+```
+pkg install gmake \
+    perl5 \
+    p5-Net-Pcap p5-Readonly p5-NetAddr-IP p5-IO-String \
+    p5-Net-Arp p5-Term-ReadKey p5-Term-ReadLine-Gnu
+```
