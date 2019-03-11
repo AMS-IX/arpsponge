@@ -894,22 +894,22 @@ sub process_pkt {
         # The destination IP must be ALIVE, and we must have MAC for it in
         # our table. If we see this, we send a unicast ARP update with the
         # correct info to the packet's source.
-        if ($sponge->arp_update_flags()
-                && $eth_obj->{dest_mac} eq $sponge->my_mac) {
-            my $dst_ip = $ip_obj->{dest_ip};
-            if (! $sponge->is_my_ip($dst_ip) ) {
-                if ($sponge->get_state($dst_ip) == ALIVE()) {
-                    my ($dst_mac, $mtime) = $sponge->arp_table($dst_ip);
-                    if ($dst_mac && $dst_mac ne $ETH_ADDR_NONE) {
-                        $sponge->send_arp_update(tha => $src_mac,
-                                                 tpa => $src_ip,
-                                                 sha => $dst_mac,
-                                                 spa => $dst_ip,
-                                                 tag => '[auto] ');
-                    }
-                }
-            }
-        }
+        return if ! $sponge->arp_update_flags();
+        return if $eth_obj->{dest_mac} ne $sponge->my_mac;
+
+        my $dst_ip = $ip_obj->{dest_ip};
+        return if $sponge->is_my_ip($dst_ip);                   # Not our IP
+        return if $sponge->get_state($dst_ip) != ALIVE();       # IP is alive
+
+        my ($dst_mac, $mtime) = $sponge->arp_table($dst_ip);
+        return if !$dst_mac or $dst_mac eq $ETH_ADDR_NONE;      # MAC is valid
+        $sponge->send_arp_update(
+            tha => $src_mac,
+            tpa => $src_ip,
+            sha => $dst_mac,
+            spa => $dst_ip,
+            tag => '[auto] ',
+        );
         return;
     }
 
