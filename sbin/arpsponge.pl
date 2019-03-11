@@ -991,6 +991,30 @@ sub process_pkt {
         return;
     }
 
+    # Devices ARPing for the network or broadcast address indicate
+    # possible bad netmasks.
+    if ($dst_ip eq $sponge->user('hex_network')) {
+        event_warning(EVENT_ALIEN,
+            "ARP for network address: src.mac=%s arp.spa=%s arp.tpa=%s",
+            hex2mac($src_mac),
+            hex2ip($src_ip),
+            hex2ip($dst_ip),
+        );
+        $sponge->send_reply($dst_ip, $arp_obj) if $sponge->sponge_net;
+        return;
+    }
+
+    if ($dst_ip eq $sponge->user('hex_broadcast')) {
+        event_warning(EVENT_ALIEN,
+            "ARP for broadcast address: src.mac=%s arp.spa=%s arp.tpa=%s",
+            hex2mac($src_mac),
+            hex2ip($src_ip),
+            hex2ip($dst_ip),
+        );
+        $sponge->send_reply($dst_ip, $arp_obj) if $sponge->sponge_net;
+        return;
+    }
+
     if (log_is_verbose() >= 2) {
         log_sverbose(2, "ARP WHO HAS %s TELL %s ",
                           hex2ip($dst_ip), hex2ip($src_ip));
