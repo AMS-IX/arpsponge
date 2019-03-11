@@ -272,20 +272,28 @@ sub Main {
 
     $sponge->is_dummy($dummy);
 
-    $sponge->user('version', $VERSION);
-    $sponge->user('net_lo', $network->first->numeric);
-    $sponge->user('net_hi', $network->last->numeric);
-    $sponge->user('start_time', time);
-    $sponge->user('statusfile', $statusfile);
-    $sponge->user('learning', $learning);
+    # Sanitise proberate
     $proberate = $DFL_PROBERATE if $proberate < 0 || $proberate > 1e6;
-    $sponge->user('probesleep', 1.0/$proberate);
-    $sponge->user('sweep_skip_alive', $sweep_skip_alive);
+
+    $sponge->user(
+        version          => $VERSION,
+        net_lo           => $network->first->numeric,
+        net_hi           => $network->last->numeric,
+        hex_network      => ip2hex($network->network),
+        hex_broadcast    => ip2hex($network->broadcast),
+        start_time       => time,
+        statusfile       => $statusfile,
+        learning         => $learning,
+        probesleep       => 1.0/$proberate,
+        sweep_skip_alive => $sweep_skip_alive,
+    );
 
     if ($sweep_sec) {
-        $sponge->user('sweep_sec', $sweep_sec);
-        $sponge->user('next_sweep', time+$sweep_sec);
-        $sponge->user('sweep_age', $sweep_threshold);
+        $sponge->user(
+            sweep_sec  => $sweep_sec,
+            next_sweep => time+$sweep_sec,
+            sweep_age  => $sweep_threshold,
+        );
     }
 
     if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
@@ -341,8 +349,10 @@ sub Main {
                            $pcap_fd, $sponge->device, $!);
     }
 
-    $sponge->user('pcap_fd', $pcap_fd);
-    $sponge->user('pcap_fh', $pcap_fh);
+    $sponge->user(
+        pcap_fd => $pcap_fd,
+        pcap_fh => $pcap_fh,
+    );
     $sponge->pcap_handle($pcap_h);
 
     ####################################################################
@@ -363,7 +373,7 @@ sub Main {
     # $::SIG{'ALRM'} = sub { do_timer($sponge)               };
 
     if ($sweep_at_start) {
-        $sponge->user('next_sweep', time-1);
+        $sponge->user(next_sweep => time-1);
     }
 
     packet_capture_loop($sponge);
@@ -383,7 +393,7 @@ sub create_control_socket {
     my $control_fh = M6::ARP::Control::Server->create_server($Control_Socket)
                         or log_fatal "%s", M6::ARP::Control->error;
 
-    $sponge->user('control', $control_fh);
+    $sponge->user(control => $control_fh);
 
     my @dfl_perms  = split(':', $DFL_SOCK_PERMS);
     my @perms      = split(':', $permissions);
@@ -514,11 +524,12 @@ sub packet_capture_loop {
     my ($sponge) = @_;
 
     # Prepare the bit vector for the select() calls.
-    $sponge->user('select', IO::Select->new(
-                                $sponge->user('pcap_fh'),
-                                $sponge->user('control'),
-                            )
-            );
+    $sponge->user(
+        select => IO::Select->new(
+                    $sponge->user('pcap_fh'),
+                    $sponge->user('control'),
+        ),
+    );
 
     # [1] Schedule our next periodic task run.
     my ($now, $next_alarm) = reset_timer($sponge, time);
@@ -697,7 +708,7 @@ sub do_timer($) {
     my $learning = $sponge->user('learning');
     if ($learning > 0) {
         do_learn($sponge);
-        $sponge->user('learning', $learning-1);
+        $sponge->user(learning => $learning-1);
         if ($learning-1 == 0) {
             event_notice(EVENT_STATE, "exiting learning state");
         }
@@ -728,7 +739,7 @@ sub do_timer($) {
     my $next_sweep = $sponge->user('next_sweep');
     if ($next_sweep && time >= int($next_sweep)) {
         do_sweep($sponge);
-        $sponge->user('next_sweep', time+$sponge->user('sweep_sec'));
+        $sponge->user(next_sweep => time+$sponge->user('sweep_sec'));
     }
     return;
 }
