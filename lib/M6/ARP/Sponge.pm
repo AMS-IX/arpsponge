@@ -64,16 +64,34 @@ __PACKAGE__->mk_accessors(qw(
 # $hash = $sponge->user;
 # $val = $sponge->user($attr);
 # $oldval = $sponge->user($attr, $newval);
+#
+# $old_vals = $sponge->user({
+#   $attr => $newval,
+#   ...
+# });
+#
 sub user {
-    my ($self, $attr, $newval) = @_;
+    if (@_ == 1) {
+        return $_[0]->{'user'};
+    }
+    if (@_ == 2) {
+        return $_[0]->{'user'}->{$_[1]};
+    }
+    if (@_ == 3) {
+        my $old = $_[0]->{'user'}->{$_[1]};
+        $_[0]->{'user'}->{$_[1]} = $_[2];
+        return $old;
+    }
+
+    my %old;
+    my ($self, %new) = @_;
     my $user = $self->{'user'};
 
-    return $user if @_ == 1 || !defined $attr;
-    return $user->{$attr} if @_ < 3;
-
-    my $oldval = $user->{$attr};
-    $user->{$attr} = $newval;
-    return $oldval;
+    while (my ($attr, $newval) = each %new) {
+        $old{$attr} = $user->{$attr};
+        $user->{$attr} = $newval;
+    }
+    return \%old;
 }
 
 sub state_name { return state_to_string($_[1]) }
