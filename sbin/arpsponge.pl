@@ -874,6 +874,10 @@ sub process_pkt {
     if ($eth_obj->{type} == $ETH_TYPE_IP) {
         my $ip_obj  = decode_ipv4($eth_obj->{data});
         my $src_ip  = $ip_obj->{src_ip};
+
+        # Nothing to do if the source IP is not on our local network.
+        return if ! $sponge->is_my_network($src_ip);
+
         # Update state for the source IP address.
         update_state($sponge, $src_ip, $src_mac);
 
