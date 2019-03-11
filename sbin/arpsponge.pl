@@ -591,7 +591,7 @@ sub get_ip_state_table_s {
     my $queue = $sponge->queue;
 
     my ($nalive, $ndead, $npending) = (0,0,0);
-    
+
     my $ip;
     for $ip (sort { $a cmp $b } keys %$states) {
         my $state = $$states{$ip};
@@ -784,7 +784,7 @@ sub do_sweep {
 
     event_notice(EVENT_STATE, "sweeping for quiet entries on %s/%d",
                         hex2ip($sponge->network), $sponge->prefixlen);
-    
+
     my $lo = $sponge->user('net_lo');
     my $hi = $sponge->user('net_hi');
 
@@ -890,7 +890,7 @@ sub process_pkt {
         # The destination IP must be ALIVE, and we must have MAC for it in
         # our table. If we see this, we send a unicast ARP update with the
         # correct info to the packet's source.
-        if ($sponge->arp_update_flags() 
+        if ($sponge->arp_update_flags()
                 && $eth_obj->{dest_mac} eq $sponge->my_mac) {
             my $dst_ip = $ip_obj->{dest_ip};
             if (! $sponge->is_my_ip($dst_ip) ) {
@@ -1042,7 +1042,7 @@ sub process_pkt {
         $state = $sponge->set_pending($dst_ip, 0);
     }
 
-    
+
     return;
 }
 
@@ -1276,7 +1276,7 @@ ideally all devices update their ARP cache immediately.
 If the query rate for an IP address exceeds the queue depth and rate
 threshold, the sponge can put the IP address in a "pending" state:
 it will send out a query for the IP address every second for the next
-@DFL_PENDING@ seconds. 
+@DFL_PENDING@ seconds.
 If there is still no sign of life from the target, the target's state moves
 from "pending" to "dead" and will be sponged. See also the
 L<--pending|/--pending>
@@ -1433,7 +1433,7 @@ don't answer probes.
 
 =item B<DEAD>
 
-All addresses are considered to be dead at startup. 
+All addresses are considered to be dead at startup.
 
 WARNING: This can potentially bring down all or most of the services
 on your LAN!
@@ -1599,7 +1599,7 @@ they may get rate-limited by the L2 infrastructure or at the
 receiving stations.
 
 Having the sponge itself be a source of periodic broadcast storms pretty
-much defeats the purpose of the thing.  
+much defeats the purpose of the thing.
 
 =over 7
 
@@ -1716,14 +1716,14 @@ Has no effect when L<--daemon|/--daemon> is specified.
 To start the program on C<eth0> for the C<91.200.17.0/26> network,
 simply use:
 
-   @NAME@ 91.200.17.0/26 dev eth0 
+   @NAME@ 91.200.17.0/26 dev eth0
 
 =head2 Status Dumping
 
 To use the status dumping functionality, do:
 
    @NAME@ --daemon --statusfile=/tmp/sponge.out \
-        91.200.17.0/26 dev eth0 
+        91.200.17.0/26 dev eth0
 
 Then send a C<USR1> signal to the process:
 
@@ -1982,7 +1982,7 @@ not an exact figure.
 =head1 AUTHORS
 
 Arien Vijn at AMS-IX (arien.vijn@ams-ix.net) created the original
-version in 2003. 
+version in 2003.
 
 Steven Bakker at AMS-IX (steven.bakker@ams-ix.net) has been extending and
 maintaining this since 2004.
