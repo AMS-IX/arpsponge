@@ -1232,14 +1232,14 @@ Sponging stops in one of three cases:
 The sponge receives a gratuitous ARP ("ARP WHO-HAS I<xx> TELL I<xx>") for
 the sponged IP address.
 
-Many systems (mostly routers) will send a gratuitous ARP when they bring
-up their interfaces, advertising their presence and seeding ARP caches.
+Many systems (mostly routers) will send a gratuitous ARP request when they
+bring up their interfaces, advertising their presence and seeding ARP caches.
 
 =item 2.
 
 The sponge receives an arbitrary IP or ARP packet from the sponged IP address.
 
-Some systems do not send gratuitous ARP packets when bringing up interfaces.
+Some systems do not send gratuitous ARP request packets when bringing up interfaces.
 However, they typically start ARPing for peers on the LAN when attempting
 to set up connections, so that is a good trigger as well.
 
@@ -1271,8 +1271,8 @@ does not sponge addresses or send probes.
 
 =head3 Gratuitous ARP
 
-The program can send out a gratuitous ARP when it starts to sponge an
-address. This should bring down the ARP rate on the LAN further, since
+The program can send out a gratuitous ARP request when it starts to sponge
+an address. This should bring down the ARP rate on the LAN further, since
 ideally all devices update their ARP cache immediately.
 
 =head3 Pending State
@@ -1288,9 +1288,9 @@ option below.
 
 =head3 Sweeping
 
-Not all devices send a gratuitous ARP when they come up, so it may be
-necessary to periodically sweep the IP range for dead or very
-quiet addresses. This also helps to clear the status for very quiet
+Not all devices send a gratuitous ARP request when they come up, so it may
+be necessary to periodically sweep the IP range for dead or very quiet
+addresses. This also helps to clear the status for very quiet
 hosts.
 
 =head3 Logging
@@ -1325,27 +1325,33 @@ This can be done in three ways:
 
 =over
 
-=item C<request>
+=item C<reply>
 
-Send an unsollicited unicast reply:
+Send an unsollicited unicast reply to I<IP-B>:
 
   ARP <IP-A> IS AT <MAC-A>
 
-Where I<IP-A> and I<MAC-A> are of the router targeted by the stray packet.
+Where I<IP-A> and I<MAC-A> are of the router targeted by the stray packet,
+and I<IP-B> is the IP address of the neighbour whose cache needs to be
+updated.
 
-=item C<reply>
+=item C<request>
 
 Send an unicast request by proxy (i.e. fake the requestor):
 
   ARP WHO HAS <IP-B> TELL <IP-A>@<MAC-A>
 
-Where I<IP-B> is the IP address of the neighbour whose cache needs to be updated.
+Where I<IP-B> is the IP address of the neighbour whose cache needs to be
+updated.
 
 =item C<gratuitous>
 
-Send a unicast gratuitous ARP on behalf of I<IP-A>:
+Send a unicast gratuitous ARP request on behalf of I<IP-A> to I<IP-B>:
 
   ARP WHO HAS <IP-A> TELL <IP-A>@<MAC-A>
+
+Where I<IP-B> is the IP address of the neighbour whose cache needs to be
+updated.
 
 =item C<all>, C<none>
 
@@ -1484,6 +1490,7 @@ X<--loglevel>
 Logging level for L<syslogd(8)|syslogd> logging. Default is C<info>.
 
 =item B<--logmask>=[B<!>|B<+>]I<event>,...
+X<--logmask>
 
 Specify which event types should be logged. Some events can occur
 very often and it can be useful to filter them out to prevent filling
@@ -1502,6 +1509,9 @@ I/O related events (broken pipes, disconnections, read failures, etc.).
 
 The "misplaced ARP" events. When multiple subnets are active on a single
 LAN, it may be prudent to filter this one out.
+
+Note that ARP queries for the network base address and broadcast address
+are also considered "alien" and will be logged as such.
 
 =item C<spoof>
 
@@ -1639,13 +1649,22 @@ Base directory for run-time files. Default is "F<@SPONGE_VAR@>/I<interface>".
 =item B<--sponge-network>
 X<--sponge-network>
 
-Statically sponge the network base address. Although it I<is> possible
-to configure this on an interface and use it as a valid IP address, it
-is generally not done. However, some entities may still send ARPs for
-this address.
+Statically sponge the network base address as well as the broadcast address.
+L<Section 4.2.3 of RFC-1812|https://tools.ietf.org/html/rfc1812#section-4.2.3>
+specifies that the "all one" and "all zero" host addresses are not valid node
+addresses (see also section
+L<3.2.1.3 of RFC-1122|https://tools.ietf.org/html/rfc1122#section-3.2.1.3>).
 
-Use this option if you have not assigned the base address to any interface
-in your network.
+Hence, you should never see ARP requests for these addresses; if you do,
+the cause is most probably a misconfigured network address or mask at the
+sender's end.
+
+By specifying C<--sponge-network>, the sponge will answer queries for both
+the network base address and the broadcast address. Note that it will neither
+query for them itself, nor send any unsollicited ARP for them.
+
+ARP queries for either the network base address or the broadcast address
+will be logged as C<alien> events (see L<--logmask|/--logmask>).
 
 =item B<--statusfile>=I<file>
 X<--statusfile>
@@ -1956,6 +1975,26 @@ L<asctl(8)|asctl>,
 L<aslogtail(8)|aslogtail>,
 L<perl(1)|perl>, L<arp(8)|arp>.
 
+=over
+
+=item Ethernet Adress Resolution Protocol (ARP):
+
+L<RFC 826|https://tools.ietf.org/html/rfc826>
+
+=item IP Address Conflict Detection:
+
+L<RFC 2131, p38, bottom|https://tools.ietf.org/html/rfc2131#page-38>
+
+L<RFC 5227|https://tools.ietf.org/html/rfc5227>
+
+=item IPv4 host addressing:
+
+L<Section 4.2.3 of RFC-1812|https://tools.ietf.org/html/rfc1812#section-4.2.3>
+
+L<Section 3.2.1.3 of RFC-1122|https://tools.ietf.org/html/rfc1122#section-3.2.1.3>
+
+=back
+
 =head1 BUGS AND LIMITATIONS
 
 =over 3
@@ -1993,7 +2032,7 @@ maintaining this since 2004.
 
 =head1 COPYRIGHT
 
-Copyright 2003-2016, AMS-IX B.V.
+Copyright 2003-2019, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
 =cut
