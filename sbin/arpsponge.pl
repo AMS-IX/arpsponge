@@ -277,8 +277,8 @@ sub Main {
 
     $sponge->user(
         version          => $VERSION,
-        net_lo           => $network->first->numeric,
-        net_hi           => $network->last->numeric,
+        net_lo           => scalar $network->first->numeric,
+        net_hi           => scalar $network->last->numeric,
         hex_network      => ip2hex($network->network),
         hex_broadcast    => ip2hex($network->broadcast),
         start_time       => time,
