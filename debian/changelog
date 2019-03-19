@@ -1,3 +1,57 @@
+arpsponge (3.18) unstable; urgency=medium
+
+  * Add --interface option when loading status on re-init.
+    This was causing issues on hosts with more than one sponge
+    (i.e. monitoring multiple interfaces). (Closes: #2)
+
+  Building:
+    * Document Makefile configuration better
+    * Add handy OS class setting.
+    * Add lib/M6/ARP/Event.pm to MANIFEST (Closes: #1)
+    * Add alternative LIBROOT values for various OS flavours.
+    * Reshuffle os-specific settings.
+    * Add ETC_DEFAULT config variable.
+
+  arpsponge:
+    * Don't set pcap timeout to 0 (it doesn't work on FreeBSD).
+    * pcap_setnonblock() should have "1" as a parameter, not "0"
+        The Net::Pcap documentation is wrong. The pcap_setnonblock(3)
+        man page says the exact opposite.
+    * Don't act on non-local IP packets.
+        Unsponging packet source only makes sense for IP
+        addresses on the local network.
+    * Explicitly send ARP replies for network/broadcast queries.
+        If the base network address or broadcast address is queried,
+        send an explicit sponge reply if --sponge-network is set,
+        otherwise, ignore those queries.
+    * Refactor sponge->user() calls.
+        Use the possibility to set more than one parameter in
+        a single call.
+    * Minor fix to help/usage text for --sponge-network.
+
+  M6::ARP::Sponge:
+    * Fix IP address determination for FreeBSD.
+    * Fix get_ip_all() for BSD, just like get_ip().
+    * Refactor user() to take multiple key/val pairs.
+    * Set both network and broadcast address to "STATIC" if sponge_net
+      is true.
+
+  General:
+    * Speed improvements.
+        * Get rid of argument shifting
+        * Eliminate else clauses.
+        * Use hash slices.
+
+    * Style fixes:
+     * Package lexicals are now Capitalised_Like_This.
+
+  Miscellaneous:
+    * Add man pages to gitignore.
+    * Remove trailing spaces.
+    * Various POD updates.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 19 Mar 2019 17:10:59 +0100
+
 arpsponge (3.17.11) unstable; urgency=low
 
   [Steven Bakker <steven.bakker@ams-ix.net>]
@@ -559,11 +613,11 @@ arpsponge (3.10-0.5) unstable; urgency=high
   Major changes:
 
     * AV Feature request implemented.
-    
+
       Some routers do not update their ARP cache when an
       IP gets unsponged. There are two cases in which this
       can happen:
-      
+
         1.  A and B have a direct peering. A goes down, address gets
             sponged. B ARPs for A, gets the sponge's MAC and starts
             trying to set up BGP sessions to it (port 179 SYN). When
@@ -626,7 +680,7 @@ arpsponge (3.10-0.5) unstable; urgency=high
       in case "2" we cannot know that, since there is no BGP traffic
       between the two, so the destination IP is that of the final
       destination.
-      
+
       In case "1" however, it's easy: the destination IP is that of A.
 
       Now, how do we update B's ARP cache?  One way is by sending a
@@ -709,7 +763,7 @@ arpsponge (3.10-0.2) unstable; urgency=high
     ARP queries if they all come from the same source.
 
     Add src_ip to the queue as well, and when the queue is full, collapse
-    entries of the same source if they are timed too closely together 
+    entries of the same source if they are timed too closely together
     (less than 1/$flood_protection_rate).
 
         * Take list:
@@ -751,7 +805,7 @@ arpsponge (3.9.4-1) unstable; urgency=high
 arpsponge (3.9.3-1) unstable; urgency=high
 
   * Signals set flags. These flags get evaluated before a packet is
-    processed. This might solve the crashes since Debian Etch. 
+    processed. This might solve the crashes since Debian Etch.
     This change was made after a hint from dvorak.
 
  -- Steven Bakker <steven.bakker@ams-ix.net>  Thu,  8 Apr 2010 19:07:58 +0200
@@ -884,7 +938,7 @@ arpsponge (3.6.1) unstable; urgency=low
 arpsponge (3.5) unstable; urgency=low
 
   * Incorporated Arien's ideas:
-  
+
     * Start in LEARN state, where we probe every second or so, for
       "--learn" times. During this period, we do not sponge addresses,
       we only probe and learn.
