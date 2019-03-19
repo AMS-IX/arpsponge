@@ -111,7 +111,7 @@ Options:
   --rate=n                - ARP threshold rate in queries/min ($DFL_RATE)
   --rundir=path           - override base directory for run-time files
                             ($SPONGE_VAR/<IFNAME>)
-  --sponge-network        - sponge the network address as well
+  --sponge-network        - sponge the network and broadcast addresses as well
   --statusfile=file       - where to write status information when receiving
                             HUP or USR1 signal (<rundir>/status)
   --sweep=sec/thr         - periodically sweep for "quiet" IP addresses
