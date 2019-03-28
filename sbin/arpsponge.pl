@@ -971,7 +971,7 @@ sub process_pkt {
         return;
     }
 
-    if ($src_ip eq $IPV4_ADDR_NONE) {
+    if ($src_ip eq $IPv4_ADDR_NONE) {
         # DHCP duplicate IP detection.
         # See RFC 2131, p38, bottom.
         event_notice(EVENT_SPONGE,
