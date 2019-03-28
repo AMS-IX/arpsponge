@@ -35,6 +35,10 @@ ARP_UPDATE_METHOD=none
 # Can also be specified on a per-interface basis.
 DISABLED=false
 
+# Whether or not to send any ARP queries.
+# Can also be specified on a per-interface basis.
+PASSIVE_MODE=false
+
 # Which events to log.
 # Valid events: io, alien, spoof, static, sponge, ctl, state, all, none
 # See also arpsponge(8).

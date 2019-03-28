@@ -90,6 +90,7 @@ Options:
   --control=socket        - location of the control socket (<rundir>/control)
   --[no]daemon            - put process in background
   --dummy                 - simulate sponging; turns off syslog
+  --passive               - do NOT source any ARP queries
   --flood-protection=n    - protect against floods from single sources;
                             queries from a source coming in faster than
                             "n" (q/sec) are ignored
@@ -164,6 +165,7 @@ sub Main {
         'control=s'           => \$Control_Socket,
         'daemon!'             => \(my $daemon),
         'dummy!'              => \(my $dummy),
+        'passive!'            => \(my $passive),
         'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
         'gratuitous!'         => \(my $gratuitous),
         'help|?'              => sub { print $::USAGE; exit 0 },
@@ -284,7 +286,21 @@ sub Main {
         learning         => $learning,
         probesleep       => 1.0/$proberate,
         sweep_skip_alive => $sweep_skip_alive,
+        passive          => $passive,
     );
+
+    if ($sponge->my_ip eq $IPv4_ADDR_NONE) {
+        if (!$passive) {
+            event_alert(EVENT_STATE, 
+                "%s has no IP address; forcing --passive",
+                $sponge->device, $sponge->my_ip_s
+            );
+            $sponge->user('passive', 1);
+            # Signal to other parts of the program that the "passive" mode was
+            # forced, so they can issue appropriate warnings.
+            $sponge->user('forced_passive', 1);
+        }
+    }
 
     if ($sweep_sec) {
         $sponge->user(
@@ -297,7 +313,7 @@ sub Main {
     if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
         my $init = is_valid_state($init_arg, -err => \(my $err));
         if (defined $err) {
-            log_fatal("bad --init argument \"$init\": $err\n");
+            log_fatal(qq{bad --init argument "$init": $err\n});
         }
         init_state($sponge, $init);
     }
@@ -712,8 +728,39 @@ sub do_timer($) {
         }
         return;
     }
+
+    do_probe_pending($sponge);
+
+    my $next_sweep = $sponge->user('next_sweep');
+    if ($next_sweep && time >= int($next_sweep)) {
+        do_sweep($sponge);
+        $sponge->user(next_sweep => time+$sponge->user('sweep_sec'));
+    }
+    return;
+}
+
+
+###############################################################################
+# do_probe_pending($sponge)
+#
+#    Called by do_timer() to query pending IP addresses.
+#
+###############################################################################
+sub do_probe_pending($) {
+    my ($sponge) = @_;
     my $pending  = $sponge->pending;
     my $sleep    = $sponge->user('probesleep');
+
+    if (keys %$sponge > 0 && $sponge->user('forced_passive')) {
+        # Log reminders that the sponge was started without an IP address, and
+        # no --passive flag.
+        event_warning(EVENT_STATE, 
+            "%s has no IP address; forced --passive; not querying pending IPs",
+            $sponge->device,
+        );
+    }
+
+    return if $sponge->user('passive');
 
     log_verbose(2, "Querying pending addresses...\n");
     my $n = 0;
@@ -733,15 +780,7 @@ sub do_timer($) {
     if ($n > 1 || log_is_verbose() > 1) {
         event_notice(EVENT_STATE, "%d pending IPs queried", $n);
     }
-
-    my $next_sweep = $sponge->user('next_sweep');
-    if ($next_sweep && time >= int($next_sweep)) {
-        do_sweep($sponge);
-        $sponge->user(next_sweep => time+$sponge->user('sweep_sec'));
-    }
-    return;
 }
-
 ###############################################################################
 # init_state($sponge)
 #
@@ -1335,6 +1374,18 @@ It can also write more detailed event to clients on the control socket
 and when the B<--statusfile> argument is given, it will write a summary
 of its current state upon receiving a C<HUP> or C<USR1> signal.
 
+=head2 Passive Mode
+
+The program can run in so-called "passive mode", where it will I<never> send
+ARP queries using its own IP address. This effectively disables
+L<sweeping|/Sweeping> and turns the L<pending state|/Pending State> into
+a passive timer.
+
+If the sponge's network interface does not have an IPv4 address assigned to
+it, passive mode is automatically turned on, but warnings will be generated
+periodically. To get rid of these, restart the daemon with
+L<--passive|/--passive>.
+
 =head1 OPTIONS
 
 =over
@@ -1432,6 +1483,15 @@ PID to I<pidfile>.
 
 This option turns off C<--verbose> and enables logging to
 L<syslogd(8)|syslogd>.
+
+=item B<--passive>
+X<--passive>
+
+=item B<--no-passive>
+X<--no-passive>
+
+Run (don't run) in passive mode. When passive mode is activated, the
+sponge will I<never> send ARP queries from its own IP address. See
 
 =item B<--dummy>
 X<--dummy>

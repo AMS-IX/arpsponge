@@ -23,7 +23,9 @@ PROG=arpsponge
 SPONGE_VAR=@SPONGE_VAR@
 
 # Program defaults
-export  AGE \
+export  \
+        AGE \
+        ARP_UPDATE_METHOD \
         DISABLED \
         DUMMY_MODE \
         FLOOD_PROTECTION \
@@ -31,15 +33,15 @@ export  AGE \
         INIT_MODE \
         LEARNING \
         LOG_MASK \
+        PASSIVE_MODE \
         PENDING \
         PERMISSIONS \
         PROBERATE \
         QUEUE_DEPTH \
         RATE \
         SPONGE_NETWORK \
-        ARP_UPDATE_METHOD \
-        SWEEP_AT_START \
         SWEEP \
+        SWEEP_AT_START \
         SWEEP_SKIP_ALIVE
 
 # Defaults for all sponges.
@@ -94,9 +96,10 @@ start_sponge() {
 
         opts="--daemon --rundir=${rundir} --pidfile=${pidfile}"
 
+        eval_bool ${DUMMY_MODE}       && opts="$opts --dummy"
+        eval_bool ${PASSIVE_MODE}     && opts="$opts --passive"
         eval_bool ${SPONGE_NETWORK}   && opts="$opts --sponge-network"
         eval_bool ${GRATUITOUS}       && opts="$opts --gratuitous"
-        eval_bool ${DUMMY_MODE}       && opts="$opts --dummy"
         eval_bool ${SWEEP_SKIP_ALIVE} && opts="$opts --sweep-skip-alive"
         eval_bool ${SWEEP_AT_START}   && opts="$opts --sweep-at-start"
 
