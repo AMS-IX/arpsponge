@@ -758,6 +758,7 @@ sub do_probe_pending($) {
             "%s has no IP address; forced --passive; not querying pending IPs",
             $sponge->device,
         );
+        return;
     }
 
     return if $sponge->user('passive');
@@ -829,6 +830,18 @@ sub do_sweep {
     my $sleep      = $opts{'probesleep'} // $sponge->user('probesleep');
     my $skip_alive = $opts{'sweep_skip_alive'}
                       // $sponge->user('sweep_skip_alive');
+
+    if ($sponge->user('forced_passive')) {
+        # Log reminders that the sponge was started without an IP address, and
+        # no --passive flag.
+        event_warning(EVENT_STATE, 
+            "%s has no IP address; forced --passive; IP sweeping disabled!",
+            $sponge->device,
+        );
+        return;
+    }
+
+    return if $sponge->user('passive');
 
     event_notice(EVENT_STATE, "sweeping for quiet entries on %s/%d",
                         hex2ip($sponge->network), $sponge->prefixlen);
