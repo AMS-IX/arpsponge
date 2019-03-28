@@ -50,8 +50,6 @@ use constant SYSLOG_IDENT => '@NAME@';
 
 my $PROG                 = $FindBin::Script;
 my $VERSION              = '@RELEASE@';
-my $NULL_IP              = ip2hex('0.0.0.0');
-my $NULL_MAC             = mac2hex('0:0:0:0:0:0');
 
 my $SPONGE_VAR           = '@SPONGE_VAR@';
 my $DFL_LOGMASK          = 'all';
@@ -973,7 +971,7 @@ sub process_pkt {
         return;
     }
 
-    if ($src_ip eq $NULL_IP) {
+    if ($src_ip eq $IPV4_ADDR_NONE) {
         # DHCP duplicate IP detection.
         # See RFC 2131, p38, bottom.
         event_notice(EVENT_SPONGE,
