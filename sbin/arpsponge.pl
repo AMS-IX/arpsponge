@@ -715,7 +715,7 @@ sub do_timer($) {
     my $pending  = $sponge->pending;
     my $sleep    = $sponge->user('probesleep');
 
-    log_verbose(2, "Probing pending addresses...\n");
+    log_verbose(2, "Querying pending addresses...\n");
     my $n = 0;
     for my $ip (sort keys %$pending) {
         $n++;
@@ -723,7 +723,7 @@ sub do_timer($) {
             $sponge->set_dead($ip);
             next;
         }
-        $sponge->send_probe($ip);
+        $sponge->send_query($ip);
         $sponge->incr_pending($ip);
         log_verbose(2, "probed $ip, state=",
                                 $sponge->get_state($ip), "\n");
@@ -731,7 +731,7 @@ sub do_timer($) {
     }
 
     if ($n > 1 || log_is_verbose() > 1) {
-        event_notice(EVENT_STATE, "%d pending IPs probed", $n);
+        event_notice(EVENT_STATE, "%d pending IPs queried", $n);
     }
 
     my $next_sweep = $sponge->user('next_sweep');
@@ -797,34 +797,34 @@ sub do_sweep {
     my $lo = $sponge->user('net_lo');
     my $hi = $sponge->user('net_hi');
 
-    my $nprobe = 0;
+    my $nquery = 0;
     my $verbose = log_is_verbose();
     log_is_verbose($verbose-1) if $verbose>0;
     for (my $num = $lo; $num <= $hi; $num++) {
         my $ip = sprintf("%08x", $num);
         my $age = time - $sponge->state_mtime($ip);
 
-        my $do_probe = 0;
+        my $do_query = 0;
         if ($sponge->get_state($ip) == ALIVE) {
             my ($dst_mac, $mtime) = $sponge->arp_table($ip);
             if ($age >= $threshold) {
                 if (!$skip_alive || !defined $dst_mac) {
-                    $do_probe++;
+                    $do_query++;
                 }
             }
         }
         elsif ($age >= $threshold) {
-            $do_probe++;
+            $do_query++;
         }
 
-        if ($do_probe) {
+        if ($do_query) {
             if ($verbose>1) {
                 log_sverbose(1, "DO PROBE %s (%d >= %d)\n",
                                 hex2ip($ip), $age, $threshold);
             }
-            $sponge->send_probe($ip);
+            $sponge->send_query($ip);
             $sponge->set_state_mtime($ip, time);
-            $nprobe++;
+            $nquery++;
             handle_input($sponge, time+$sleep);
             next;
         }
@@ -834,7 +834,7 @@ sub do_sweep {
         }
     }
     log_is_verbose($verbose);
-    event_notice(EVENT_STATE, "probed $nprobe IP address(es)");
+    event_notice(EVENT_STATE, "queried $nquery IP address(es)");
 }
 
 ###############################################################################
@@ -1300,7 +1300,7 @@ by parties that did not clean up their BGP configurations.
 
 By default, the sponge spends @DFL_LEARN@ seconds in "learning mode"
 at startup. During this time it records IP and MAC addresses, but
-does not sponge addresses or send probes.
+does not sponge addresses or send queries.
 
 =head3 Gratuitous ARP
 
@@ -1436,8 +1436,8 @@ L<syslogd(8)|syslogd>.
 =item B<--dummy>
 X<--dummy>
 
-Dummy operation (simulate sponging). Does send probes but no sponge
-replies.
+Dummy operation (simulate sponging). Does send ARP queries, but no ARP
+(sponge) replies.
 
 =item B<--flood-protection>=I<r>
 X<--flood-protection>
@@ -1472,7 +1472,7 @@ How to initialise the sponge's state table:
 All addresses are considered to be alive at startup. This is the least
 disruptive initialisation mode. Addresses will only get sponged after
 their ARP queue fills up AND the rate exceeds the threshold AND they
-don't answer probes.
+don't answer ARP queries.
 
 =item B<DEAD>
 
@@ -1498,9 +1498,9 @@ with massive numbers of broadcast queries.
 =item B<NONE>
 
 No states are set. This emulates the ALIVE state with a full queue.
-No probes are sent, but the first ARP query for an address with an
+No queries are sent, but the first ARP query for an address with an
 undefined state will result in a PENDING state for that address, at
-which point probing for that address will commence.
+which point querying for that address will commence.
 
 For a large network, this can be a real bonus. It still quickly catches
 dead addresses, but doesn't incur the overhead of large ARP sweeps.
@@ -1511,7 +1511,7 @@ dead addresses, but doesn't incur the overhead of large ARP sweeps.
 X<--learning>
 
 Spend I<secs> seconds on LEARNING mode. During the learning mode, we only
-listen to network traffic, we don't send probes or sponged answers. This
+listen to network traffic, we don't send ARP queries or sponged answers. This
 parameter is especially useful in conjunction with init states I<DEAD>,
 I<PENDING> and I<NONE> as it will clear the table for live IP addresses.
 
@@ -1625,7 +1625,7 @@ Write daemon PID to I<pidfile> instead of the default
 X<--proberate>
 
 The rate at which we send our ARP queries. Used when sweeping
-and probing pending addresses.
+and querying pending addresses.
 Default is @DFL_PROBERATE@, but check the rate your network can
 comfortably handle.
 
@@ -1637,7 +1637,7 @@ the time spent in a probing sweep:
   Tmax =   ---------
            PROBERATE
 
-So a sweep over 100 addresses with a probe rate of 50 takes about 2 seconds.
+So a sweep over 100 addresses with a query rate of 50 takes about 2 seconds.
 
 The CPU can usually throw ICMP packets at an interface much faster than
 the actual wire-speed, so many do not make it onto the wire.
@@ -1751,7 +1751,7 @@ X<--sweep-skip-alive>
 
 Do not sweep IP addresses with sponge state of ALIVE. Note that this only
 counts for IP addresses that have an ARP entry: IP addresses in ALIVE state,
-but without an ARP entry are probed anyway.
+but without an ARP entry are queried anyway.
 
 =item B<--verbose>[=I<n>]
 X<--verbose>

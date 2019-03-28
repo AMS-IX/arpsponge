@@ -715,8 +715,8 @@ sub _cmd_probe {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
 
-    $sponge->send_probe($ip);
-    return $self->send_ok("[ip=$ip] probe sent");
+    $sponge->send_query($ip);
+    return $self->send_ok("[ip=$ip] query sent");
 }
 
 1;
