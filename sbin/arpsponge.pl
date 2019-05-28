@@ -50,8 +50,6 @@ use constant SYSLOG_IDENT => '@NAME@';
 
 my $PROG                 = $FindBin::Script;
 my $VERSION              = '@RELEASE@';
-my $NULL_IP              = ip2hex('0.0.0.0');
-my $NULL_MAC             = mac2hex('0:0:0:0:0:0');
 
 my $SPONGE_VAR           = '@SPONGE_VAR@';
 my $DFL_LOGMASK          = 'all';
@@ -92,6 +90,7 @@ Options:
   --control=socket        - location of the control socket (<rundir>/control)
   --[no]daemon            - put process in background
   --dummy                 - simulate sponging; turns off syslog
+  --passive               - do NOT source any ARP queries
   --flood-protection=n    - protect against floods from single sources;
                             queries from a source coming in faster than
                             "n" (q/sec) are ignored
@@ -166,6 +165,7 @@ sub Main {
         'control=s'           => \$Control_Socket,
         'daemon!'             => \(my $daemon),
         'dummy!'              => \(my $dummy),
+        'passive!'            => \(my $passive),
         'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
         'gratuitous!'         => \(my $gratuitous),
         'help|?'              => sub { print $::USAGE; exit 0 },
@@ -286,7 +286,21 @@ sub Main {
         learning         => $learning,
         probesleep       => 1.0/$proberate,
         sweep_skip_alive => $sweep_skip_alive,
+        passive          => $passive,
     );
+
+    if ($sponge->my_ip eq $IPv4_ADDR_NONE) {
+        if (!$passive) {
+            event_alert(EVENT_STATE, 
+                "%s has no IP address; forcing --passive",
+                $sponge->device, $sponge->my_ip_s
+            );
+            $sponge->user('passive', 1);
+            # Signal to other parts of the program that the "passive" mode was
+            # forced, so they can issue appropriate warnings.
+            $sponge->user('forced_passive', 1);
+        }
+    }
 
     if ($sweep_sec) {
         $sponge->user(
@@ -299,7 +313,7 @@ sub Main {
     if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
         my $init = is_valid_state($init_arg, -err => \(my $err));
         if (defined $err) {
-            log_fatal("bad --init argument \"$init\": $err\n");
+            log_fatal(qq{bad --init argument "$init": $err\n});
         }
         init_state($sponge, $init);
     }
@@ -714,27 +728,8 @@ sub do_timer($) {
         }
         return;
     }
-    my $pending  = $sponge->pending;
-    my $sleep    = $sponge->user('probesleep');
 
-    log_verbose(2, "Probing pending addresses...\n");
-    my $n = 0;
-    for my $ip (sort keys %$pending) {
-        $n++;
-        if ($$pending{$ip} > PENDING($sponge->max_pending)) {
-            $sponge->set_dead($ip);
-            next;
-        }
-        $sponge->send_probe($ip);
-        $sponge->incr_pending($ip);
-        log_verbose(2, "probed $ip, state=",
-                                $sponge->get_state($ip), "\n");
-        handle_input($sponge, time+$sleep);
-    }
-
-    if ($n > 1 || log_is_verbose() > 1) {
-        event_notice(EVENT_STATE, "%d pending IPs probed", $n);
-    }
+    do_probe_pending($sponge);
 
     my $next_sweep = $sponge->user('next_sweep');
     if ($next_sweep && time >= int($next_sweep)) {
@@ -744,6 +739,49 @@ sub do_timer($) {
     return;
 }
 
+
+###############################################################################
+# do_probe_pending($sponge)
+#
+#    Called by do_timer() to query pending IP addresses.
+#
+###############################################################################
+sub do_probe_pending($) {
+    my ($sponge) = @_;
+    my $pending  = $sponge->pending;
+    my $sleep    = $sponge->user('probesleep');
+
+    if (keys %$sponge > 0 && $sponge->user('forced_passive')) {
+        # Log reminders that the sponge was started without an IP address, and
+        # no --passive flag.
+        event_warning(EVENT_STATE, 
+            "%s has no IP address; forced --passive; not querying pending IPs",
+            $sponge->device,
+        );
+        return;
+    }
+
+    return if $sponge->user('passive');
+
+    log_verbose(2, "Querying pending addresses...\n");
+    my $n = 0;
+    for my $ip (sort keys %$pending) {
+        $n++;
+        if ($$pending{$ip} > PENDING($sponge->max_pending)) {
+            $sponge->set_dead($ip);
+            next;
+        }
+        $sponge->send_query($ip);
+        $sponge->incr_pending($ip);
+        log_verbose(2, "probed $ip, state=",
+                                $sponge->get_state($ip), "\n");
+        handle_input($sponge, time+$sleep);
+    }
+
+    if ($n > 1 || log_is_verbose() > 1) {
+        event_notice(EVENT_STATE, "%d pending IPs queried", $n);
+    }
+}
 ###############################################################################
 # init_state($sponge)
 #
@@ -793,40 +831,52 @@ sub do_sweep {
     my $skip_alive = $opts{'sweep_skip_alive'}
                       // $sponge->user('sweep_skip_alive');
 
+    if ($sponge->user('forced_passive')) {
+        # Log reminders that the sponge was started without an IP address, and
+        # no --passive flag.
+        event_warning(EVENT_STATE, 
+            "%s has no IP address; forced --passive; IP sweeping disabled!",
+            $sponge->device,
+        );
+        return;
+    }
+
+    return if $sponge->user('passive');
+
     event_notice(EVENT_STATE, "sweeping for quiet entries on %s/%d",
                         hex2ip($sponge->network), $sponge->prefixlen);
 
     my $lo = $sponge->user('net_lo');
     my $hi = $sponge->user('net_hi');
 
-    my $nprobe = 0;
+    my $nquery = 0;
     my $verbose = log_is_verbose();
     log_is_verbose($verbose-1) if $verbose>0;
     for (my $num = $lo; $num <= $hi; $num++) {
         my $ip = sprintf("%08x", $num);
         my $age = time - $sponge->state_mtime($ip);
 
-        my $do_probe = 0;
+        my $do_query = 0;
         if ($sponge->get_state($ip) == ALIVE) {
             my ($dst_mac, $mtime) = $sponge->arp_table($ip);
             if ($age >= $threshold) {
                 if (!$skip_alive || !defined $dst_mac) {
-                    $do_probe++;
+                    $do_query++;
                 }
             }
         }
         elsif ($age >= $threshold) {
-            $do_probe++;
+            $do_query++;
         }
 
-        if ($do_probe) {
+        if ($do_query) {
             if ($verbose>1) {
                 log_sverbose(1, "DO PROBE %s (%d >= %d)\n",
                                 hex2ip($ip), $age, $threshold);
             }
-            $sponge->send_probe($ip);
+            $sponge->send_query($ip);
             $sponge->set_state_mtime($ip, time);
-            $nprobe++;
+            $nquery++;
             handle_input($sponge, time+$sleep);
             next;
         }
@@ -836,7 +886,7 @@ sub do_sweep {
         }
     }
     log_is_verbose($verbose);
-    event_notice(EVENT_STATE, "probed $nprobe IP address(es)");
+    event_notice(EVENT_STATE, "queried $nquery IP address(es)");
 }
 
 ###############################################################################
@@ -973,7 +1023,7 @@ sub process_pkt {
         return;
     }
 
-    if ($src_ip eq $NULL_IP) {
+    if ($src_ip eq $IPv4_ADDR_NONE) {
         # DHCP duplicate IP detection.
         # See RFC 2131, p38, bottom.
         event_notice(EVENT_SPONGE,
@@ -1302,7 +1352,7 @@ by parties that did not clean up their BGP configurations.
 
 By default, the sponge spends @DFL_LEARN@ seconds in "learning mode"
 at startup. During this time it records IP and MAC addresses, but
-does not sponge addresses or send probes.
+does not sponge addresses or send queries.
 
 =head3 Gratuitous ARP
 
@@ -1336,6 +1386,18 @@ priority C<info>.
 It can also write more detailed event to clients on the control socket
 and when the B<--statusfile> argument is given, it will write a summary
 of its current state upon receiving a C<HUP> or C<USR1> signal.
+
+=head2 Passive Mode
+
+The program can run in so-called "passive mode", where it will I<never> send
+ARP queries using its own IP address. This effectively disables
+L<sweeping|/Sweeping> and turns the L<pending state|/Pending State> into
+a passive timer.
+
+If the sponge's network interface does not have an IPv4 address assigned to
+it, passive mode is automatically turned on, but warnings will be generated
+periodically. To get rid of these, restart the daemon with
+L<--passive|/--passive>.
 
 =head1 OPTIONS
 
@@ -1435,11 +1497,20 @@ PID to I<pidfile>.
 This option turns off C<--verbose> and enables logging to
 L<syslogd(8)|syslogd>.
 
+=item B<--passive>
+X<--passive>
+
+=item B<--no-passive>
+X<--no-passive>
+
+Run (don't run) in passive mode. When passive mode is activated, the
+sponge will I<never> send ARP queries from its own IP address. See
+
 =item B<--dummy>
 X<--dummy>
 
-Dummy operation (simulate sponging). Does send probes but no sponge
-replies.
+Dummy operation (simulate sponging). Does send ARP queries, but no ARP
+(sponge) replies.
 
 =item B<--flood-protection>=I<r>
 X<--flood-protection>
@@ -1474,7 +1545,7 @@ How to initialise the sponge's state table:
 All addresses are considered to be alive at startup. This is the least
 disruptive initialisation mode. Addresses will only get sponged after
 their ARP queue fills up AND the rate exceeds the threshold AND they
-don't answer probes.
+don't answer ARP queries.
 
 =item B<DEAD>
 
@@ -1500,9 +1571,9 @@ with massive numbers of broadcast queries.
 =item B<NONE>
 
 No states are set. This emulates the ALIVE state with a full queue.
-No probes are sent, but the first ARP query for an address with an
+No queries are sent, but the first ARP query for an address with an
 undefined state will result in a PENDING state for that address, at
-which point probing for that address will commence.
+which point querying for that address will commence.
 
 For a large network, this can be a real bonus. It still quickly catches
 dead addresses, but doesn't incur the overhead of large ARP sweeps.
@@ -1513,7 +1584,7 @@ dead addresses, but doesn't incur the overhead of large ARP sweeps.
 X<--learning>
 
 Spend I<secs> seconds on LEARNING mode. During the learning mode, we only
-listen to network traffic, we don't send probes or sponged answers. This
+listen to network traffic, we don't send ARP queries or sponged answers. This
 parameter is especially useful in conjunction with init states I<DEAD>,
 I<PENDING> and I<NONE> as it will clear the table for live IP addresses.
 
@@ -1627,7 +1698,7 @@ Write daemon PID to I<pidfile> instead of the default
 X<--proberate>
 
 The rate at which we send our ARP queries. Used when sweeping
-and probing pending addresses.
+and querying pending addresses.
 Default is @DFL_PROBERATE@, but check the rate your network can
 comfortably handle.
 
@@ -1639,7 +1710,7 @@ the time spent in a probing sweep:
   Tmax =   ---------
            PROBERATE
 
-So a sweep over 100 addresses with a probe rate of 50 takes about 2 seconds.
+So a sweep over 100 addresses with a query rate of 50 takes about 2 seconds.
 
 The CPU can usually throw ICMP packets at an interface much faster than
 the actual wire-speed, so many do not make it onto the wire.
@@ -1753,7 +1824,7 @@ X<--sweep-skip-alive>
 
 Do not sweep IP addresses with sponge state of ALIVE. Note that this only
 counts for IP addresses that have an ARP entry: IP addresses in ALIVE state,
-but without an ARP entry are probed anyway.
+but without an ARP entry are queried anyway.
 
 =item B<--verbose>[=I<n>]
 X<--verbose>

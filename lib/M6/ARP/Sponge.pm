@@ -350,18 +350,18 @@ sub incr_pending {
 }
 
 ###############################################################################
-# $sponge->send_probe($ip);
+# $sponge->send_query($ip);
 #
-#   Send a (probe) ARP "WHO HAS $ip". This prevents us from
+#   Send a ARP "WHO HAS $ip" query. This prevents us from
 #   erroneously sponging when there's a cretin sending ARP floods.
 #
 ###############################################################################
-sub send_probe {
+sub send_query {
     my ($self, $ip) = @_;
 
     if (log_is_verbose >=2) {
         log_sverbose(2,
-            "Probing [dev=%s]: %s\n", $self->phys_device, hex2ip($ip)
+            "Querying [dev=%s]: %s\n", $self->phys_device, hex2ip($ip)
         );
     }
 
