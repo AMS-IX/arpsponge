@@ -26,7 +26,8 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  libreadonly-perl (>= 1.02),
  libreadonly-xs-perl (>= 1.04),
  libio-string-perl (>= 1.08),
- libnet-arp-perl (>= 1.0)
+ libnet-arp-perl (>= 1.0),
+ net-tools,
 Description: Nifty ARP sponge.
  Nifty ARP sponge featuring gratuitous ARP, sweeping, reporting, etc.
  Also keeps an internal ARP table which can be dumped to a file. The

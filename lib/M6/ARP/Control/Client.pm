@@ -20,6 +20,8 @@
 ###############################################################################
 package M6::ARP::Control::Client;
 
+use strict;
+
 use base qw( M6::ARP::Control::Base );
 
 use IO::Socket;
