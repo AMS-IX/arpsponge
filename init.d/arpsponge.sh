@@ -15,6 +15,10 @@
 #
 ###############################################################################
 
+if [ -e /lib/lsb/init-functions ]; then
+  . /lib/lsb/init-functions
+fi
+
 BINDIR=@BINDIR@
 #BINDIR=../bin
 PATH=/sbin:/bin:/usr/bin:${BINDIR}
