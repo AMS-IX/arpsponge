@@ -20,6 +20,8 @@
 ###############################################################################
 package M6::ARP::Table;
 
+use strict;
+
 use Time::HiRes qw( time );
 
 BEGIN {
