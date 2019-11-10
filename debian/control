@@ -12,6 +12,8 @@ Build-Depends: debhelper (>= 10),
  libio-string-perl (>= 1.08),
  libnet-arp-perl (>= 1.0)
 Standards-Version: 4.3.0.3
+Vcs-Git: https://github.com/AMS-IX/arpsponge.git
+Vcs-Browser: https://github.com/AMS-IX/arpsponge
 
 Package: arpsponge
 Architecture: all
