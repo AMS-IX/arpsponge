@@ -62,8 +62,6 @@ my $opt_test      = 0;
 my $rundir        = $SPONGE_VAR;
 
 my $INTERACTIVE   = 1;
-my $MAX_HISTORY   = 1000;
-my $HISTFILE      = "$::ENV{HOME}/.$0_history";
 
 my $VERSION    = '@RELEASE@';
 my $app_header = "\nThis is $0, v$VERSION\n\n"
