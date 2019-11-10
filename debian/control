@@ -11,7 +11,7 @@ Build-Depends: debhelper (>= 9),
  libreadonly-perl (>= 1.02),
  libio-string-perl (>= 1.08),
  libnet-arp-perl (>= 1.0)
-Standards-Version: 3.6.1
+Standards-Version: 4.3.0.3
 
 Package: arpsponge
 Architecture: all
