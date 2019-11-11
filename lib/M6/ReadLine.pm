@@ -526,7 +526,7 @@ sub init_readline {
             'name'          => $prog,
             @_,
     );
-    $args{history_file} //= "$::ENV{HOME}/.$args{name}_history";
+    $args{history_file} //= "$::ENV{HOME}/.$args{name}_history" if $::ENV{HOME};
     $args{prompt}       //= "$args{name}> ";
 
     $TERM = Term::ReadLine->new( $args{name}, *STDIN, *STDOUT );

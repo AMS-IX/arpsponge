@@ -37,7 +37,6 @@ my $CONN          = undef;
 # Values set on the Command Line.
 my $opt_verbose   = undef;
 my $rundir        = $SPONGE_VAR;
-my $HISTFILE      = "$::ENV{HOME}/.$0_history";
 
 my $VERSION    = '@RELEASE@';
 my $app_header = "\nThis is $0, v$VERSION\n\n"

@@ -2,7 +2,7 @@ Source: arpsponge
 Section: perl
 Priority: optional
 Maintainer: Steven Bakker <steven.bakker@ams-ix.net>
-Build-Depends: debhelper (>= 9),
+Build-Depends: debhelper (>= 10),
  perl (>= 5.10.0),
  libnet-pcap-perl (>= 0.16),
  libterm-readline-gnu-perl (>= 1.17),
@@ -11,7 +11,9 @@ Build-Depends: debhelper (>= 9),
  libreadonly-perl (>= 1.02),
  libio-string-perl (>= 1.08),
  libnet-arp-perl (>= 1.0)
-Standards-Version: 3.6.1
+Standards-Version: 4.3.0.3
+Vcs-Git: https://github.com/AMS-IX/arpsponge.git
+Vcs-Browser: https://github.com/AMS-IX/arpsponge
 
 Package: arpsponge
 Architecture: all
@@ -24,7 +26,8 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  libreadonly-perl (>= 1.02),
  libreadonly-xs-perl (>= 1.04),
  libio-string-perl (>= 1.08),
- libnet-arp-perl (>= 1.0)
+ libnet-arp-perl (>= 1.0),
+ net-tools,
 Description: Nifty ARP sponge.
  Nifty ARP sponge featuring gratuitous ARP, sweeping, reporting, etc.
  Also keeps an internal ARP table which can be dumped to a file. The
