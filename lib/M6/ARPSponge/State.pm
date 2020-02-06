@@ -28,9 +28,9 @@ BEGIN {
     use parent qw( Exporter );
 
     my @states = qw(
+        STATE_NONE
         STATE_STATIC STATE_DEAD
         STATE_ALIVE STATE_PENDING
-        STATE_NONE
     );
 
     our @EXPORT_OK = ( @states );
@@ -41,120 +41,120 @@ BEGIN {
 }
 
 # State constants/macros
-my $INT_NONE    = undef;
-my $INT_STATIC  = -3;
-my $INT_DEAD    = -2;
-my $INT_ALIVE   = -1;
-my $INT_PENDING = 0;
+use constant {
+    INT_NONE      => -4,
+    INT_STATIC    => -3,
+    INT_DEAD      => -2,
+    INT_ALIVE     => -1,
+    INT_PENDING   =>  0,
+};
 
-my $OBJ_NONE    = __PACKAGE__->new_from_int( $INT_NONE );
-my $OBJ_STATIC  = __PACKAGE__->new_from_int( $INT_STATIC );
-my $OBJ_DEAD    = __PACKAGE__->new_from_int( $INT_DEAD );
-my $OBJ_ALIVE   = __PACKAGE__->new_from_int( $INT_ALIVE );
+use constant {
+    MIN_INT_STATE => INT_NONE
+};
 
-sub STATE_NONE {
-    return $OBJ_NONE;
+sub STATE_NONE() {
+    state $obj = __PACKAGE__->new_from_int( INT_NONE );
+    return $obj;
 }
 
-sub STATE_STATIC {
-    return $OBJ_STATIC;
+sub STATE_STATIC() {
+    state $obj = __PACKAGE__->new_from_int( INT_STATIC );
+    return $obj;
 }
 
-sub STATE_DEAD {
-    return $OBJ_DEAD;
+sub STATE_DEAD() {
+    state $obj = __PACKAGE__->new_from_int( INT_DEAD );
+    return $obj;
 }
 
-sub STATE_ALIVE {
-    return $OBJ_ALIVE;
+sub STATE_ALIVE() {
+    state $obj = __PACKAGE__->new_from_int( INT_ALIVE );
+    return $obj;
 }
 
-sub STATE_PENDING { __PACKAGE__->new_from_int(0 + $_[$#_]) };
+sub STATE_PENDING($) {
+    __PACKAGE__->new_from_int(0 + $_[$#_])
+};
 
-sub ALL {
+sub ALL() {
     return (STATE_STATIC, STATE_DEAD, STATE_ALIVE, STATE_PENDING(0));
 }
 
 my %STR_TO_INT = (
-    'STATIC'  => $INT_STATIC,
-    'DEAD'    => $INT_DEAD,
-    'ALIVE'   => $INT_ALIVE,
-    'PENDING' => $INT_PENDING,
+    'NONE'    => INT_NONE,
+    'STATIC'  => INT_STATIC,
+    'DEAD'    => INT_DEAD,
+    'ALIVE'   => INT_ALIVE,
+    'PENDING' => INT_PENDING,
 );
 
-use overload 
+my %INT_TO_STR = reverse %STR_TO_INT;
+
+use overload
     '""'        => \&to_string,
     '0+'        => \&to_num,
     '='         => \&clone,
     '++'        => \&increment,
     '--'        => \&decrement,
+    '+'         => \&_add,
+    '-'         => \&_subtract,
     fallback    => 1;
 
 
 sub new {
-    my $type = shift;
-    my $val  = shift;
+    my ($type, $val) = @_;
     if (!defined($val) or looks_like_number($val)) {
         return $type->new_from_int($val, @_);
     }
-    else {
-        return $type->new_from_string($val, @_);
-    }
+    return $type->new_from_string($val, @_);
 }
 
 sub new_from_int {
-    my $type = shift;
-    my $val  = shift;
+    my ($type, $val) = @_;
     my %opts = (-err => \(my $err_s), @_);
 
-    if (!defined $val or $val >= $INT_STATIC) {
+    $val //= INT_NONE;
+    if ($val >= MIN_INT_STATE) {
         return bless \$val, $type;
     }
-    else {
-        ${$opts{-err}} = qq/"$val" is not a valid state/;
-        return;
-    }
+    ${$opts{-err}} = qq/"$val" is not a valid state/;
+    return;
 }
 
 sub new_from_string {
-    my $type = shift;
-    my $arg = uc shift;
-    my %opts = (-err => \(my $err_s), @_);
+    my ($type, $arg, @args) = @_;
+    $arg = uc( $arg // 'NONE' );
+    my %opts = (-err => \(my $err_s), @args);
 
-    $arg =~ s/^\s+//;
-    $arg =~ s/\s+$//;
-    
-    my $val;
-    if ($arg eq 'NONE')       { $val = $INT_NONE    }
-    elsif ($arg eq 'STATIC')  { $val = $INT_STATIC  }
-    elsif ($arg eq 'DEAD')    { $val = $INT_DEAD    }
-    elsif ($arg eq 'ALIVE')   { $val = $INT_ALIVE   }
-    elsif ($arg eq 'PENDING') { $val = $INT_PENDING }
-    elsif ($arg =~ /^PENDING\s*\(\s*(\d+)\s*\)$/) {
-        $val = $INT_PENDING + $1;
+    for ($arg) {
+        s/^\s+//;
+        s/\s+$//;
+        if (/^PENDING\s*\(\s*(\d+)\s*\)$/) {
+            return STATE_PENDING($1);
+        }
+        if (my $val = $STR_TO_INT{$_}) {
+            return $type->new_from_int($val);
+        }
     }
-    else {
-        ${$opts{-err}} = qq/"$arg" is not a valid state/;
-        return;
-    }
-    return $type->new_from_int($val);
+    substr($_, 20, -20) = '...' if length($_) > 43;
+    ${$opts{-err}} = qq/"$_" is not a valid state/;
+    return;
 }
 
 sub clone {
-    my $self = shift;
+    my ($self) = @_;
     my $clone = int($$self);
     return bless \$clone, ref $self;
 }
 
 sub to_string {
-    my $self = shift;
+    my ($self) = @_;
 
-    if (!defined $$self)              { return 'NONE' }
-    elsif ($$self == STATE_STATIC)    { return 'STATIC' }
-    elsif ($$self == STATE_DEAD)      { return 'DEAD' }
-    elsif ($$self == STATE_ALIVE)     { return 'ALIVE' }
-    elsif ($$self < STATE_PENDING(0)) { return 'ILLEGAL' }
-    else {
-        return sprintf("PENDING(%d)", $$self - STATE_PENDING(0));
+    for ($$self) {
+        return 'NONE' unless defined $_;
+        return sprintf("PENDING(%d)", $_ - INT_PENDING) if $_ >= INT_PENDING;
+        return $INT_TO_STR{$_} // 'ILLEGAL';
     }
 }
 
@@ -163,13 +163,26 @@ sub to_num {
 }
 
 sub increment {
-    ++${$_[0]}
+    ++${$_[0]};
 }
 
 sub decrement {
-    --${$_[0]}
+    --${$_[0]};
 }
 
+sub _add {
+    my ($self, $other) = @_;
+
+    my $result = int($$self + $other);
+    bless \$result;
+}
+
+sub _subtract {
+    my ($self, $other, $swap) = @_;
+
+    my $result = int($swap ? $other - $$self : $$self - $other);
+    bless \$result;
+}
 1;
 
 __END__
@@ -217,11 +230,6 @@ can be imported using the C<:states> or C<:all> tag.
 
 =over
 
-=item B<STATE_NONE>
-X<STATE_NONE>
-
-Integer value I<undef>, string value C<NONE>.
-
 =item B<STATE_ALIVE>
 X<STATE_ALIVE>
 
@@ -237,6 +245,11 @@ X<STATE_STATIC>
 
 Integer value C<-3>, string value C<STATIC>.
 
+=item B<STATE_NONE>
+X<STATE_NONE>
+
+Integer value C<-4>, string value C<NONE>.
+
 =item B<STATE_PENDING> ( I<NUM> )
 X<STATE_PENDING>
 
@@ -251,7 +264,7 @@ Integer value I<NUM> (>= 0), string value C<PENDING(NUM)>.
 =item B<ALL>
 X<ALL>
 
-Return a list of the state values (L<see above|/STATE VALUES>), except I<NONE>:
+Return a list of the state values (L<see above|/STATE VALUES>), except C<NONE>:
 
     STATE_STATIC, STATE_DEAD, STATE_ALIVE, STATE_PENDING(0)
 
@@ -276,7 +289,7 @@ variable to instantiate a new instance:
 
 =over
 
-=item B<new> ( I<ARG> )
+=item B<new> ( I<ARG> [, B<-err> =E<gt> REF ] )
 X<new>
 
 Create a new C<M6::ARPSponge::State> object with I<ARG> as its value.
@@ -284,27 +297,43 @@ I<ARG> can be a number representing a state, a string, or another
 C<M6::ARPSponge::State> reference. Depending on which type of argument
 it gets, it will either call L</new_from_int> or L</new_from_string>.
 
-=item B<new_from_int> ( I<INT> )
+If the I<ARG> is invalid, the method will return C<undef> and (if given)
+the I<REF> will contain an error message.
+
+=item B<new_from_int> ( I<INT> [, B<-err> =E<gt> REF ] )
 X<new_from_int>
 
 Create a new C<M6::ARPSponge::State> object with I<INT> as its value.
 I<INT> is a number representing a state.
 
-=item B<new_from_string> ( I<STR> )
+If I<INT> is not defined, it is equated to I<STATE_NONE>.
+
+If the I<INT> is invalid, the method will return C<undef> and (if given)
+the I<REF> will contain an error message.
+
+=item B<new_from_string> ( I<STR> [, B<-err> =E<gt> REF ] )
 X<new_from_string>
 
 Create a new C<M6::ARPSponge::State> object with I<STR> as its value.
 I<STR> is a string representing a state.
 
+If I<STR> is not defined, it is equated to I<STATE_NONE>.
+
+If the I<STR> is invalid, the method will return C<undef> and (if given)
+the I<REF> will contain an error message.
+
 =back
 
 =head1 OVERLOADED OPERATORS AND COMPARISON
 
-The '""' (stringify), '0+' (numify), '++', '--', and '=' operators are
-overloaded and implemented by the L<methods below|/METHODS>.
+The '""' (stringify), '0+' (numify), '++', '--', '+', '-', and '='
+operators are overloaded.
 
 Because of this overloading, instances of this class can be compared
-with both integer comparison and string comparison.
+using both integer comparison and string comparison.
+
+Note that no bounds checks are performed on the arithmetic operators,
+so the result may well be an C<ILLEGAL> state object.
 
 =head1 METHODS
 
@@ -313,27 +342,27 @@ with both integer comparison and string comparison.
 =item B<to_string>
 X<to_string>
 
-Implements stringification.
+Implements stringification. Returns C<ILLEGAL> for integer state values
+that are out of range.
 
 =item B<to_num>
 X<to_snum>
 
 Implements numification.
 
+=item B<clone>
+X<clone>
+
+Returns a copy of the object.
+
 =item B<increment>
 X<increment>
-
-Implements C<++>.
 
 =item B<decrement>
 X<decrement>
 
-Implements C<-->.
-
-=item B<clone>
-X<clone>
-
-Implements the assignment (C<=>) operator.
+Implement the C<++> and C<--> operators, resp. Can also be called as a
+regular method.
 
 =back
 
