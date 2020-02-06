@@ -44,7 +44,10 @@ has 'table'  => (
 
 sub lookup {
     my ($self, $ip) = @_;
-    return $self->table->{$ip} ? @{$self->table->{$ip}} : ();
+    if (exists $self->table->{$ip}) {
+        return @{$self->table->{$ip}};
+    }
+    return;
 }
 
 sub update {
@@ -53,10 +56,10 @@ sub update {
     if (defined $mac && $mac ne ETH_ADDR_NONE) {
         # uncoverable condition false
         $self->table->{$ip} = [ $mac, $time // time ];
+        return $self;
     }
-    else {
-        delete $self->table->{$ip};
-    }
+
+    delete $self->table->{$ip};
     return $self;
 }
 
@@ -67,7 +70,7 @@ sub delete {
 }
 
 sub clear {
-    my $self = shift;
+    my ($self) = @_;
     %{$self->table} = ();
     return $self;
 }
@@ -193,9 +196,9 @@ Add or update the ARP entry for I<HEXIP>, mapping it to I<HEXMAC>.
 If I<TSTAMP> is given, its value is used for the entry's timestamp;
 otherwise, the current time is used.
 
-If I<HEXMAC> matches the C<000000000000> string (i.e. the MAC address
-is C<00:00:00:00:00:00>), any existing entry for I<HEXIP> is deleted,
-effectively implementing L</delete>().
+If I<HEXMAC> is I<undef> or matches the C<000000000000> string
+(i.e. the MAC address is C<00:00:00:00:00:00>), any existing entry
+for I<HEXIP> is deleted, effectively implementing L</delete>().
 
 Returns the object reference, so calls can be chained:
 

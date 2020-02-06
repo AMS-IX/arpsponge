@@ -99,18 +99,18 @@ END {
 }
 
 sub __log_getset {
-    my $ref = shift;
-    if (@_) {
+    my ($ref) = @_;
+    if (@_ > 1) {
         my $old = $$ref;
-        $$ref = shift;
+        $$ref = $_[1];
         return $old;
     }
     return $$ref;
 }
 
 sub __log_getset_reopen {
-    my $ref = shift;
-    my $old = __log_getset($ref, @_);
+    my ($ref, @args) = @_;
+    my $old = __log_getset($ref, @args);
     
     if ($$ref ne $old) {
         closelog;
@@ -120,7 +120,7 @@ sub __log_getset_reopen {
 }
 
 sub init_log {
-    syslog_ident(shift @_) if @_;
+    syslog_ident($_[0]) if @_;
     openlog(syslog_ident, syslog_options, syslog_facility);
     $Notify = IO::Select->new();
     clear_log_buffer();
@@ -166,7 +166,7 @@ sub log_debug           { log_print_prio(LOG_DEBUG,    @_) }
 #
 ###############################################################################
 sub add_notify {
-    my $fh = shift;
+    my ($fh) = @_;
     $Notify->add($fh);
     return $fh;
 }
@@ -181,7 +181,7 @@ sub add_notify {
 #
 ###############################################################################
 sub remove_notify {
-    my $fh = shift;
+    my ($fh) = @_;
     $Notify->remove($fh);
     return $fh;
 }
@@ -194,8 +194,8 @@ sub remove_notify {
 sub print_notify($@) {
     $Notify || return;
 
-    my $format = shift;
-    my $msg = sprintf($format, @_);
+    my ($format, @args) = @_;
+    my $msg = sprintf($format, @args);
     for my $fh ($Notify->can_write(0)) {
         $fh->send_log($msg);
     }
@@ -218,15 +218,15 @@ sub log_print_prio($$@) {
         splice @Log_Buffer, 0, -$Log_Buffer_Size;
     }
 
+    print_notify($format, @args);
     if ($Verbose > 0) {
         my $head = strftime("%Y-%m-%d %H:%M:%S ", localtime(time))
                  . $Syslog_Ident . "[$$]:";
         print STDOUT map { "$head $_\n" } split(/\n/, sprintf($format, @args));
+        return;
     }
-    else {
-        syslog($prio, $format, @args);
-    }
-    print_notify($format, @args);
+    syslog($prio, $format, @args);
+    return;
 }
 
 ###############################################################################
@@ -288,9 +288,9 @@ sub log_sverbose($@) {
 }
 
 sub is_valid_log_prio {
-    my $arg = shift;
+    my ($arg, @opts) = @_;
     my $err_s;
-    my %opts = (-err => \$err_s, @_);
+    my %opts = (-err => \$err_s, @opts);
 
     if (defined (my $prio = $STR_TO_LOG_PRIO{lc $arg}) ) {
         return $prio;
@@ -301,7 +301,7 @@ sub is_valid_log_prio {
 }
 
 sub log_prio_to_string {
-    my $prio = int(shift);
+    my ($prio) = @_;
 
     if ($prio > LOG_DEBUG()) {
         $prio = LOG_DEBUG();

@@ -25,7 +25,7 @@ package M6::ARPSponge::Queue;
 # The entire structure is implemented as a hash, with each value
 # an ARRAY ref.
 #
-# The idea is this ARRAY is a circular buffer. Values are added at the tail
+# The ARRAY acts as a circular buffer. Values are added at the tail
 # until the maximum size is reached, at which point we shift the head off
 # of the ARRAY whenever a new item gets added. In theory, an ARRAY and two
 # index positions (head, tail) would also serve, without the need for
@@ -55,8 +55,7 @@ has '_table' => (
 );
 
 sub clear_all {
-    my $self = shift;
-    %{$self->_table} = ();
+    %{$_[0]->_table} = ();
 }
 
 
@@ -108,8 +107,10 @@ sub depth {
 # [Statistics: comment/code > 4]
 #
 sub rate {
-	my $q = $_[0]->_table->{$_[1]};
-	return undef if !defined($q) or @$q < 2;
+	my $q = $_[0]->_table->{$_[1]} or return undef;
+
+	return undef if @$q < 2;
+
 	my $first = $q->[0]->[1];
 	my $last  = $q->[$#$q]->[1];
 	my $time  = ($first < $last) ? $last-$first : 1;
@@ -126,17 +127,17 @@ sub add {
 	my ($self, $ip, $src_ip, $val) = @_;
 
     my $q = $self->_table->{$ip};
-    if ($q) {
-        if (int(@$q) >= $self->max_depth) {
-            shift @$q;
-        }
-        push @$q, [ $src_ip, $val ];
-        return int(@$q);
-    }
-    else {
+    if (! defined $q) {
         $self->_table->{$ip} = [ [ $src_ip, $val ] ];
         return 1;
     }
+
+    if (int(@$q) >= $self->max_depth) {
+        # Shift off head _before_ pushing tail.
+        shift @$q;
+    }
+    push @$q, [ $src_ip, $val ];
+    return int(@$q);
 }
 
 

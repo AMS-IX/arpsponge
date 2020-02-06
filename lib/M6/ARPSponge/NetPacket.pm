@@ -106,7 +106,7 @@ use constant {
 
 
 sub decode_ethernet {
-    my $pkt = shift;
+    my ($pkt) = @_;
     my $self = {};
 
     if (defined $pkt) {
@@ -119,7 +119,7 @@ sub decode_ethernet {
 
 
 sub encode_ethernet {
-    my $self = shift;
+    my ($self) = @_;
 
     return pack('H12H12na*', 
         $self->{dest_mac}, $self->{src_mac},
@@ -129,7 +129,7 @@ sub encode_ethernet {
 
 
 sub decode_ipv4 {
-    my $pkt = shift;
+    my ($pkt) = @_;
 
     return {} if ! defined $pkt;
 
@@ -162,7 +162,7 @@ sub decode_ipv4 {
 
 
 sub decode_arp {
-    my $pkt = shift;
+    my ($pkt) = @_;
     return {} if !defined $pkt;
 
     my $self = {};
@@ -189,7 +189,7 @@ sub decode_arp {
 
 
 sub encode_arp {
-    my $self = shift;
+    my ($self) = @_;
 
     $self->{htype} //= ARP_HTYPE_ETHERNET;
     $self->{proto} //= ARP_PROTO_IPv4;

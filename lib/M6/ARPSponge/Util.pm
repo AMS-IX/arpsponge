@@ -46,17 +46,17 @@ BEGIN {
 
 
 sub int2ip {
-    hex2ip(sprintf("%08x", shift @_));
+    hex2ip(sprintf("%08x", $_[0]));
 }
 
 
 sub ip2int {
-    hex(ip2hex(shift @_));
+    hex(ip2hex($_[0]));
 }
 
 
 sub hex2ip {
-    my $hex = shift;
+    my ($hex) = @_;
 
     $hex =~ /(..)(..)(..)(..)/;
     my $ip = sprintf("%d.%d.%d.%d", hex($1), hex($2), hex($3), hex($4));
@@ -65,12 +65,12 @@ sub hex2ip {
 
 
 sub ip2hex {
-    return sprintf("%02x%02x%02x%02x", split(/\./, shift));
+    return sprintf("%02x%02x%02x%02x", split(/\./, $_[0]));
 }
 
 
 sub hex2mac {
-    my $hex = substr("000000000000".(shift @_), -12);
+    my $hex = substr("000000000000".$_[0], -12);
     $hex =~ /(..)(..)(..)(..)(..)(..)/;
     return sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
             hex($1), hex($2), hex($3), hex($4), hex($5), hex($6));
@@ -79,7 +79,7 @@ sub hex2mac {
 
 sub mac2hex {
     return if @_ == 0 or !defined $_[0];
-    my @mac = split(/[\s\.\-:\-]/, shift);
+    my @mac = split(/[\s\.\-:\-]/, $_[0]);
     return if 12 % int(@mac);
 
     my $digits = int(12 / int(@mac));
@@ -123,8 +123,7 @@ sub hex_addr_in_net {
 
 
 sub _is_valid_num {
-    my $func = shift;
-    my $arg  = shift;
+    my ($func, $arg) = @_;
     my $err_s;
     my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
 
@@ -149,16 +148,16 @@ sub _is_valid_num {
             return;
         }
     }
-    else {
-        if (defined $opts{-min} && $num <= $opts{-min}) {
-            ${$opts{-err}} = 'number too small';
-            return;
-        }
-        if (defined $opts{-max} && $num >= $opts{-max}) {
-            ${$opts{-err}} = 'number too large';
-            return;
-        }
+
+    if (defined $opts{-min} && $num <= $opts{-min}) {
+        ${$opts{-err}} = 'number too small';
+        return;
     }
+    if (defined $opts{-max} && $num >= $opts{-max}) {
+        ${$opts{-err}} = 'number too large';
+        return;
+    }
+
     ${$opts{-err}} = '';
     return $num;
 }
@@ -169,7 +168,7 @@ sub is_valid_float { return _is_valid_num(\&POSIX::strtod, @_) }
 
 
 sub is_valid_ip {
-    my $arg = shift;
+    my ($arg) = @_;
     my $err_s;
     my %opts = (-err => \$err_s, -network => undef, @_);
 
@@ -191,18 +190,17 @@ sub is_valid_ip {
         ${$opts{-err}} = qq/$arg is out of range /.$net->cidr();
         return;
     }
-    else {
-        ${$opts{-err}} = qq/** INTERNAL ** is_valid_ip(): -network /
-                       . qq/argument "$opts{-network}" is not valid/;
-        warn ${$opts{-err}};
-        return;
-    }
+
+    ${$opts{-err}} = qq/** INTERNAL ** is_valid_ip(): -network /
+                    . qq/argument "$opts{-network}" is not valid/;
+    warn ${$opts{-err}};
+    return;
 }
 
 
 sub format_time {
-    my $time = shift;
-    my $separator = @_ ? shift : '@';
+    my ($time)= @_;
+    my $separator = @_ > 1 ? $_[1] : '@';
     if (defined $time && $time > 0) {
         return strftime("%Y-%m-%d${separator}%H:%M:%S", localtime($time));
     }
@@ -210,13 +208,12 @@ sub format_time {
 }
 
 sub relative_time {
-    my $time = shift;
-    my $with_direction = @_ ? shift : 1;
+    my ($time) = @_;
+    my $with_direction = @_ > 1 ? $_[1] : 1;
     my $now  = time;
 
     return 'never' if !$time;
 
-    my $direction = $time > $now ? 'from now' : 'ago';
     my $diff = abs(time - $time);
 
     my $day = int($diff / (24*3600));
@@ -231,7 +228,7 @@ sub relative_time {
     $str .= strftime("%H:%M:%S", gmtime($diff));
     
     if ($with_direction) {
-        $str .= " $direction";
+        $str .= " " . $time > $now ? 'from now' : 'ago';
     }
     return $str;
 }
