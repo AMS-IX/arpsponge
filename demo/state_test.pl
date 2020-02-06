@@ -19,32 +19,39 @@ my $state_2 = $state_1;
 printf "state_1: %d (%s)\n", $state_1, $state_1;
 printf "state_2: %d (%s)\n", $state_2, $state_2;
 
-say "decrementing state_2:";
+say "\ndecrementing state_2:";
 
 $state_2--;
 
-say "state_2 is ", ($state_2 == STATE_DEAD)   ? "" : "not ", "DEAD";
-say "state_2 is ", ($state_2 eq 'DEAD') ? "" : "not ", "DEAD";
+say "state_2 number is ", ($state_2 == STATE_DEAD)   ? "" : "not ", "DEAD";
+say "state_2 string is ", ($state_2 eq 'DEAD') ? "" : "not ", "DEAD";
+
+say "state_1 is ", ($state_1 eq 'DEAD') ? "" : "not ", "DEAD";
+
+print "\n";
 
 my $state_3 = M6::ARPSponge::State->new_from_string('ALIVE');
 printf "state_3: %d (%s)\n", $state_3, $state_3;
 
 if (looks_like_number($state_3)) {
-    print "$state_3 looks like a number.\n";
+    say "$state_3 looks like a number.";
 } else {
-    print "$state_3 does not look like a number.\n";
+    say "$state_3 does not look like a number.";
 }
+
+print "\n";
 
 my $undef = STATE_NONE;
 my $str = $undef->to_string;
 if (looks_like_number($undef)) {
-    print "$undef looks like a number.\n";
+    say "$undef looks like a number.";
 } else {
-    print "$undef does not look like a number.\n";
+    say "$undef does not look like a number.";
 }
 
 print "> ";
 while (<>) {
+    chomp;
     my $err = '?';
     my $state = M6::ARPSponge::State->new($_, -err => \$err);
     if (!defined $state) {
