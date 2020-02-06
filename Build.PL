@@ -20,9 +20,10 @@ my $build = Module::Build->new(
     configure_requires => { 'Module::Build' => '0.38' },
 
     build_requires => {
-        'Test::More'     => '0.98',
-        'Test::Class'    => '0.35',
-        'Devel::Cover'   => '0.66',
+        'Test::More'      => '0.98',
+        'Test::Exception' => '0.35',
+        'Test::Class'     => '0.35',
+        'Devel::Cover'    => '0.66',
     },
 
     requires => {
