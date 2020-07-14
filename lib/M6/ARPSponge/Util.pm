@@ -123,9 +123,14 @@ sub hex_addr_in_net {
 
 
 sub _is_valid_num {
-    my ($func, $arg) = @_;
-    my $err_s;
-    my %opts = (-err => \$err_s, -min => undef, -max => undef, -inclusive => 1, @_);
+    my ($func, $arg, @opts) = @_;
+    my %opts = (
+        -err => \(my $err_s),
+        -min => undef, -max => undef, -inclusive => 1,
+        @opts
+    );
+
+    ${$opts{-err}} = '';
 
     if (!defined $arg || length($arg) == 0) {
         ${$opts{-err}} = 'not a valid number';
@@ -147,6 +152,7 @@ sub _is_valid_num {
             ${$opts{-err}} = 'number too large';
             return;
         }
+        return $num;
     }
 
     if (defined $opts{-min} && $num <= $opts{-min}) {
@@ -158,7 +164,6 @@ sub _is_valid_num {
         return;
     }
 
-    ${$opts{-err}} = '';
     return $num;
 }
 
@@ -168,9 +173,8 @@ sub is_valid_float { return _is_valid_num(\&POSIX::strtod, @_) }
 
 
 sub is_valid_ip {
-    my ($arg) = @_;
-    my $err_s;
-    my %opts = (-err => \$err_s, -network => undef, @_);
+    my ($arg, @opts) = @_;
+    my %opts = (-err => \(my $err_s), -network => undef, @opts);
 
     if (!defined $arg || length($arg) == 0) {
         ${$opts{-err}} = q/"" is not a valid IPv4 address/;
@@ -228,7 +232,7 @@ sub relative_time {
     $str .= strftime("%H:%M:%S", gmtime($diff));
     
     if ($with_direction) {
-        $str .= " " . $time > $now ? 'from now' : 'ago';
+        $str .= $time > $now ? ' from now' : ' ago';
     }
     return $str;
 }
