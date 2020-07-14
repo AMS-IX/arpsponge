@@ -103,16 +103,16 @@ use overload
 
 
 sub new {
-    my ($type, $val) = @_;
+    my ($type, $val, @opts) = @_;
     if (!defined($val) or looks_like_number($val)) {
-        return $type->new_from_int($val, @_);
+        return $type->new_from_int($val, @opts);
     }
-    return $type->new_from_string($val, @_);
+    return $type->new_from_string($val, @opts);
 }
 
 sub new_from_int {
-    my ($type, $val) = @_;
-    my %opts = (-err => \(my $err_s), @_);
+    my ($type, $val, @opts) = @_;
+    my %opts = (-err => \(my $err_s), @opts);
 
     $val //= INT_NONE;
     if ($val >= MIN_INT_STATE) {
@@ -123,9 +123,9 @@ sub new_from_int {
 }
 
 sub new_from_string {
-    my ($type, $arg, @args) = @_;
+    my ($type, $arg, @opts) = @_;
     $arg = uc( $arg // 'NONE' );
-    my %opts = (-err => \(my $err_s), @args);
+    my %opts = (-err => \(my $err_s), @opts);
 
     for ($arg) {
         s/^\s+//;
@@ -133,12 +133,12 @@ sub new_from_string {
         if (/^PENDING\s*\(\s*(\d+)\s*\)$/) {
             return STATE_PENDING($1);
         }
-        if (my $val = $STR_TO_INT{$_}) {
-            return $type->new_from_int($val);
-        }
+        my $val = $STR_TO_INT{$_};
+        return $type->new_from_int($val) if defined $val;
+
+        substr($_, 20, -20) = '...' if length($_) > 43;
+        ${$opts{-err}} = qq/"$_" is not a valid state/;
     }
-    substr($_, 20, -20) = '...' if length($_) > 43;
-    ${$opts{-err}} = qq/"$_" is not a valid state/;
     return;
 }
 
