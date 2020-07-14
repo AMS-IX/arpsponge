@@ -484,7 +484,7 @@ sub handle_input {
 
         if (@ready == 0) {
             # A signal or another error.
-            if ($! == EINTR) { # Ignore EINTR errors; they are expected.
+            if ($! != EINTR) { # Ignore EINTR errors; they are expected.
                 $Error_Count++;
                 if ($Error_Count == 1) { # Suppress multiple errors.
                     event_err(EVENT_IO, "error in select(): %s", $!);
