@@ -146,7 +146,8 @@ sub test_is_valid_int : Test(19) {
                 -inclusive => 1,
                 -min => 1,
                 -max => 12345);
-    ok(defined($num), 'valid with inclusive');
+    ok(defined($num), 'valid with inclusive')
+        or diag("error: $err");
 
     $err = undef;
     $num = is_valid_int('0', 
