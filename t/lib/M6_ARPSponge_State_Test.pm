@@ -98,7 +98,7 @@ sub test_clone : Test(7) {
     cmp_ok($state, '==', STATE_PENDING(0), 'state=PENDING(1); state--; state == PENDING(0)');
 }
 
-sub test_new : Test(12) {
+sub test_new : Test(14) {
     my $self = shift;
 
     my $from_nothing = M6::ARPSponge::State->new();
@@ -131,6 +131,11 @@ sub test_new : Test(12) {
     my $bad2 = M6::ARPSponge::State->new('INVALID', -err => \$err);
     ok(!defined($bad2), 'new("INVALID") => undef');
     like($err, qr/^".*?" is not a valid state$/, 'new("INVALID") => error');
+
+    # Very long bad state, should be truncated
+    my $bad3 = M6::ARPSponge::State->new('INVALID' x 10, -err => \$err);
+    ok(!defined($bad3), 'new("INVALID") => undef');
+    like($err, qr/^".*?\.\.\..*?" is not a valid state$/, 'new("INVALID...INVALID") => error');
 }
 
 sub test_new_from_int : Test(5) {
