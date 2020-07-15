@@ -453,14 +453,8 @@ sub _cmd_set_alive {
     if ( ! $sponge->is_my_network($ip) ) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
-    my $mac;
     my $old_s = $sponge->state_name($sponge->get_state($ip));
-    if (@args > 1) {
-        ($mac) = $sponge->set_alive($ip, $args[0]);
-    }
-    else {
-        ($mac) = $sponge->set_alive($ip);
-    }
+    my ($mac) = $sponge->set_alive(@args);
     my $new_s = $sponge->state_name($sponge->get_state($ip));
     my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
     $self->_log_ctl(
