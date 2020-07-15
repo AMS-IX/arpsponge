@@ -292,7 +292,7 @@ sub Main {
 
     if ($sponge->my_ip eq $IPv4_ADDR_NONE) {
         if (!$passive) {
-            event_alert(EVENT_STATE, 
+            event_alert(EVENT_STATE,
                 "%s has no IP address; forcing --passive",
                 $sponge->device, $sponge->my_ip_s
             );
@@ -771,7 +771,7 @@ sub do_probe_pending($) {
     if (keys %$sponge > 0 && $sponge->user('forced_passive')) {
         # Log reminders that the sponge was started without an IP address, and
         # no --passive flag.
-        event_warning(EVENT_STATE, 
+        event_warning(EVENT_STATE,
             "%s has no IP address; forced --passive; not querying pending IPs",
             $sponge->device,
         );
@@ -851,7 +851,7 @@ sub do_sweep {
     if ($sponge->user('forced_passive')) {
         # Log reminders that the sponge was started without an IP address, and
         # no --passive flag.
-        event_warning(EVENT_STATE, 
+        event_warning(EVENT_STATE,
             "%s has no IP address; forced --passive; IP sweeping disabled!",
             $sponge->device,
         );
