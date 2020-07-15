@@ -117,14 +117,12 @@ sub match_prefix {
     my $word;
     for my $w (sort @$words) {
         if (substr(lc $w, 0, length($input)) eq lc $input) {
-            if (!defined $word) {
-                $word = $w;
-            }
-            else {
+            if (defined $word) {
                 return print_error_cond(!$silent,
                         qq{"$input" is ambiguous: matches "$word" and "$w"}
                     );
             }
+            $word = $w;
         }
     }
     return clear_error($word);
@@ -169,9 +167,11 @@ sub check_bool_arg {
     if ($arg =~ /^(1|yes|true|on)$/i) {
         return clear_error(1);
     }
-    elsif ($arg =~ /^(0|no|false|off)$/i) {
+
+    if ($arg =~ /^(0|no|false|off)$/i) {
         return clear_error(0);
     }
+
     return print_error_cond(!$silent,
                 qq{$argname: "$arg" is not a valid boolean});
 }
@@ -199,10 +199,8 @@ sub check_mac_address_arg {
         || $arg =~ /^[\da-f]{1,12}$/i) {
         return clear_error($arg);
     }
-    else {
-        print_error_cond($silent, qq{$argname: "$arg" is not a valid MAC address});
-        return;
-    }
+    print_error_cond($silent, qq{$argname: "$arg" is not a valid MAC address});
+    return;
 }
 
 sub complete_ip_address_arg {
@@ -234,13 +232,9 @@ sub complete_ip_address_arg {
             return keys %completions;
             #return grep { length($_) <= $have_len+1 } @completions;
         }
-        else {
-            return grep { length($_) == length($fixed)+2 } @completions;
-        }
+        return grep { length($_) == length($fixed)+2 } @completions;
     }
-    else {
-        return ("$fixed.", "$fixed.x");
-    }
+    return ("$fixed.", "$fixed.x");
 }
 
 sub complete_filename {
@@ -296,14 +290,9 @@ sub parse_words {
         my $words_str = join(q{ }, sort grep { length $_ } keys %$word_list);
 
         if (!@$words) {
-            if (exists $word_list->{''}) {
-                return 1;
-            }
-            else {
-                return print_error("@$parsed: expected one of:\n",
-                                   fmt_text('', $words_str, undef, 4));
-                #return print_error("@$parsed: expected one of:\n$words_str");
-            }
+            return 1 if exists $word_list->{''};
+            return print_error("@$parsed: expected one of:\n",
+                                fmt_text('', $words_str, undef, 4));
         }
         my $w = $words->[0];
         my $l = length($w);
@@ -311,32 +300,31 @@ sub parse_words {
         if (@match == 1) {
             push @$parsed, $match[0];
             shift @$words;
-            return parse_words($words, $word_list->{$match[0]},
-                               $parsed, $args);
+            return parse_words(
+                    $words, $word_list->{$match[0]},
+                    $parsed, $args
+            );
         }
-        elsif (@match > 1) {
+        if (@match > 1) {
             return print_error(
-                        qq{ambibuous input "$$words[0]"; matches:\n},
-                        fmt_text('', join(" ", sort @match), undef, 4),
-                    );
+                qq{ambibuous input "$$words[0]"; matches:\n},
+                fmt_text('', join(" ", sort @match), undef, 4),
+            );
         }
-        else {
-            return print_error(
-                        qq{invalid input "$$words[0]"; expected one of:\n},
-                        fmt_text('', $words_str, undef, 4)
-                    );
-        }
+        return print_error(
+            qq{invalid input "$$words[0]"; expected one of:\n},
+            fmt_text('', $words_str, undef, 4)
+        );
     }
-    elsif (my $arg_spec = $syntax->{arg}) {
+
+    if (my $arg_spec = $syntax->{arg}) {
         my $arg_name = $arg_spec->{name};
         $args->{$arg_name} = $arg_spec->{default};
         if (!@$words) {
             if ($arg_spec->{optional}) {
                 return parse_words($words, $arg_spec, $parsed, $args);
             }
-            else {
-                return print_error("@$parsed: missing <$arg_name> argument");
-            }
+            return print_error("@$parsed: missing <$arg_name> argument");
         }
         my $arg_val;
         if (my $type = $TYPES{$arg_spec->{type}}) {
@@ -351,11 +339,13 @@ sub parse_words {
         shift @$words;
         return parse_words($words, $arg_spec, $parsed, $args);
     }
-    elsif (@$words) {
+
+    if (@$words) {
         return print_error(
-                qq{@$parsed: expected end of line instead of "$$words[0]"\n}
-               );
+            qq{@$parsed: expected end of line instead of "$$words[0]"\n}
+        );
     }
+
     return 1;
 }
 
@@ -391,20 +381,21 @@ sub complete_words {
             shift @$words;
             return complete_words($words, $partial, $word_list->{$match[0]});
         }
-        elsif (@match > 1) {
+
+        if (@match > 1) {
             return ([],
-                    [qq{** "$$words[0]" ambiguous; matches: }
-                    . join(', ', sort @match)]
-                );
+                [qq{** "$$words[0]" ambiguous; matches: }
+                . join(', ', sort @match)]
+            );
         }
-        else {
-            return([],
-                   [qq{** "$$words[0]" invalid; expected: }
-                   . join(", ", sort @next)]
-                );
-        }
+
+        return([],
+            [qq{** "$$words[0]" invalid; expected: }
+            . join(", ", sort @next)]
+        );
     }
-    elsif (my $arg_spec = $syntax->{arg}) {
+
+    if (my $arg_spec = $syntax->{arg}) {
         my $arg_name = $arg_spec->{name};
         my @next = ("<$arg_name>");
         my @literal = ();
@@ -430,20 +421,18 @@ sub complete_words {
             shift @$words;
             return complete_words($words, $partial, $arg_spec);
         }
-        else {
-            return([],
-                ['** error'.(defined last_error() ? ': '.last_error() : '')]
-            );
-        }
+        return([],
+            ['** error'.(defined last_error() ? ': '.last_error() : '')]
+        );
     }
-    elsif (@$words || length($partial)) {
+
+    if (@$words || length($partial)) {
         return([], [
-                '** error: trailing junk "'.join(' ', @$words, $partial).'"'
-            ]);
+            '** error: trailing junk "'.join(' ', @$words, $partial).'"'
+        ]);
     }
-    else {
-        return([], ['(return)']);
-    }
+
+    return([], ['(return)']);
 }
 
 
