@@ -132,8 +132,9 @@ my $Timer_Cycle    = 1.0;
 
 # Keep track of how many errors we've seen and when we logged the
 # last error. This is used to suppress too much logging.
-my $Last_Error       = 0;
-my $Error_Count      = 0;
+my $Last_Select_Error_Time  = 0;
+my $Last_Select_Error       = 0;
+my $Select_Error_Count      = 0;
 
 # ============================================================================
 END {
@@ -476,21 +477,36 @@ sub handle_input {
 
         $now = time; # Update time.
 
-        if ($Error_Count > 1 && $now > $Last_Error + 15) {
+        if ($Select_Error_Count > 1 && $now > $Last_Select_Error_Time + 15) {
             # We've seen multiple select errors in the last 15 seconds.
             # Only the first was logged. Log the number of repetitions.
-            event_err(EVENT_IO, "select error repeated %d time(s)", $Error_Count-1);
-            $Error_Count = 0;
+            event_err(EVENT_IO, "previous select error repeated %d time(s)",
+                $Select_Error_Count-1);
+            $Select_Error_Count = 0;
         }
 
         if (@ready == 0) {
+            # Ignore timeout and EINTR errors; they are expected.
+            next if $! == 0 || $! == EINTR;
+
             # A signal or another error.
-            if ($! != 0 && $! != EINTR) { # Ignore EINTR errors; they are expected.
-                $Error_Count++;
-                if ($Error_Count == 1) { # Suppress multiple errors.
-                    event_err(EVENT_IO, "error in select(): %s", $!);
-                    $Last_Error = $now;
+            my $err = $!;
+
+            # Log repeat count of previous error.
+            if ($Last_Select_Error != $err) {
+                if ($Select_Error_Count > 1) {
+                    event_err(EVENT_IO,
+                        "previous select error repeated %d time(s)",
+                        $Select_Error_Count-1);
+                    $Select_Error_Count = 0;
                 }
+            }
+
+            $Select_Error_Count++;
+            $Last_Select_Error = $err;
+            if ($Select_Error_Count == 1) { # Suppress multiple errors.
+                event_err(EVENT_IO, "error in select(): %s", $!);
+                $Last_Select_Error_Time = $now;
             }
             next;
         }
