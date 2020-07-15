@@ -5,8 +5,9 @@ build-stamp
 configure-stamp
 debian/.debhelper/
 debian/arpsponge/
-debian/arpsponge.debhelper.log
-debian/arpsponge.substvars
+debian/*.*.log
+debian/*.substvars
+debian/*.*.debhelper
 debian/files
 defaults.sample
 init.d/arpsponge
