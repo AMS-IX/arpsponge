@@ -1,7 +1,6 @@
 ##############################################################################
-##############################################################################
 #
-# ARP Query Timestamp Queue 
+# ARP Query Timestamp Queue
 #
 #   Copyright 2005-2016 AMS-IX B.V.; All rights reserved.
 #
@@ -24,7 +23,7 @@ package M6::ARP::Queue;
 use strict;
 
 BEGIN {
-	our $VERSION = 1.04;
+    our $VERSION = 1.04;
 }
 
 our $DFL_DEPTH = 1000;
@@ -49,7 +48,7 @@ M6::ARP::Queue - ARP query queue.
  $q->clear_all();
 
  while ( ! $q->is_full($dst_ip) ) {
-	...
+    ...
  }
 
  $q_depth_1 = $q->depth($dst_ip);
@@ -66,9 +65,9 @@ M6::ARP::Queue - ARP query queue.
 =head1 DESCRIPTION
 
 This object class is used by the L<M6::ARP::Sponge|M6::ARP::Sponge>
-module to store [source, timestamp] tuples for ARP queries. 
+module to store [source, timestamp] tuples for ARP queries.
 
-The object holds a collection of circular buffers that are accessed by 
+The object holds a collection of circular buffers that are accessed by
 unique keys (IP address strings in the typical usage scenario). Pairs
 of source IP and timestamp data added to a queue until its size reaches
 the maximum depth, at which point newly added values cause the oldest
@@ -105,12 +104,12 @@ Returns a reference to the newly created object.
 =cut
 
 sub new {
-	my ($type, $max_depth) = @_;
+    my ($type, $max_depth) = @_;
 
-	$max_depth //= $DFL_DEPTH;
+    $max_depth //= $DFL_DEPTH;
 
-	$type = ref $type if ref $type;
-	bless {'max_depth' => $max_depth, q=>{}}, $type;
+    $type = ref $type if ref $type;
+    bless {'max_depth' => $max_depth, q=>{}}, $type;
 }
 
 =back
@@ -142,7 +141,7 @@ Return the depth of the queue for I<IP>.
 =cut
 
 sub depth {
-	my $q = $_[0]->get_queue($_[1]);
+    my $q = $_[0]->get_queue($_[1]);
     return $q ? int(@$q) : 0
 }
 
@@ -184,20 +183,20 @@ per minute.
 #
 # Hence, the corrected formula is:
 #
-# 	(n-1) / (Tn - T1)
+#   (n-1) / (Tn - T1)
 #
 # Which gives the correct rate of "1" for the above examples.
 #
 # [Statistics: comment/code > 4]
 #
 sub rate {
-	my $q = $_[0]->get_queue($_[1]);
-	return undef unless defined($q) && @$q > 1;
-	my $first = $q->[0]->[1];
-	my $last  = $q->[$#$q]->[1];
-	my $time  = ($first < $last) ? $last-$first : 1;
-	my $n = int(@$q)-1;
-	return ($n / $time) * 60;
+    my $q = $_[0]->get_queue($_[1]);
+    return undef unless defined($q) && @$q > 1;
+    my $first = $q->[0]->[1];
+    my $last  = $q->[$#$q]->[1];
+    my $time  = ($first < $last) ? $last-$first : 1;
+    my $n = int(@$q)-1;
+    return ($n / $time) * 60;
 }
 
 =item X<max_depth>B<max_depth>
@@ -225,17 +224,17 @@ queue depth.
 =cut
 
 sub add {
-	my ($self, $ip, $src_ip, $val) = @_;
+    my ($self, $ip, $src_ip, $val) = @_;
 
     # Oooh, very h4xx||
     my $q = $self->{'q'}->{$ip} //
            ($self->{'q'}->{$ip} = []);
 
-	if (int(@$q) >= $self->max_depth) {
-		shift @$q;
-	}
-	push @$q, [ $src_ip, $val ];
-	return int(@$q);
+    if (int(@$q) >= $self->max_depth) {
+        shift @$q;
+    }
+    push @$q, [ $src_ip, $val ];
+    return int(@$q);
 }
 
 
@@ -259,15 +258,15 @@ Also:
 =cut
 
 sub get_entry {
-	my ($self, $ip, $index) = @_;
+    my ($self, $ip, $index) = @_;
 
     my $q = $self->get_queue($ip);
-	$index = 0 unless defined($index);
-	if ($index < 0) {
-		$index = int(@$q) + $index;
-		$index = 0 if $index < 0;
-	}
-	return $q->[$index];
+    $index = 0 unless defined($index);
+    if ($index < 0) {
+        $index = int(@$q) + $index;
+        $index = 0 if $index < 0;
+    }
+    return $q->[$index];
 }
 
 =item X<get_timestamp>B<get> ( I<IP> [, I<INDEX>] )
@@ -281,7 +280,7 @@ as for C<get_entry()|/get_entry> above.
 =cut
 
 sub get_timestamp {
-	my ($self, $ip, $index) = @_;
+    my ($self, $ip, $index) = @_;
 
     if (my $entry = $self->get_entry($ip, $index)) {
         return $entry->[1];
@@ -290,7 +289,7 @@ sub get_timestamp {
 }
 
 sub get {
-	my ($self, $ip, $index) = @_;
+    my ($self, $ip, $index) = @_;
 
     if (my $entry = $self->get_entry($ip, $index)) {
         return $entry->[1];
@@ -322,7 +321,7 @@ Returns the new queue depth after reducing.
 =cut
 
 sub reduce {
-	my ($self, $ip, $max_rate) = @_;
+    my ($self, $ip, $max_rate) = @_;
 
     my $q = $self->get_queue($ip);
 

@@ -1,4 +1,3 @@
-#############################################################################
 ##############################################################################
 #
 # ARP sponge control socket.
@@ -23,7 +22,7 @@ package M6::ARP::Control;
 use strict;
 
 BEGIN {
-	our $VERSION = '0.02';
+    our $VERSION = '0.02';
 }
 
 our $Error       = undef;
@@ -70,7 +69,7 @@ protocol for controlling the ARP sponge using UNIX domain sockets.
 
 The server (L<arpsponge>) uses a
 L<M6::ARP::Control::Server>
-object, the client (L<asctl>) uses 
+object, the client (L<asctl>) uses
 L<M6::ARP::Control::Client>.
 
 The implementation consists of a fairly thin wrapper around
@@ -79,7 +78,7 @@ L<M6::ARP::Control::Server>
 part.
 
 You will probably never have to deal with this module directly,
-but rather use 
+but rather use
 L<M6::ARP::Control::Server>
 or
 L<M6::ARP::Control::Client>.
@@ -92,7 +91,7 @@ The basic protocol implemented by this module is very simple:
 
 =over
 
-=item 1. 
+=item 1.
 
 Client connects to server.
 
@@ -118,7 +117,7 @@ which is prefixed by "\014LOG\t" and terminated with a newline.
 The client should be aware that these lines can show up where
 normal command output is expected.
 
-The 
+The
 L<M6::ARP::Control::Client>
 object knows how to handle this and will store logging information
 in an internal buffer.
@@ -140,7 +139,7 @@ L<M6::ARP::Control::Base/_get_data>.
 
 =item X<$M6::ARP::Control::MAXLOGLINES>I<$M6::ARP::Control::MAXLOGLINES>
 
-Maximum number of log lines that a 
+Maximum number of log lines that a
 L<M6::ARP::Control::Client> should buffer internally.
 
 =back

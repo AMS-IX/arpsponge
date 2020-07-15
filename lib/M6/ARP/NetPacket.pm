@@ -1,5 +1,4 @@
 ##############################################################################
-##############################################################################
 #
 # ARP Sponge network packet routines.
 #
@@ -27,10 +26,10 @@ use strict;
 use Readonly;
 
 BEGIN {
-	use Exporter;
+    use Exporter;
 
-	our $VERSION = 1.04;
-	our @ISA = qw( Exporter );
+    our $VERSION = 1.04;
+    our @ISA = qw( Exporter );
 
     my @functions = qw(
             decode_ethernet decode_ip decode_ipv4 decode_arp
@@ -50,14 +49,14 @@ BEGIN {
             $ARP_PROTO_IP
         );
 
-	our @EXPORT_OK = ( @functions, @variables );
-	our @EXPORT    = ();
+    our @EXPORT_OK = ( @functions, @variables );
+    our @EXPORT    = ();
 
-	our %EXPORT_TAGS = ( 
-			'all'    => [ @EXPORT_OK ],
-			'func'   => [ @functions ],
-			'vars'   => [ @variables ],
-		);
+    our %EXPORT_TAGS = (
+            'all'    => [ @EXPORT_OK ],
+            'func'   => [ @functions ],
+            'vars'   => [ @variables ],
+        );
 }
 
 # The only things we're interested in right now...
@@ -105,7 +104,7 @@ M6::ARP::NetPacket - (partially) decode ethernet, IP and ARP packets
 
  if ( $eth_data->{type} == $ETH_TYPE_ARP ) {
     $arp_data = decode_arp( $eth_data->{'data'} );
-    
+
     if ($arp_data->{opcode} == $ARP_OPCODE_REQUEST) {
         printf( "ARP WHO-HAS %s TELL %s\@%s\n",
                 hex2ip( $arp_data->{'tpa'} ),
@@ -480,7 +479,7 @@ sub decode_arp {
         @self{qw( htype proto hlen plen opcode )},
         my $payload
     ) = unpack('nnCCna*', $pkt);
-        
+
     # Take the long way home.
     my $spec = 'H'.($self{hlen}*2).'H'.($self{plen}*2);
     @self{qw( sha spa tha tpa )} = unpack($spec.$spec, $payload);

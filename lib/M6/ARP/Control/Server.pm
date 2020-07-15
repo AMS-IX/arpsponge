@@ -1,4 +1,3 @@
-#############################################################################
 ##############################################################################
 #
 # ARP sponge control socket, server side.
@@ -34,7 +33,7 @@ use Time::HiRes        qw( time );
 use POSIX qw( strftime );
 
 BEGIN {
-	our $VERSION = '0.04';
+    our $VERSION = '0.04';
 }
 
 my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
@@ -104,7 +103,7 @@ sub accept {
     my ($self) = @_;
 
     my $socket = $self->SUPER::accept() or return $self->_set_error($!);
-    
+
     bless $socket, ref $self;
     $socket->blocking(0); # Make sure we never hang as a server.
     return $socket->_send_data("\014READY\n");
@@ -159,7 +158,7 @@ sub handle_command {
     my ($self, $sponge) = @_;
 
     my $buf = $self->get_command or return;
-    
+
     my ($cmd, @args) = split(' ', $buf);
 
     my $sub_name = $Command_Dispatch{lc $cmd};
@@ -294,21 +293,21 @@ sub _cmd_ping {
 
 sub _cmd_get_status {
     my ($self, $sponge, $cmd, @args) = @_;
-    
+
     my $status = $self->_get_status_info_s($sponge);
     return $self->send_ok($status);
 }
 
 sub _cmd_get_param {
     my ($self, $sponge, $cmd, @args) = @_;
-    
+
     my $status = $self->_get_param_info_s($sponge);
     return $self->send_ok($status);
 }
 
 sub _cmd_get_log {
     my ($self, $sponge, $cmd, @args) = @_;
-    
+
     my $count = 0;
     if (@args) {
         $count = is_valid_int($args[0], -min=>1);

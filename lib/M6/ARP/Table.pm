@@ -1,5 +1,4 @@
 ##############################################################################
-##############################################################################
 #
 # ARP Table
 #
@@ -25,7 +24,7 @@ use strict;
 use Time::HiRes qw( time );
 
 BEGIN {
-	our $VERSION = 1.03;
+    our $VERSION = 1.03;
 }
 
 =pod
@@ -66,10 +65,10 @@ Create a new object instance and return a reference to it.
 =cut
 
 sub new {
-	my ($type, $max_depth) = @_;
+    my ($type, $max_depth) = @_;
 
     $type = ref $type if ref $type;
-	bless { arp => {}, rarp => {} }, $type;
+    bless { arp => {}, rarp => {} }, $type;
 }
 
 =back
@@ -85,12 +84,12 @@ Clear the ARP table for I<IP>.
 =cut
 
 sub clear {
-	my ($self, $ip) = @_;
+    my ($self, $ip) = @_;
 
-	if (my $mac = $self->arp($ip)) {
-		delete $self->{rarp}->{$mac}->{$ip};
-	}
-	delete $self->{arp}->{$ip};
+    if (my $mac = $self->arp($ip)) {
+        delete $self->{rarp}->{$mac}->{$ip};
+    }
+    delete $self->{arp}->{$ip};
 }
 
 =item X<arp>B<arp> ( I<IP> )
@@ -100,7 +99,7 @@ entry for I<IP>.
 
 =cut
 
-sub arp	{ $_[0]->{'arp'}->{$_[1]} }
+sub arp { $_[0]->{'arp'}->{$_[1]} }
 
 =item X<rarp>B<rarp> ( I<MAC> )
 
@@ -135,12 +134,12 @@ Returns the timestamp.
 =cut
 
 sub add {
-	my ($self, $ip, $mac, $timestamp) = @_;
-	$timestamp //= time;
-	$self->clear($ip);
-	$self->{'arp'}->{$ip} = $mac;
-	$self->{'rarp'}->{$mac}->{$ip} = $timestamp;
-	return $timestamp;
+    my ($self, $ip, $mac, $timestamp) = @_;
+    $timestamp //= time;
+    $self->clear($ip);
+    $self->{'arp'}->{$ip} = $mac;
+    $self->{'rarp'}->{$mac}->{$ip} = $timestamp;
+    return $timestamp;
 }
 
 1;

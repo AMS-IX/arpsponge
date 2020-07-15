@@ -1,5 +1,4 @@
 ###############################################################################
-###############################################################################
 #
 # ARP Sponge Flags
 #
@@ -29,7 +28,7 @@ BEGIN {
 
     my @func   = qw(
         parse_update_flags update_flags_to_str is_valid_state
-        state_to_string 
+        state_to_string
     );
     my @states = qw( STATIC DEAD ALIVE PENDING NONE );
     my @update_flags = qw(
@@ -43,7 +42,7 @@ BEGIN {
     our @EXPORT_OK = ( @func, @states, @update_flags );
     our @EXPORT    = ();
 
-    our %EXPORT_TAGS = ( 
+    our %EXPORT_TAGS = (
         'func'   => \@func,
         'states' => \@states,
         'flags'  => \@update_flags,
@@ -177,7 +176,7 @@ them.
 sub update_flags_to_str {
     my ($arg) = @_;
     my @list;
-    
+
     if ($arg == ARP_UPDATE_NONE) {
         return ('none');
     }

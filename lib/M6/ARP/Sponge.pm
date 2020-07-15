@@ -1,5 +1,4 @@
 ###############################################################################
-###############################################################################
 #
 # ARP sponge
 #
@@ -45,7 +44,7 @@ use IO::Select;
 our $VERSION = 1.07;
 
 # Accessors; use the factory :-)
-__PACKAGE__->mk_accessors(qw( 
+__PACKAGE__->mk_accessors(qw(
                 is_dummy
                 queuedepth      my_ip               my_mac
                 network         prefixlen
@@ -164,12 +163,12 @@ sub new {
         my $v = shift @args;
         $k =~ s/^-//;
         $self->{lc $k} = $v;
-    
+
     }
     bless $self, $type;
 
     ($self->{'phys_device'}) = split(/:/, $self->{'device'});
-    
+
     $self->{'ip_all'} = { map { $_ => 1 } $self->get_ip_all };
     $self->my_ip( $self->get_ip );
     $self->my_mac( $self->get_mac );
@@ -539,7 +538,7 @@ sub set_dead {
     my ($self, $ip) = @_;
     my $rate = $self->queue->rate($ip) // 0.0;
 
-    event_notice(EVENT_SPONGE,  
+    event_notice(EVENT_SPONGE,
         "sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
 
     $self->gratuitous_arp($ip) if $self->gratuitous;

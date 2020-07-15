@@ -1,5 +1,4 @@
 ##############################################################################
-##############################################################################
 #
 # ARP Stuff Utility routines
 #
@@ -25,22 +24,22 @@ use POSIX qw( strftime strtod strtol );
 use NetAddr::IP;
 
 BEGIN {
-	use Exporter;
+    use Exporter;
 
-	our $VERSION = 1.04;
-	our @ISA = qw( Exporter );
+    our $VERSION = 1.04;
+    our @ISA = qw( Exporter );
 
-	our @EXPORT_OK = qw( 
+    our @EXPORT_OK = qw(
             int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
             format_time relative_time hex_addr_in_net
             is_valid_int is_valid_float is_valid_ip
             arpflags2int int2arpflags
         );
-	our @EXPORT    = ();
+    our @EXPORT    = ();
 
-	our %EXPORT_TAGS = ( 
-			'all'    => \@EXPORT_OK
-		);
+    our %EXPORT_TAGS = (
+            'all'    => \@EXPORT_OK
+        );
 }
 
 =pod
@@ -97,7 +96,7 @@ Example: int2ip(3250751620) returns "193.194.136.132".
 =cut
 
 sub int2ip {
-	hex2ip(sprintf("%08x", $_[0]));
+    hex2ip(sprintf("%08x", $_[0]));
 };
 
 ###############################################################################
@@ -111,7 +110,7 @@ Example: ip2int("193.194.136.132") returns "3250751620".
 =cut
 
 sub ip2int {
-	hex(ip2hex($_[0]));
+    hex(ip2hex($_[0]));
 };
 
 ###############################################################################
@@ -125,11 +124,11 @@ Example: hex2ip("c1c28884") returns "193.194.136.132".
 =cut
 
 sub hex2ip {
-	my ($hex) = @_;
+    my ($hex) = @_;
 
-	$hex =~ /(..)(..)(..)(..)/;
-	my $ip = sprintf("%d.%d.%d.%d", hex($1), hex($2), hex($3), hex($4));
-	return $ip;
+    $hex =~ /(..)(..)(..)(..)/;
+    my $ip = sprintf("%d.%d.%d.%d", hex($1), hex($2), hex($3), hex($4));
+    return $ip;
 };
 
 ###############################################################################
@@ -144,7 +143,7 @@ returns "c1c28884".
 =cut
 
 sub ip2hex {
-	return sprintf("%02x%02x%02x%02x", split(/\./, $_[0]));
+    return sprintf("%02x%02x%02x%02x", split(/\./, $_[0]));
 };
 
 ###############################################################################
@@ -159,10 +158,10 @@ returns "a1:b2:03:04:e5:f6"
 =cut
 
 sub hex2mac {
-	my $hex = substr("000000000000$_[0]", -12);
-	$hex =~ /(..)(..)(..)(..)(..)(..)/;
-	return sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
-			hex($1), hex($2), hex($3), hex($4), hex($5), hex($6));
+    my $hex = substr("000000000000$_[0]", -12);
+    $hex =~ /(..)(..)(..)(..)(..)(..)/;
+    return sprintf("%02x:%02x:%02x:%02x:%02x:%02x",
+            hex($1), hex($2), hex($3), hex($4), hex($5), hex($6));
 };
 
 ###############################################################################
@@ -179,13 +178,13 @@ returns "a1b20304e5f6".
 
 sub mac2hex {
     return if !@_ or !defined $_[0];
-	my @mac = split(/[\s\.\-:\-]/, $_[0]);
-	return undef if 12 % int(@mac);
-	my $digits = int(12 / int(@mac));
-	my $hex;
-	my $pref = '000000000000';
-	foreach my $grp (@mac) { $hex .= substr($pref.$grp, -$digits) }
-	return lc $hex;
+    my @mac = split(/[\s\.\-:\-]/, $_[0]);
+    return undef if 12 % int(@mac);
+    my $digits = int(12 / int(@mac));
+    my $hex;
+    my $pref = '000000000000';
+    foreach my $grp (@mac) { $hex .= substr($pref.$grp, -$digits) }
+    return lc $hex;
 };
 
 ###############################################################################
@@ -200,7 +199,7 @@ returns "a1:b2:03:04:e5:f6"
 =cut
 
 sub mac2mac {
-	hex2mac(mac2hex($_[0]));
+    hex2mac(mac2hex($_[0]));
 }
 
 ###############################################################################
@@ -213,7 +212,7 @@ notation.
 
 Returns 1 if I<ADDR> is part of I<NET>/I<PREFIX>, C<undef> otherwise.
 
-=cut 
+=cut
 
 sub hex_addr_in_net {
     my ($addr, $net, $len) = @_;
@@ -446,9 +445,9 @@ sub is_valid_ip {
         ${$opts{-err}} = qq/"$arg" is not a valid IPv4 address/;
         return;
     }
-    
+
     return $ip->addr() if !$opts{-network};
-   
+
     if (my $net = NetAddr::IP->new($opts{-network})) {
         return $ip->addr() if $net->contains($ip);
         ${$opts{-err}} = qq/$arg is out of range /.$net->cidr();
@@ -477,7 +476,7 @@ returns "2011-03-23@15:41:18"
 =cut
 
 sub format_time {
-	my ($time, $separator) = @_;
+    my ($time, $separator) = @_;
     if (defined $time && $time > 0) {
         $separator //= '@';
         return strftime("%Y-%m-%d${separator}%H:%M:%S", localtime($time));
@@ -500,7 +499,7 @@ returns "1 day 4h49m5s ago"
 =cut
 
 sub relative_time {
-	my $time = $_[0];
+    my $time = $_[0];
     return 'never' if !$time;
 
     my $with_direction = @_ > 1 ? $_[1] : 1;
@@ -517,7 +516,7 @@ sub relative_time {
     }
 
     $str .= strftime("%H:%M:%S", gmtime($diff));
-    
+
     if ($with_direction) {
         my $direction = $time > $now ? 'from now' : 'ago';
         $str .= " $direction";

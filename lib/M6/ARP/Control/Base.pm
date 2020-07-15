@@ -1,4 +1,3 @@
-#############################################################################
 ##############################################################################
 #
 # ARP sponge control socket, base class.
@@ -27,7 +26,7 @@ use M6::ARP::Control;
 use IO::Socket;
 
 BEGIN {
-	our $VERSION = '0.03';
+    our $VERSION = '0.03';
 }
 
 sub error { return M6::ARP::Control->error() };
@@ -124,7 +123,7 @@ M6::ARP::Control::Base - base class for arpsponge control communications
     if ($arg !~ /^Simon says, /) {
         return $self->_set_error("You forgot the magic prefix");
     }
-    
+
     $self->_send_data($arg) || return;
     return $self->_get_data;
  }
