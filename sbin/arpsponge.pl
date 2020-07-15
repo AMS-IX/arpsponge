@@ -471,6 +471,7 @@ sub handle_input {
         }
 
         # [3] Wait for something to happen (timeout, signal or packet).
+        $! = 0;
         my @ready = $select->can_read($next_alarm - $now);
 
         $now = time; # Update time.
@@ -484,7 +485,7 @@ sub handle_input {
 
         if (@ready == 0) {
             # A signal or another error.
-            if ($! == EINTR) { # Ignore EINTR errors; they are expected.
+            if ($! != 0 && $! != EINTR) { # Ignore EINTR errors; they are expected.
                 $Error_Count++;
                 if ($Error_Count == 1) { # Suppress multiple errors.
                     event_err(EVENT_IO, "error in select(): %s", $!);
