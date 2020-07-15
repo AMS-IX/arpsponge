@@ -38,28 +38,28 @@ use M6::ARP::Sponge qw( :flags );
 use Scalar::Util qw( reftype );
 
 BEGIN {
-	use Exporter;
+    use Exporter;
 
     our $VERSION     = '1.00';
-	my  @check_func  = qw(
+    my  @check_func  = qw(
             check_ip_address_arg  complete_ip_address_arg
             check_int_arg
             check_float_arg
             check_bool_arg
             match_prefix
         );
-	my  @gen_functions = qw( compile_syntax init_readline exit_readline
+    my  @gen_functions = qw( compile_syntax init_readline exit_readline
                              parse_line
                              print_error_cond print_error
                              last_error set_error clear_error
                              yesno print_output
                              clr_to_eol term_width fmt_text );
-	my  @functions   = (@check_func, @gen_functions);
+    my  @functions   = (@check_func, @gen_functions);
     my  @vars        = qw( $TERM $IN $OUT $PROMPT $PAGER
                            $HISTORY_FILE $IP_NETWORK );
-	our @EXPORT_OK   = (@functions, @vars);
-	our @EXPORT      = @gen_functions;
-	our %EXPORT_TAGS = ( func => \@functions, check => \@check_func,
+    our @EXPORT_OK   = (@functions, @vars);
+    our @EXPORT      = @gen_functions;
+    our %EXPORT_TAGS = ( func => \@functions, check => \@check_func,
                          all => \@EXPORT_OK, vars => \@vars );
 }
 
@@ -209,7 +209,7 @@ sub complete_ip_address_arg {
     my $partial = shift;
 
     my $network   = $IP_NETWORK->short;
-    
+
     my $fixed_octets = int($IP_NETWORK->masklen / 8);
 
     return $network if $fixed_octets == 4;
@@ -225,7 +225,7 @@ sub complete_ip_address_arg {
             # and reveal only the next digit, turn the rest into "x".
             my %completions = map {
                     my $keep = substr($_, 0, $have_len+1);
-                    my $hide = length($_) > $have_len+1 
+                    my $hide = length($_) > $have_len+1
                                 ? substr($_, $have_len+1)
                                 : '';
                     $hide =~ s/[\da-f]/x/gi;
@@ -460,7 +460,7 @@ sub complete_line {
     my $words   = substr($line, 0, $start);
     #print "<$words> <$text>\n";
     my @words = split(' ', $words);
-    my ($literal, $description) 
+    my ($literal, $description)
             = complete_words(\@words, $text, { words=>$SYNTAX });
     if (!@$literal && @$description) {
         print "\n";
