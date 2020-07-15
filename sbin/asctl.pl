@@ -462,7 +462,7 @@ sub complete_log_mask {
     }
     my $prefix  = join('', map { "$_," } @words);
     DEBUG "\ncomplete_log_mask partial:<$partial>; prefix:<$prefix>";
-    
+
     my @names;
     for my $name (event_names()) {
         if (substr($name, 0, length($partial)) eq $partial) {
@@ -504,7 +504,7 @@ sub complete_arp_update_flags {
     }
     my $prefix  = join('', map { "$_," } @words);
     DEBUG "\ncomplete_arp_update_flags partial:<$partial>; prefix:<$prefix>";
-    
+
     my @names;
     for my $name (keys %M6::ARP::Const::STR_TO_UPDATE_FLAG) {
         if (substr($name, 0, length($partial)) eq $partial) {
@@ -747,7 +747,7 @@ sub do_inform_about {
         $delay = $dfl_probe_delay;
     }
 
-    my $src_list = expand_ip_filter(arg => $$args{'src_ip'}, 
+    my $src_list = expand_ip_filter(arg => $$args{'src_ip'},
                                     name => 'source-ip') or return;
 
     my $dst_list = expand_ip_filter(arg => $$args{'dst_ip'},
@@ -787,7 +787,7 @@ sub do_inform_about {
             return undef if $interrupt;
             my $dst = shift;
             return do_ip_run($src_list,
-                sub { 
+                sub {
                     return undef if $interrupt;
                     if ($INTERACTIVE && $count % $print_freq == 0) {
                         $time_estimate = $pairs * $estimate_per_update + 0.5;
@@ -933,7 +933,7 @@ sub do_show_arp {
         for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$output) {
             push @output,
                     sprintf("%-17s %-17s %-11d %s",
-                        $$info{mac}, $$info{ip}, 
+                        $$info{mac}, $$info{ip},
                         $$info{mac_changed},
                         format_time($$info{mac_changed}),
                     );
@@ -1083,7 +1083,7 @@ sub shared_show_arp_ip {
     my $reply = '';
     if ($args->{'ip'}) {
         my $arg_count = 0;
-        $reply = expand_ip_run($args->{'ip'}, 
+        $reply = expand_ip_run($args->{'ip'},
                     sub {
                         $arg_count++;
                         return check_send_command($conn, "$command $_[0]");
@@ -1209,7 +1209,7 @@ sub do_clear_arp {
 
     Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
 
-    return expand_ip_run($ip, 
+    return expand_ip_run($ip,
                   sub {
                       return check_send_command($conn, "clear_arp $_[0]");
                   }
@@ -1259,7 +1259,7 @@ sub do_probe {
 
     my $start = time;
     my $n = 0;
-    expand_ip_run($ip, 
+    expand_ip_run($ip,
         sub {
             my $r = check_send_command($conn, "probe $_[0]") or return;
             my ($o, $reply, $out, $t) = parse_server_reply($r);
@@ -1444,7 +1444,7 @@ sub do_set_dummy {
                    -options => $args->{-options},
                    -type    => 'bool');
 }
- 
+
 # cmd: set sweep period
 sub do_set_sweep_period {
     my ($conn, $parsed, $args) = @_;
@@ -1532,7 +1532,7 @@ sub do_set_ip_pending {
     my ($conn, $parsed, $args) = @_;
 
     DEBUG "set ip pending";
-    return expand_ip_run($args->{'ip'}, 
+    return expand_ip_run($args->{'ip'},
         sub {
             do_set_ip_generic(-conn    => $conn,
                       -command => 'set_pending',
@@ -1549,7 +1549,7 @@ sub do_set_ip_pending {
 sub do_set_ip_dead {
     my ($conn, $parsed, $args) = @_;
 
-    return expand_ip_run($args->{'ip'}, 
+    return expand_ip_run($args->{'ip'},
         sub {
             do_set_ip_generic(-conn    => $conn,
                       -command => 'set_dead',
@@ -1575,7 +1575,7 @@ sub do_set_ip_alive {
 
     my $mac = $args->{'mac'} ? mac2hex($args->{'mac'}) : undef;
 
-    return expand_ip_run($args->{'ip'}, 
+    return expand_ip_run($args->{'ip'},
         sub {
             do_set_ip_generic(
                 -conn    => $conn,
@@ -1696,7 +1696,7 @@ sub do_param {
         sprintf("$tag= %s\n", 'sweep_skip_alive',
             $$info{sweep_skip_alive}?'yes':'no'),
         sprintf("$tag= %d pkts/sec\n", 'proberate', $$info{proberate}),
-        sprintf("$tag= %s\n", 'learning', 
+        sprintf("$tag= %s\n", 'learning',
             $$info{learning}?"yes ($$info{learning} secs)":'no'),
         sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
         sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
@@ -1713,7 +1713,7 @@ sub get_status {
     my ($conn, $opts) = @_;
 
     my $reply;
-    
+
     if ($conn) {
         $reply = check_send_command($conn, 'get_status') or return;
     }
@@ -1912,10 +1912,10 @@ sub do_load_status {
     }
     $fh->close;
     verbose(" ok\n");
-    
+
     verbose("checking and setting states\n");
 
-    my %ip_stats   = (ALIVE=>0, STATIC=>0, DEAD=>0, 
+    my %ip_stats   = (ALIVE=>0, STATIC=>0, DEAD=>0,
                       TOTAL=>0, PENDING=>0, CHANGED=>0);
     for my $ip (sort { $a cmp $b } keys %state_table) {
         $ip_stats{'TOTAL'}++;
@@ -2258,7 +2258,7 @@ Execute:
 
 That is, the daemon is told to clear the state information, so the next
 ARP for that address will put it in a C<PENDING> state.
-    
+
 =back
 
 The handling of C<DEAD> state information in the dump file allows us to load
@@ -2273,7 +2273,7 @@ seconds between probes, display response RTT per probe and
 a summary at the end. Can be stopped by an interrupt signal
 (C<Ctrl-C>).
 
-=item B<probe> [B<--delay>=I<sec> | B<--rate>=I<rate>] I<ip-range> 
+=item B<probe> [B<--delay>=I<sec> | B<--rate>=I<rate>] I<ip-range>
 X<probe>
 
 Send broadcast ARP queries (probes) for addresses in I<ip-range>.
