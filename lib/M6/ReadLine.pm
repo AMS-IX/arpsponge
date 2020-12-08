@@ -685,9 +685,9 @@ sub print_output {
     my $curr_fh = select;
     if ($TERM && -t $curr_fh) {
         local($::SIG{PIPE}) = 'IGNORE';
-        open(MORE, "|$PAGER");
-        print MORE $out;
-        close MORE;
+        open my $fh, "|$PAGER";
+        print $fh $out;
+        close $fh;
         $ret = $? == 0;
         $TERM->on_new_line();
     }
