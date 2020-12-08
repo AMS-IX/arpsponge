@@ -202,7 +202,7 @@ sub Main {
     my $exit = 0;
     if (@$args) {
         if ($opt_quiet) {
-            open STDOUT, ">/dev/null";
+            open STDOUT, '>', '/dev/null';
         }
         do_command(join(' ', @$args), $CONN);
         $exit = $ERR != 0;

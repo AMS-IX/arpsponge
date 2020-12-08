@@ -21,6 +21,8 @@ use Pod::Usage;
 use FindBin;
 use Config;
 
+use IPC::Run qw( run );
+
 use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
                   pcap_get_selectable_fd pcap_setnonblock );
 
@@ -1163,9 +1165,17 @@ sub start_daemon($$) {
     my ($sponge, $Pid_File) = @_;
 
     if (-f $Pid_File) {
-        open(PID, "<$Pid_File"); chomp(my $pid = <PID>); close PID;
+        my $pid;
+        if (open my $pid_fh, '<', $Pid_File) {
+            chomp($pid = <$pid_fh>);
+            close $pid_fh;
+        }
         if ($pid) {
-            chomp(my $proc = `ps h -p $pid -o args`);
+            run [qw( ps h -o args -p ), $pid],
+                '<', \undef,
+                '>', \(my $proc = ''),
+                '2>', '/dev/null';
+
             if ($proc =~ /$PROG/) {
                 log_fatal("already running (pid = $pid)\n");
             }
