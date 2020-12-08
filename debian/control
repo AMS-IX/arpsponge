@@ -10,6 +10,7 @@ Build-Depends: debhelper (>= 9),
  libnetaddr-ip-perl (>= 4.028),
  libreadonly-perl (>= 1.02),
  libio-string-perl (>= 1.08),
+ libipc-run-perl (>= 0.92),
  libnet-arp-perl (>= 1.0)
 Standards-Version: 4.3.0.3
 Vcs-Git: https://github.com/AMS-IX/arpsponge.git
@@ -26,6 +27,7 @@ Depends: ${shlibs:Depends}, ${misc:Depends},
  libreadonly-perl (>= 1.02),
  libreadonly-xs-perl (>= 1.04),
  libio-string-perl (>= 1.08),
+ libipc-run-perl (>= 0.92),
  libnet-arp-perl (>= 1.0),
  net-tools,
 Description: Nifty ARP sponge.
