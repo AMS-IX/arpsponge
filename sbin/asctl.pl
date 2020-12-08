@@ -1638,10 +1638,14 @@ sub do_status {
         sprintf("$tag%s\n", 'interface:', $$info{interface}),
         sprintf("$tag%s\n", 'IP:', $$info{ip}),
         sprintf("$tag%s\n", 'MAC:', $$info{mac}),
-        sprintf("$tag%s (in %d secs) [%d]\n", 'next sweep:',
-                format_time($$info{next_sweep}),
+        sprintf("$tag%s", 'next sweep:', format_time($$info{next_sweep})),
+        ($$info{next_sweep} ? 
+            sprintf(" (in %d secs) [%d]",
                 $$info{next_sweep}-$$info{date},
-                $$info{next_sweep}),
+                $$info{next_sweep})
+            : ''
+        ),
+        "\n",
     );
 }
 
