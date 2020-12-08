@@ -1,3 +1,14 @@
+arpsponge (3.20) unstable; urgency=medium
+
+  * get_ip*() fixes.
+     * Use "ip" on Linux instead of "ifconfig", so secondary IP addresses
+       get picked up as well. (Suggested by Jan Kayser <jan@linx.net>.)
+     * Use IPC::Run instead of "open" and backtics.
+  * use modern open() syntax.
+  * Use IPC::Run.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 08 Dec 2020 18:34:52 +0100
+
 arpsponge (3.19) unstable; urgency=medium
 
   [ Steven Bakker ]
