@@ -40,6 +40,7 @@ use M6::ARP::NetPacket  qw( :all );
 use POSIX               qw( strftime );
 use Net::ARP;
 use IO::Select;
+use IPC::Run qw( run );
 
 our $VERSION = 1.07;
 
@@ -274,16 +275,18 @@ sub get_mac {
 #
 ###############################################################################
 sub get_ip_all {
-    my @ip;
 
-    open(IFCONFIG, 'ifconfig -a 2>/dev/null|');
-    while (my $l = <IFCONFIG>) {
-        if ($l =~ /^.*inet (?:addr:)?(\S+)/) {
-            push @ip, ip2hex($1);
-        }
-    }
-    close IFCONFIG;
-    return @ip;
+    my $cmd = $^O =~ /linux/i
+                ? [qw(ip -4 address show)] 
+                : [qw(ifconfig -a)];
+
+    run $cmd,
+        '<', \undef,
+        '>', \(my $stdout),
+        '2>', '/dev/null';
+
+    my @ip_str = $stdout =~ /^.*inet (?:addr:\s*)?([\d\.]+)/mg;
+    return map { ip2hex($_) } @ip_str;
 }
 
 ###############################################################################
@@ -297,12 +300,19 @@ sub get_ip_all {
 sub get_ip {
     my $dev = pop @_;
     if (ref $dev) { $dev = $dev->device }
-    my $ip = `ifconfig $dev 2>/dev/null`;
 
-    if ($ip !~ s/^.*inet (?:addr:)?(\S+).*$/$1/s) {
-        $ip = '0.0.0.0';
-    }
-    return ip2hex($ip);
+
+    my $cmd = $^O =~ /linux/i
+                ? [qw(ip -4 address show dev), $dev, 'primary']
+                : ['ifconfig', $dev];
+
+    run $cmd,
+        '<', \undef,
+        '>', \(my $stdout),
+        '2>', '/dev/null';
+
+    my ($ip_str) = $stdout =~ /^.*inet (?:addr:\s*)?([\d.]+)/m;
+    return ip2hex($ip_str // '0.0.0.0');
 }
 
 ###############################################################################
