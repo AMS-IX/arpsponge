@@ -21,6 +21,7 @@ This is released as free software, see the "Copying" file that came with this so
     * IO::Select
     * IO::Socket
     * IO::String
+    * IPC::Run
     * NetAddr::IP
     * Net::ARP
     * Net::IPv4Addr
@@ -79,5 +80,5 @@ Installing dependencies:
 pkg install gmake \
     perl5 \
     p5-Net-Pcap p5-Readonly p5-NetAddr-IP p5-IO-String \
-    p5-Net-Arp p5-Term-ReadKey p5-Term-ReadLine-Gnu
+    p5-Net-Arp p5-Term-ReadKey p5-Term-ReadLine-Gnu p5-IPC-Run
 ```
