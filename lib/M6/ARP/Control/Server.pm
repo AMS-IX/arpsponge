@@ -551,18 +551,33 @@ sub _cmd_set_arp_update_flags {
 sub _cmd_set_sweep_sec {
     my ($self, $sponge, $cmd, @args) = @_;
 
-    my $sec = is_valid_int($args[0], -min=>1);
+    my $sec = is_valid_int($args[0], -min=>0);
     if (!defined $sec) {
-        return $self->send_error("$cmd <POSITIVE-INT>");
+        return $self->send_error("$cmd <NON-NEGATIVE-INT>");
     }
     $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $sec);
     my $old = $sponge->user('sweep_sec');
     $sponge->user('sweep_sec', $sec);
     my $new = $sponge->user('sweep_sec');
 
-    # See if we need to sweep right now.
-    my $next = $sponge->user('next_sweep') - $old + $new;
-    $sponge->user('next_sweep', $next);
+    my $next_sweep = 0;
+    if ($new >= 1) {
+        # Fix sweep age (threshold) if not previously set.
+        if (!$sponge->user('sweep_age')) {
+            $sponge->user('sweep_age', $new);
+        }
+        # Determine new "next sweep" time.
+        my $old_next = $sponge->user('next_sweep') // 0;
+        if ($old_next > $old) {
+            # Adjust existing setting.
+            $next_sweep = $old_next - $old + $new;
+        }
+        else {
+            # No previous setting; make a brand new one.
+            $next_sweep = time + $new;
+        }
+    }
+    $sponge->user('next_sweep', $next_sweep);
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $new));
 }
 

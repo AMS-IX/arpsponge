@@ -180,7 +180,7 @@ my %Syntax = (
         '$secs'    => { type=>'int', min=>1 }, },
     'set sweep_period $secs' => {
         '?'        => 'Set sweep/probe parameters.',
-        '$secs'    => { type=>'int', min=>1 }, },
+        '$secs'    => { type=>'int', min=>0 }, },
     'set sweep_skip_alive $bool' => {
         '?'        => 'Enable/disable sweeping of ALIVE addresses.',
         '$bool'    => { type=>'bool' }, },
