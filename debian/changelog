@@ -1,3 +1,18 @@
+arpsponge (3.21) unstable; urgency=medium
+
+  * Fix time display if no sweep is set.
+  * Allow sweep to be disabled dynamically.
+     * Allow sweep period (sweep_sec) to be set to 0, disabling sweeping.
+     * Make sure that next_sweep is properly adjusted, especially for
+       "0 to non-0" and "non-0 to 0" transitions.
+     * Make sure that sweep_age is set when sweep_sec is non-zero (set it
+       to sweep_sec if necessary)
+  * Add "debian/arpsponge.links"
+    Create symlinks (/usr/sbin/... -> /usr/local/sbin/...)
+    for backwards compatibility.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 07 Jan 2021 16:18:37 +0100
+
 arpsponge (3.20) unstable; urgency=medium
 
   * get_ip*() fixes.
