@@ -1954,21 +1954,40 @@ F</etc/init.d/@NAME@>. This script looks for the following files:
 
 =over 4
 
-=item F</etc/default/@NAME@/defaults>
+=item F<@ETC_DEFAULT@/@NAME@/defaults>
 
 Contains default options for every sponge instance. The options are
 specified as L<sh(1)|sh> shell variables.
 
-=item F</etc/default/@NAME@/ethX>
+=item F<@ETC_DEFAULT@/@NAME@/interfaces.d/if_name>
 
-Contains a network definition for the sponge on I<ethX>.
+Contains a network definition for the sponge on I<if_name>.
+
+=item F<@ETC_DEFAULT@/@NAME@/ethX> (LEGACY)
+
+Contains a network definition for the sponge on I<ethX>. This is a
+legacy option, because it forces a name format on interfaces. If
+both F<interfaces.d/> and F<ethX> file(s) exist, a warning will be
+emitted, and the contents of F<interfaces.d/> will be used instead.
+
+To migrate from this legacy situation, simply do the following:
+
+    cd @ETC_DEFAULT@
+    mkdir interfaces.d
+    mv eth* interfaces.d
 
 =back
 
-For every I<ethX> file the script finds, it starts a sponge daemon on
-the I<ethX> interface. The sponge daemon will write its status file to
-F<$SPONGE_VAR/ethX/status> and create a control socket in
-F<$SPONGE_VAR/ethX/control>.
+Note that there are two possible locations for interface configuration files.
+The files in the F<interfaces.d> sub-directory are the preferred way to go,
+since it allows any kind of device name: any non-hidden regular file will
+be seen as an interface configuration file.
+
+For every interface configuration file the script finds, it starts a sponge
+daemon on the corresponding interface. The sponge daemon will write its
+status file to F<$SPONGE_VAR/if_name/status> and create a control socket in
+F<$SPONGE_VAR/if_name/control>, where I<if_name> corresponds to the
+interface name.
 
 =head2 Init Variables
 
@@ -2061,8 +2080,9 @@ This specifies the network for which to sponge.
 
 =item I<DEVICE> (optional)
 
-By default, the init script will use I<ethX> as the device name, but this
-can be overridden with the I<DEVICE> variable.
+By default, the init script will use the configuration file's name
+as the device name, but this can be overridden with the I<DEVICE>
+variable.
 
 =back
 
@@ -2074,30 +2094,39 @@ can be overridden with the I<DEVICE> variable.
 
 Init script for the @NAME@.
 
-=item F</etc/default/@NAME@/defaults>
+=item F<@ETC_DEFAULT@/@NAME@/defaults>
 
 Contains default options for the sponge's L<init(1)|init> script.
 
-=item F</etc/default/@NAME@/ethX>
+=item F<@ETC_DEFAULT@/@NAME@/interfaces.d/if_name>
 
-Contains a interface specific options for the sponge on I<ethX>.
+Contains interface specific options for the sponge on I<ethX>.
 This I<must> define the C<NETWORK> variable.
 
-This is used by the sponge's L<init(1)|init> script.
+This is used by the sponge's L<init(1)|init> script, see
+also L<SYSTEM INIT SCRIPT|/SYSTEM INIT SCRIPT>.
 
-=item F<@SPONGE_VAR@/ethX/status>
+=item F<@ETC_DEFAULT@/@NAME@/ethX> (LEGACY)
 
-Status file for the sponge daemon that runs on interface I<ethX>.
+Contains (I<LEGACY>) interface specific options for the sponge on I<ethX>.
+This I<must> define the C<NETWORK> variable.
+
+This is used by the sponge's L<init(1)|init> script, see
+also L<SYSTEM INIT SCRIPT|/SYSTEM INIT SCRIPT>.
+
+=item F<@SPONGE_VAR@/if_name/status>
+
+Status file for the sponge daemon that runs on interface I<if_name>.
 This is set up by the sponge's L<init(1)|init> script.
 
-=item F<@SPONGE_VAR@/ethX/control>
+=item F<@SPONGE_VAR@/if_name/control>
 
 Control socket for L<asctl>(8).
 This is set up by the sponge's L<init(1)|init> script.
 
-=item F<@SPONGE_VAR@/ethX/pid>
+=item F<@SPONGE_VAR@/if_name/pid>
 
-PID file for the sponge daemon that runs on interface I<ethX>.
+PID file for the sponge daemon that runs on interface I<if_name>.
 This is set up by the sponge's L<init(1)|init> script.
 
 =back
