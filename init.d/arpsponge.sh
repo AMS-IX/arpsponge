@@ -8,12 +8,12 @@
 # Short-Description: Starts the arpsponge daemon
 ### END INIT INFO
 
-###############################################################################
-###############################################################################
+#############################################################################
+#############################################################################
 #
 # Start-up script for the arpsponge program.
 #
-###############################################################################
+#############################################################################
 
 if [ -e /lib/lsb/init-functions ]; then
   . /lib/lsb/init-functions
@@ -25,6 +25,7 @@ PATH=/sbin:/bin:/usr/bin:${BINDIR}
 
 PROG=arpsponge
 SPONGE_VAR=@SPONGE_VAR@
+ETC_DEFAULT=@ETC_DEFAULT@
 
 # Program defaults
 export  \
@@ -49,8 +50,11 @@ export  \
         SWEEP_SKIP_ALIVE
 
 # Defaults for all sponges.
-if test -f @ETC_DEFAULT@/${PROG}/defaults ; then
-    . @ETC_DEFAULT@/${PROG}/defaults
+if [ -f "${ETC_DEFAULT}/${PROG}/defaults" ]; then
+    . "${ETC_DEFAULT}/${PROG}/defaults"
+    # Make sure the "defaults" file doesn't accidentally overwrites
+    # our ETC_DEFAULT.
+    ETC_DEFAULT=@ETC_DEFAULT@
 fi
 
 
@@ -70,6 +74,32 @@ eval_bool() {
 fatal() {
     echo "** arpsponge init error:" $@ >&2
     exit 1
+}
+
+
+# opts=$(fix_opts_bool "$opts" "$opt" "$val")
+#
+#   Add "$opt" to "$opts" if "$val" evaluates to true.
+#
+fix_opts_bool() {
+    local opts="$1"
+    local opt="$2"
+    local val="$3"
+    eval_bool "$val" && opts="$opts $opt"
+    echo "$opts"
+}
+
+
+# opts=$(fix_opts "$opts" "$opt" "$val")
+#
+#   Add "$opt=$val" to "$opts" if "$val" has length > 0
+#
+fix_opts() {
+    local opts="$1"
+    local opt="$2"
+    local val="$3"
+    [ -n "$val" ] && opts="$opts $opt=$val"
+    echo "$opts"
 }
 
 
@@ -100,31 +130,25 @@ start_sponge() {
 
         opts="--daemon --rundir=${rundir} --pidfile=${pidfile}"
 
-        eval_bool ${DUMMY_MODE}       && opts="$opts --dummy"
-        eval_bool ${PASSIVE_MODE}     && opts="$opts --passive"
-        eval_bool ${SPONGE_NETWORK}   && opts="$opts --sponge-network"
-        eval_bool ${GRATUITOUS}       && opts="$opts --gratuitous"
-        eval_bool ${SWEEP_SKIP_ALIVE} && opts="$opts --sweep-skip-alive"
-        eval_bool ${SWEEP_AT_START}   && opts="$opts --sweep-at-start"
+        opts=$(fix_opts_bool "$opts" --dummy "${DUMMY_MODE}")
+        opts=$(fix_opts_bool "$opts" --passive "${PASSIVE_MODE}")
+        opts=$(fix_opts_bool "$opts" --sponge-network "${SPONGE_NETWORK}")
+        opts=$(fix_opts_bool "$opts" --gratuitous "${GRATUITOUS}")
+        opts=$(fix_opts_bool "$opts" --sweep-skip-alive "${SWEEP_SKIP_ALIVE}")
+        opts=$(fix_opts_bool "$opts" --sweep-at-start "${SWEEP_AT_START}")
 
-        [ -n "${INIT_MODE}" ]       && opts="$opts --init=${INIT_MODE}"
-        [ -n "${LEARNING}" ]        && opts="$opts --learning=${LEARNING}"
-        [ -n "${QUEUE_DEPTH}" ]     && opts="$opts --queuedepth=${QUEUE_DEPTH}"
-        [ -n "${RATE}" ]            && opts="$opts --rate=${RATE}"
-        [ -n "${PENDING}" ]         && opts="$opts --pending=${PENDING}"
-        [ -n "${SWEEP}" ]           && opts="$opts --sweep=${SWEEP}"
-        [ -n "${PROBERATE}" ]       && opts="$opts --proberate=${PROBERATE}"
-        [ -n "${AGE}" ]             && opts="$opts --age=${AGE}"
-        [ -n "${LOGMASK}" ]         && opts="$opts --logmask=${LOGMASK}"
-        [ -n "${PERMISSIONS}" ]     && opts="$opts --permissions=${PERMISSIONS}"
-
-        if [ -n "${ARP_UPDATE_METHOD}" ]; then
-            opts="$opts --arp-update-method=${ARP_UPDATE_METHOD}"
-        fi
-
-        if [ -n "${FLOOD_PROTECTION}" ]; then
-            opts="$opts --flood-protection=${FLOOD_PROTECTION}"
-        fi
+        opts=$(fix_opts "$opts" --init "${INIT_MODE}")
+        opts=$(fix_opts "$opts" --learning "${LEARNING}")
+        opts=$(fix_opts "$opts" --queuedepth "${QUEUE_DEPTH}")
+        opts=$(fix_opts "$opts" --rate "${RATE}")
+        opts=$(fix_opts "$opts" --pending "${PENDING}")
+        opts=$(fix_opts "$opts" --sweep "${SWEEP}")
+        opts=$(fix_opts "$opts" --proberate "${PROBERATE}")
+        opts=$(fix_opts "$opts" --age "${AGE}")
+        opts=$(fix_opts "$opts" --logmask "${LOGMASK}")
+        opts=$(fix_opts "$opts" --permissions "${PERMISSIONS}")
+        opts=$(fix_opts "$opts" --arp-update-method "${ARP_UPDATE_METHOD}")
+        opts=$(fix_opts "$opts" --flood-protection "${FLOOD_PROTECTION}")
 
         if eval_bool $SPONGE_DEBUG
         then
@@ -147,15 +171,49 @@ start_sponge() {
 
         if [ "$mode" = "re-init" ] && [ -f "${rundir}/status" ]
         then
-            ${BINDIR}/asctl --interface="${DEVICE}" -c load status "${rundir}/status"
+            ${BINDIR}/asctl \
+                --interface="${DEVICE}" \
+                -c load status "${rundir}/status"
         fi
     )
 }
 
+find_legacy_interface_configs() {
+    local config_dir=$1
+    find "$config_dir" \
+        -maxdepth 1 \
+        -type f \
+        -name 'eth*' \
+    | sort 2>/dev/null
+}
+
+find_interface_configs() {
+    local config_dir=$1
+    find "$config_dir" \
+        -maxdepth 1 \
+        -type f \
+        \! -name '.*' \
+    | sort 2>/dev/null
+}
 
 start() {
-    SPONGES=$(find "@ETC_DEFAULT@/${PROG}" \
-                -maxdepth 1 -type f -name 'eth*' 2>/dev/null)
+    local config_dir="$ETC_DEFAULT/${PROG}"
+    SPONGES=$(find_legacy_interface_configs "$config_dir")
+
+    if [ -d "$config_dir/interfaces.d" ]; then
+        # Allow interface configs to be put in "interfaces.d"
+        # sub-directory, so the name can be anything, including
+        # "defaults".
+        if [ -n "$SPONGES" ]; then
+            echo "${PROG}: WARNING: interface configurations" \
+                "will be taken from $config_dir/interfaces.d"
+            echo "${PROG}: WARNING: interface configurations" \
+                "from $config_dir will be ignored: $SPONGES"
+        fi
+        config_dir="$config_dir/interfaces.d"
+        SPONGES=$(find_interface_configs $config_dir)
+    fi
+
     if [ -n "${SPONGES}" ]
     then
         echo "Starting ${PROG}(s):"
@@ -163,6 +221,9 @@ start() {
         do
             start_sponge "$1" ${file}
         done
+    else
+        echo "${PROG}: WARNING: no interface configuration files found in" \
+            "$config_dir -- no ${PROG}(s) started"
     fi
     return 0
 }
