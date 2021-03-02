@@ -166,7 +166,7 @@ start_sponge() {
         printf "  %-10s " "${DEVICE}"
 
         ${BINDIR}/${PROG} ${opts} ${NETWORK} dev "${DEVICE}" 2>/dev/null
-    
+
         [ $? -eq 0 ] && echo "[Ok]" || echo "[FAILED]"
 
         if [ "$mode" = "re-init" ] && [ -f "${rundir}/status" ]
@@ -305,7 +305,7 @@ status() {
                     else
                         echo "[Ok]"
                     fi
-                else 
+                else
                     retval=1
                     echo "[FAILED]"
                 fi
