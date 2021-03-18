@@ -157,19 +157,20 @@ per minute.
 #   n / (Tn - T1)
 #
 # Where "n" is the number of entries, "T1" is the timestamp
-# of the first entry and "Tn" is the n-th timestamp.
+# of the first entry, and "Tn" is the n-th timestamp.
 #
-# However, this skews the calculation somewhat (the shorter the queue the
-# worse the skew... hey that rhymes!).
+# However, this skews the calculation somewhat (the shorter the queue, the
+# worse the skew... hey, that rhymes!).
 #
 # Consider the case where we send a packet once every second:
 #
 #   Packet 1 at time 0
 #   Packet 2 at time 1
 #
-# In the queue we now have two entries with timestamps 0 and 1. Using the
-# above formula, we get a rate of _two_ packets per second... That's clearly
-# wrong. Even worse, the rate slowly aproaches 1 the further we go:
+# In the queue we now have two entries, with timestamps 0 and 1, resp.
+# Using the above formula, we get a rate of _two_ packets per second!
+# That's clearly wrong. Even worse, the rate slowly aproaches 1 the
+# further we go:
 #
 #   Packet   3 at time  2 => rate = 1.5
 #   Packet   4 at time  3 => rate = 1.3333
@@ -191,7 +192,7 @@ per minute.
 #
 sub rate {
     my $q = $_[0]->get_queue($_[1]);
-    return undef unless defined($q) && @$q > 1;
+    return undef if !defined($q) || @$q <= 1;
     my $first = $q->[0]->[1];
     my $last  = $q->[$#$q]->[1];
     my $time  = ($first < $last) ? $last-$first : 1;
