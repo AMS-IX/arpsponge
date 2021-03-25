@@ -164,16 +164,14 @@ sub check_bool_arg {
 
     my $argname = $spec->{name} // 'bool';
 
-    if ($arg =~ /^(1|yes|true|on)$/i) {
-        return clear_error(1);
+    my $err;
+
+    my $val = is_valid_bool($arg, -err => \$err);
+    if (defined $val) {
+        return clear_error($val);
     }
 
-    if ($arg =~ /^(0|no|false|off)$/i) {
-        return clear_error(0);
-    }
-
-    return print_error_cond(!$silent,
-                qq{$argname: "$arg" is not a valid boolean});
+    return print_error_cond(!$silent, qq{$argname: "$arg": $err});
 }
 
 sub check_ip_address_arg {

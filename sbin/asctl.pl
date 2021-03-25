@@ -49,6 +49,8 @@ my $CONN            = undef;
 my $ERR             = 0;
 my $STATUS          = {};
 
+my $MAX_DUMP_AGE    = 60;
+
 my $DFL_PROBE_DELAY = 0.1;
 my $MIN_PROBE_DELAY = 0.001;
 my $DFL_PROBE_RATE  = 1/$DFL_PROBE_DELAY;
@@ -133,6 +135,9 @@ my %Syntax = (
     'set ip $ip dead'   => {
         '?'       => 'Sponge given IP(s).',
         '$ip'      => { type=>'ip-range'  } },
+    'set ip $ip static'   => {
+        '?'        => 'Mark given IP(s) as statically sponged.',
+        '$ip'      => { type=>'ip-range'  } },
     'set ip $ip pending $pending?' => {
         '?'        => 'Set given IP(s) to pending state'
                     . ' <pending> (default 0).',
@@ -174,6 +179,12 @@ my %Syntax = (
         '$secs'    => { type=>'int', min=>0 }, },
     'set dummy $bool' => {
         '?'        => 'Enable/disable DUMMY mode.',
+        '$bool'    => { type=>'bool' }, },
+    'set passive $bool' => {
+        '?'        => 'Enable/disable PASSIVE mode.',
+        '$bool'    => { type=>'bool' }, },
+    'set static $bool' => {
+        '?'        => 'Enable/disable STATIC mode.',
         '$bool'    => { type=>'bool' }, },
     'set sweep_age $secs' => {
         '?'        => 'Set sweep/probe parameters.',
@@ -285,6 +296,65 @@ sub do_command {
 }
 
 #############################################################################
+sub expand_ip_chunk {
+    my ($name, $ip_s, $silent) = @_;
+
+    my ($lo_s, $hi_s);
+
+    if ($ip_s !~ m{/\d+$}) {
+        ($lo_s, $hi_s) = split(/-/, $ip_s, 2);
+
+        check_ip_address_arg({name=>$name}, $lo_s, $silent) or return;
+        my $lo = ip2int($lo_s);
+        DEBUG "lo: <$lo_s> $lo";
+        my $hi;
+        if ($hi_s) {
+            check_ip_address_arg({name=>$name}, $hi_s, $silent) or return;
+            $hi = ip2int($hi_s);
+            DEBUG "hi: <$hi_s> $hi";
+        }
+        if ($hi < $lo) {
+            $silent or print_error(
+                        qq{$name: "$lo_s-$hi_s" is not a valid IP range});
+            return;
+        }
+        return [$lo_s, $hi_s, $lo, $hi // $lo];
+    }
+
+    my $cidr = NetAddr::IP->new($ip_s);
+    if (!$cidr) {
+        $silent or print_error(
+                qq{$name: "$ip_s" is not a valid IP range});
+        return;
+    }
+    if (!$M6::ReadLine::IP_NETWORK->contains($cidr)) {
+        $silent or print_error(
+                qq{$name: $ip_s is out of range }
+                . $M6::ReadLine::IP_NETWORK->cidr
+        );
+        return;
+    }
+
+    $lo_s = $cidr->first == $M6::ReadLine::IP_NETWORK->first
+        ? $cidr->first->addr
+        : $cidr->network->addr;
+
+    $hi_s = $cidr->last == $M6::ReadLine::IP_NETWORK->last
+        ? $cidr->last->addr
+        : $cidr->broadcast->addr;
+
+    return [$lo_s, $hi_s, ip2int($lo_s), ip2int($hi_s)];
+}
+
+#############################################################################
+# Expand the $arg_str as an IP address range:
+#
+#   192.168.0.4, 192.168.0.5 .. 192.168.0.8
+#   192.168.0.4 - 192.168.0.8
+#   192.168.0.4 .. 192.168.0.8
+#   192.168.0.4/30, 192.168.0.8
+#
+#############################################################################
 sub expand_ip_range {
     my ($arg_str, $name, $silent) = @_;
 
@@ -297,25 +367,8 @@ sub expand_ip_range {
 
     my @list;
     for my $ip_s (@args) {
-        my ($lo_s, $hi_s) = split(/-/, $ip_s, 2);
-
-        check_ip_address_arg({name=>$name}, $lo_s, $silent) or return;
-        my $lo = ip2int($lo_s);
-        DEBUG "lo: <$lo_s> $lo";
-        my $hi;
-        if ($hi_s) {
-            check_ip_address_arg({name=>$name}, $hi_s, $silent) or return;
-            $hi = ip2int($hi_s);
-            DEBUG "hi: <$hi_s> $hi";
-        }
-        else { $hi = $lo; }
-
-        if ($hi < $lo) {
-            $silent or print_error(
-                        qq{$name: "$lo_s-$hi_s" is not a valid IP range});
-            return;
-        }
-        push @list, [ $lo, $hi, $lo_s, $hi_s ];
+        my $chunk = expand_ip_chunk($name, $ip_s, $silent) or return;
+        push @list, $chunk;
     }
     return \@list;
 }
@@ -1314,10 +1367,10 @@ sub do_set_generic {
     elsif ($type eq 'boolean') {
         $old = $old ? 'yes' : 'no';
         $new = $new ? 'yes' : 'no';
-        $type = '%s';
+        $fmt = '%s';
     }
     elsif ($type eq 'int') {
-        $type = '%d';
+        $fmt = '%d';
     }
     elsif ($type eq 'float') {
         $fmt = '%0.2f';
@@ -1445,6 +1498,30 @@ sub do_set_dummy {
                    -type    => 'bool');
 }
 
+# cmd: set passive
+sub do_set_passive {
+    my ($conn, $parsed, $args) = @_;
+
+    do_set_generic(-conn    => $conn,
+                   -name    => 'passive',
+                   -command => 'set_passive_mode',
+                   -val     => $args->{'bool'},
+                   -options => $args->{-options},
+                   -type    => 'bool');
+}
+
+# cmd: set static
+sub do_set_static {
+    my ($conn, $parsed, $args) = @_;
+
+    do_set_generic(-conn    => $conn,
+                   -name    => 'static',
+                   -command => 'set_static_mode',
+                   -val     => $args->{'bool'},
+                   -options => $args->{-options},
+                   -type    => 'bool');
+}
+
 # cmd: set sweep period
 sub do_set_sweep_period {
     my ($conn, $parsed, $args) = @_;
@@ -1560,6 +1637,21 @@ sub do_set_ip_dead {
     );
 }
 
+# cmd: set ip static
+sub do_set_ip_static {
+    my ($conn, $parsed, $args) = @_;
+
+    return expand_ip_run($args->{'ip'},
+        sub {
+            do_set_ip_generic(-conn    => $conn,
+                      -command => 'set_static',
+                      -name    => 'state',
+                      -ip      => hex2ip($_[0]),
+                      -options => $args->{-options});
+        }
+    );
+}
+
 # cmd: sponge
 sub do_sponge { &do_set_ip_dead }
 
@@ -1649,6 +1741,15 @@ sub do_status {
     );
 }
 
+# $bool = get_static_mode();
+sub get_static_mode {
+    my $conn = shift;
+    my $raw = check_send_command($conn, 'get_param') or return;
+
+    my ($opts, $reply, $output, $tag) = parse_server_reply($raw, {raw=>1});
+    return $output->[0]->{static};
+}
+
 # $flags_integer = get_arp_update_flags();
 sub get_arp_update_flags {
     my $conn = shift;
@@ -1703,6 +1804,8 @@ sub do_param {
         sprintf("$tag= %s\n", 'learning',
             $$info{learning}?"yes ($$info{learning} secs)":'no'),
         sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
+        sprintf("$tag= %s\n", 'passive', $$info{passive}?'yes':'no'),
+        sprintf("$tag= %s\n", 'static', $$info{static}?'yes':'no'),
         sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
         sprintf("$tag= %s\n", 'log_level', $$info{log_level}),
         sprintf("$tag= %s\n", 'log_mask', $$info{log_mask}),
@@ -1856,15 +1959,16 @@ sub do_load_status {
         ) or return;
 
     my $fname = $args->{'file'};
-    my $fh = IO::File->new("<$fname")
-                or return print_error("cannot read $fname: $!");
+
+    open my $fh, '<', $fname
+        or return print_error("cannot read $fname: $!");
 
     my $mtime = ($fh->stat)[9];
 
-    if ($mtime + 60 < time) {
+    if ($mtime + $MAX_DUMP_AGE < time) {
         print_error("** status file $fname\n",
                     "** timestamp [", format_time($mtime), "]",
-                    " older than 60 seconds");
+                    " older than $MAX_DUMP_AGE seconds");
 
         my $load = 0;
         if ($opts->{force}) {
@@ -1884,66 +1988,55 @@ sub do_load_status {
         }
     }
 
-    verbose("getting current state table...");
+    verbose("getting current state table...\n");
 
     my ($curr_state_table, $curr_stats) = get_state_table($conn);
+    return if !$curr_state_table;
 
-    verbose(" ok\n");
+    verbose("reading state table(s) from $fname...\n");
+    my ($state_table, $arp_table) = read_state_table_from_file($fname, $fh);
+    return if !$state_table;
 
-    my $parse_state = 'none';
-    my %state_table = ();
-    my %arp_table   = ();
-
-    verbose("reading state tables...");
-    local($_);
-    while ($_ = $fh->getline) {
-        if (/^<STATE>$/)          { $parse_state = 'state' }
-        elsif (/^<ARP-TABLE>$/)   { $parse_state = 'arp'   }
-        elsif (/^<\/[\w-]+>$/)    { $parse_state = 'none'  }
-        elsif ($parse_state eq 'state' &&
-            /^([\d\.]+) \s+ ([A-Z]+) \s+ \d+ \s+ \d+\.\d+ \s+ \S+[\@\s]\S+$/x) {
-            my $ip = ip2hex($1);
-            $state_table{$ip} = $2;
-        }
-
-        elsif ($parse_state eq 'arp' &&
-                /^([a-f\d\:]+) \s+ ([\d\.]+) \s+ \d+ \s+ \S+[\@\s]\S+$/x) {
-            my ($mac, $ip) = (mac2hex($1), ip2hex($2));
-            if (exists $state_table{$ip} && $state_table{$ip} eq 'ALIVE') {
-                $arp_table{$ip} = $mac;
-            }
-        }
-    }
-    $fh->close;
-    verbose(" ok\n");
 
     verbose("checking and setting states\n");
 
+    my $is_static_mode = get_static_mode($conn);
+
     my %ip_stats   = (ALIVE=>0, STATIC=>0, DEAD=>0,
                       TOTAL=>0, PENDING=>0, CHANGED=>0);
-    for my $ip (sort { $a cmp $b } keys %state_table) {
+
+    for my $ip (sort { $a cmp $b } keys %$state_table) {
         $ip_stats{'TOTAL'}++;
-        $ip_stats{$state_table{$ip}}++;
-        $$curr_state_table{$ip} //= 'DEAD';
-        if ($$curr_state_table{$ip} eq $state_table{$ip}) {
+        $ip_stats{$$state_table{$ip}}++;
+        $$curr_state_table{$ip} //= 'NONE';
+        if ($$curr_state_table{$ip} eq $$state_table{$ip}) {
             #verbose "no change ", hex2ip($ip), "\n";
             next;
         }
-        foreach ($state_table{$ip}) {
+        foreach ($$state_table{$ip}) {
             if ($_ eq 'ALIVE') {
                 $ip_stats{'CHANGED'}++;
                 do_set_ip_generic(
                     -conn    => $conn,
                     -command => 'set_alive',
                     -name    => 'state',
-                    -val     => $arp_table{$ip},
+                    -val     => $$arp_table{$ip},
                     -ip      => hex2ip($ip),
                     -options => [],
                 )
             }
+            elsif ($_ eq 'STATIC') {
+                $ip_stats{'CHANGED'}++;
+                check_send_command($conn, "set_static $ip");
+            }
             elsif ($_ eq 'DEAD') {
                 $ip_stats{'CHANGED'}++;
-                check_send_command($conn, "clear_ip $ip");
+                if ($is_static_mode) {
+                    check_send_command($conn, "set_dead $ip");
+                }
+                else {
+                    check_send_command($conn, "clear_ip $ip");
+                }
             }
         }
     }
@@ -1965,6 +2058,153 @@ sub do_load_status {
                  " pending=$$curr_stats{PENDING}",
                  " changed=$ip_stats{CHANGED}",
         );
+}
+
+sub read_state_table_from_file {
+    my ($fname, $fh) = @_;
+
+    if (!$fh) {
+        open $fh, '<', $fname or return print_error("cannot read $fname: $!");
+    }
+
+    my $input = do {
+        local($/) = undef;
+        $fh->getline;
+    };
+
+    if ($input =~ /^\s*<STATUS>\s*\n/s) {
+        return parse_classic_status($input);
+    }
+    if ($input =~ /^\s*\{/s) {
+        return parse_json_status($input, $fname);
+    }
+    if ($input =~ /^(\s*(?:#[^\n]*)?\n)*---\n/) {
+        return parse_yaml_status($input, $fname);
+    }
+
+    return print_error("$fname: unknown format");
+}
+
+sub parse_json_status {
+    my ($input, $fname) = @_;
+    
+    my $data = eval { decode_json($input) };
+
+    if (my $err = $@) {
+        chomp($err);
+        $err =~ s/(, at character offset \d+.*?) at .*? line \d+\.$/$1/;
+        my ($off) = $err =~ /, at character offset (\d+)/;
+        my $good_input = substr($input, 0, $off);
+        my $newlines = $good_input =~ tr/\n//;
+        my $lineno = $newlines + 1;
+        my $col = $off - length($good_input) + 1;
+        $err =~ s/, at character offset \d+/, at line $lineno, column $col/;
+        $err .= "\n   Line: $lineno\n   Column: $col";
+        return print_error("JSON Error: $err\n\n** cannot load '$fname'");
+    }
+
+    return (
+        expand_state_table(
+            $data->{"arpsponge.state-table"},
+            "$fname/arpsponge.state-table",
+        ),
+        expand_arp_table(
+            $data->{"arpsponge.arp-table"},
+            "$fname/arpsponge.state-table",
+        ),
+    );
+}
+
+sub parse_yaml_status {
+    my ($input, $fname) = @_;
+    
+    my $data = eval { YAML::Load($input) };
+
+    if (my $err = $@) {
+        $err =~ s/at \S+ line \d+\.$//;
+        $err =~ s/\n+$//;
+        return print_error("$err\n\n** cannot load '$fname'\n");
+    }
+    return (
+        expand_state_table(
+            $data->{"arpsponge.state-table"},
+            "$fname/arpsponge.state-table"
+        ),
+        expand_state_table(
+            $data->{"arpsponge.arp-table"},
+            "$fname/arpsponge.state-table"
+        ),
+    );
+}
+
+sub expand_state_table {
+    my ($table, $varname) = @_;
+
+    return {} if !$table;
+
+    # The keys in the state table can be IP addresses or IP ranges.
+    # We should sort by least specific -> most specific first.
+    my @chunks_by_size;
+    while (my ($key, $state) = each %$table) {
+        my @ip_list = split(/\s*,\s*/, $key);
+        for my $ip_s (@ip_list) {
+            my $chunk = expand_ip_range($ip_s, $varname) or return;
+            my $chunk_size = $chunk->[3] - $chunk->[2] + 1;
+            push @$chunk, $state;
+            push @{$chunks_by_size[$chunk_size]}, $chunk;
+        }
+    }
+    my %new_table;
+    for my $chunk_list (reverse grep { defined } @chunks_by_size) {
+        for my $chunk (@$chunk_list) {
+            my ($lo_s, $hi_s, $lo, $hi, $state) = @$chunk;
+            for (my $ip_i = $lo; $ip_i <= $hi; $ip_i++) {
+                $new_table{int2ip($ip_i)} = $state;
+            }
+        }
+    }
+    return \%new_table;
+}
+
+sub parse_classic_status {
+    my ($input) = @_;
+    local($_);
+
+    my $parse_state = 'none';
+    my %state_table = ();
+    my %arp_table   = ();
+
+    foreach (split(/\n/, $input)) {
+        if (/^<\/[\w-]+>$/) {
+            $parse_state = 'none';
+            next;
+        }
+        if (/^<STATE>$/) {
+            $parse_state = 'state';
+            next;
+        }
+        if (/^<ARP-TABLE>$/) {
+            $parse_state = 'arp';
+            next;
+        }
+
+        if ($parse_state eq 'state' &&
+            /^([\d\.]+) \s+ ([A-Z]+) \s+ \d+ \s+ \d+\.\d+ \s+ \S+[\@\s]\S+$/x) {
+            my $ip = ip2hex($1);
+            $state_table{$ip} = $2;
+            next;
+        }
+
+        if ($parse_state eq 'arp' &&
+                /^([a-f\d\:]+) \s+ ([\d\.]+) \s+ \d+ \s+ \S+[\@\s]\S+$/x) {
+            my ($mac, $ip) = (mac2hex($1), ip2hex($2));
+            if (exists $state_table{$ip} && $state_table{$ip} eq 'ALIVE') {
+                $arp_table{$ip} = $mac;
+            }
+            next;
+        }
+    }
+    return (\%state_table, \%arp_table);
 }
 
 ###############################################################################
@@ -2215,9 +2455,59 @@ Both I<dst_ip> and I<src_ip> can be I<$ip-filter> arguments.
 =item B<load status> [B<--force>] I<file>
 X<load status>
 
-Load IP/ARP state from I<file>. The I<file> should be a dump file previously
-created by the daemon's dump facility (see also "L<dump status|/dump status>"
-above).
+Load IP/ARP state from I<file>. The I<file> should be in one of three formats:
+
+=over
+
+=item * B<arpsponge dump format>
+
+A dump file previously created by the daemon's dump facility
+(see also "L<dump status|/dump status>" above).
+
+=item * B<YAML>
+
+A YAML file with the following structure:
+
+    ---
+    arpsponge.state-table:
+        IP: STATE
+        ...
+
+    arpsponge.arp-table:
+        IP: MAC
+        ...
+
+=item * B<JSON>
+
+A JSON file with the following structure:
+
+    {
+        "arpsponge.state-table" : {
+            "IP" : "STATE",
+            ...
+        },
+        "arpsponge.arp-table" : {
+            "IP" : "MAC",
+            ...
+        }
+    }
+
+=back
+
+For the YAML and JSON formats, I<IP> can be a single IP address
+or a range. Examples:
+
+    # Single address:
+        192.168.0.1
+    
+    # CIDR notation:
+        192.168.0.0/24
+
+    # Range notation:
+        192.168.0.0-192.168.0.255
+
+The I<STATE> is one of C<STATIC>, C<DEAD>, C<ALIVE>, C<PENDING(N)>,
+where I<N> is a non-negative integer.
 
 By default, a dump file that's older than 60 seconds is ignored, since it is
 likely to contain stale information, unless B<--force> is given.
@@ -2256,18 +2546,41 @@ If we have:
   91.200.17.3   DEAD       0    0.000     2011-07-05@17:15:45
   </STATE>
 
-Execute:
+=over
+
+=item *
+
+In static mode, execute:
+
+  set ip 91.200.17.3 dead
+
+=item *
+
+In non-static mode, execute:
 
   clear ip 91.200.17.3
 
 That is, the daemon is told to clear the state information, so the next
-ARP for that address will put it in a C<PENDING> state.
+ARP for that address will put it in a C<PENDING(0)> state.
 
 =back
 
 The handling of C<DEAD> state information in the dump file allows us to load
 relatively old data, without resulting in sponging of active addresses, while
 still allowing quick discovery of the still-dead addresses.
+
+=item B<STATIC>
+
+Execute:
+
+  set ip 91.200.17.3 static
+
+
+=item B<PENDING>(I<N>)
+
+Ignored.
+
+=back
 
 =item B<ping> [[I<count> [I<delay>]]
 X<ping>

@@ -33,6 +33,7 @@ BEGIN {
             int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
             format_time relative_time hex_addr_in_net
             is_valid_int is_valid_float is_valid_ip
+            is_valid_bool
             arpflags2int int2arpflags
         );
     our @EXPORT    = ();
@@ -71,6 +72,8 @@ M6::ARP::Util - IP, MAC, misc. utility routines
  $chance = is_valid_float($some_string, -min=>0, -max=>1, -inclusive=>1);
 
  $ip_string = is_valid_ip($some_string, -network=>'192.168.1.0/24');
+
+ $bool = is_valid_bool($some_expr);
 
 =head1 DESCRIPTION
 
@@ -411,6 +414,54 @@ sub is_valid_float {
 
     ${$opts{-err}} = '';
     return $num;
+}
+
+###############################################################################
+
+=item B<is_valid_bool> ( I<ARG> [, -err => I<REF> ] )
+X<is_valid_bool>
+
+Check whether I<ARG> is defined and represents a valid boolean value.
+Acceptable values are:
+
+=over
+
+=item I<true>:
+
+C<true>, C<yes>, C<on>, I<integer E<gt> 0>.
+
+=item I<false>:
+
+C<false>, C<no>, C<off>, I<integer E<lt>= 0>.
+
+=back
+
+Returns C<1> for I<true>, C<0> for I<false>, or I<undef> on error.
+
+If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
+contain a diagnostic.
+
+=cut
+
+sub is_valid_bool {
+    my ($arg, @opt) = @_;
+    my $err_s;
+    my %opts = (-err => \$err_s, @opt);
+
+    if (!defined $arg || length($arg) == 0) {
+        ${$opts{-err}} = q/not a valid boolean/;
+        return;
+    }
+
+    if ($arg =~ /^(?:[+-]?)\d+$/) {
+        return int($arg)>0 ? 1 : 0;
+    }
+
+    return 1 if $arg =~ /^true|yes|on$/i;
+    return 0 if $arg =~ /^false|no|off$/i;
+
+    ${$opts{-err}} = qq/not a valid boolean/;
+    return;
 }
 
 ###############################################################################

@@ -45,6 +45,7 @@ export  \
         QUEUE_DEPTH \
         RATE \
         SPONGE_NETWORK \
+        STATIC_MODE \
         SWEEP \
         SWEEP_AT_START \
         SWEEP_SKIP_ALIVE
@@ -132,6 +133,7 @@ start_sponge() {
 
         opts=$(fix_opts_bool "$opts" --dummy "${DUMMY_MODE}")
         opts=$(fix_opts_bool "$opts" --passive "${PASSIVE_MODE}")
+        opts=$(fix_opts_bool "$opts" --static "${STATIC_MODE}")
         opts=$(fix_opts_bool "$opts" --sponge-network "${SPONGE_NETWORK}")
         opts=$(fix_opts_bool "$opts" --gratuitous "${GRATUITOUS}")
         opts=$(fix_opts_bool "$opts" --sweep-skip-alive "${SWEEP_SKIP_ALIVE}")
