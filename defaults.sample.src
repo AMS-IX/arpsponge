@@ -64,6 +64,11 @@ LOGMASK=all
 #
 # 	NETWORK=prefix/len
 #
+# Optional:
+#
+#   STATIC_STATE_FILE=config_file_path
+#   DEVICE=ifname
+#
 # e.g.:
 #
 #	echo "NETWORK=192.168.1.0/24" > /etc/default/arpsponge/interfaces.d/eth0
@@ -77,5 +82,7 @@ LOGMASK=all
 #
 # Each of the variables above can be specified too and will be used
 # for this single instance of the sponge only.
+#
+# See also the arpsponge(8) man page.
 #
 #############################################################################
