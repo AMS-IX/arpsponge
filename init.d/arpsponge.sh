@@ -44,6 +44,7 @@ export  \
         PROBERATE \
         QUEUE_DEPTH \
         RATE \
+        SOCKET_PERMISSIONS \
         SPONGE_NETWORK \
         STATIC_MODE \
         SWEEP \
@@ -139,6 +140,7 @@ start_sponge() {
         opts=$(fix_opts_bool "$opts" --sweep-skip-alive "${SWEEP_SKIP_ALIVE}")
         opts=$(fix_opts_bool "$opts" --sweep-at-start "${SWEEP_AT_START}")
 
+        opts=$(fix_opts "$opts" --permissions "${SOCKET_PERMISSIONS}")
         opts=$(fix_opts "$opts" --init "${INIT_MODE}")
         opts=$(fix_opts "$opts" --learning "${LEARNING}")
         opts=$(fix_opts "$opts" --queuedepth "${QUEUE_DEPTH}")
