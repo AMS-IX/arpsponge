@@ -1,3 +1,22 @@
+arpsponge (3.22~2.gbpfc750a) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @fc750ae1c07a39e360914b04ed8ca8aa4ff45781 **
+
+  * Add feature of "interfaces.d" to init script and do some refactoring.
+  * Eliminate trailing spaces in init script.
+  * Update arpsponge POD with init changes.
+  * Fix comments for "rate" method, and refactor "return undef" logic.
+  * Initial commit for static mode support.
+  * Get static mode to working state.
+  * Add STATIC_MODE in defaults; fix per-interface section.
+  * Add SOCKET_PERMISSIONS handling
+  * Add dependencies for FreeBSD.
+  * Add STATIC/PASSIVE mode config information.
+  * Add STATIC_STATE_FILE.
+  * Remove SOCKET_PERMISSIONS again, add STATIC_STATE_FILE
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Fri, 26 Mar 2021 18:29:59 +0100
+
 arpsponge (3.21) unstable; urgency=medium
 
   * Fix time display if no sweep is set.
