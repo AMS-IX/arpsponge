@@ -2072,6 +2072,10 @@ How many seconds to spend in learning mode.
 
 The argument to C<--pending>.
 
+=item I<PASSIVE_MODE> (boolean)
+
+Whether or not to turn on the L<--passive|/--passive> flag.
+
 =item I<PERMISSIONS>
 
 The argument to C<--permissions>.
@@ -2094,6 +2098,10 @@ Directory root that holds state information for the various sponge
 instances. The script will create the directory if it doesn't exist yet.
 Together with the interface (I<$INTERFACE>) this is used to specify the
 I<rundir> to the sponge ("B<--rundir>=I<$SPONGE_VAR>/I<$INTERFACE>").
+
+=item I<STATIC_MODE> (boolean)
+
+Whether or not to turn on the L<--static|/--static> flag.
 
 =item I<SWEEP>
 
@@ -2122,6 +2130,14 @@ This specifies the network for which to sponge.
 By default, the init script will use the configuration file's name
 as the device name, but this can be overridden with the I<DEVICE>
 variable.
+
+=item I<STATIC_STATE_FILE> (string)
+
+If I<STATIC_MODE> is true, this variable can be used to specify
+a file with a status dump to load on (re)start of the ARP sponge.
+
+See L<asctl's "load status" command|"asctl/load status"> for more
+information.
 
 =back
 
