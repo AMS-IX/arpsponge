@@ -35,6 +35,8 @@ use NetAddr::IP;
 use Term::ReadLine;
 use IO::File;
 use Scalar::Util    qw( reftype );
+use YAML qw();
+use JSON qw();
 
 use M6::ARP::Control::Client;
 use M6::ARP::Event     qw( :standard );
@@ -77,7 +79,7 @@ END {
 sub verbose(@) { print @_ if $opt_verbose; }
 sub DEBUG(@)   { print_error(@_) if $opt_debug; }
 
-my @IP_STATES = qw(all alive dead pending none);
+my @IP_STATES = qw(all alive dead pending static none);
 my %Syntax = (
     'quit' => { '?'       => 'Disconnect and quit.', },
     'help' => { '?'       => 'Show command summary.', },
@@ -307,7 +309,7 @@ sub expand_ip_chunk {
         check_ip_address_arg({name=>$name}, $lo_s, $silent) or return;
         my $lo = ip2int($lo_s);
         DEBUG "lo: <$lo_s> $lo";
-        my $hi;
+        my $hi = $lo;
         if ($hi_s) {
             check_ip_address_arg({name=>$name}, $hi_s, $silent) or return;
             $hi = ip2int($hi_s);
@@ -318,7 +320,7 @@ sub expand_ip_chunk {
                         qq{$name: "$lo_s-$hi_s" is not a valid IP range});
             return;
         }
-        return [$lo_s, $hi_s, $lo, $hi // $lo];
+        return [$lo, $hi, $lo_s, $hi_s // $lo_s];
     }
 
     my $cidr = NetAddr::IP->new($ip_s);
@@ -335,15 +337,21 @@ sub expand_ip_chunk {
         return;
     }
 
-    $lo_s = $cidr->first == $M6::ReadLine::IP_NETWORK->first
-        ? $cidr->first->addr
+    my ($cidr_first, $cidr_last, $net_first, $net_last) = (
+        $cidr->first->addr, $cidr->last->addr,
+        $M6::ReadLine::IP_NETWORK->first->addr,
+        $M6::ReadLine::IP_NETWORK->last->addr,
+    );
+    $lo_s = $cidr_first eq $net_first
+        ? $cidr_first
         : $cidr->network->addr;
 
-    $hi_s = $cidr->last == $M6::ReadLine::IP_NETWORK->last
-        ? $cidr->last->addr
+    $hi_s = $cidr_last eq $net_last
+        ? $cidr_last
         : $cidr->broadcast->addr;
 
-    return [$lo_s, $hi_s, ip2int($lo_s), ip2int($hi_s)];
+    print "CHUNK: $lo_s - $hi_s\n";
+    return [ip2int($lo_s), ip2int($hi_s), $lo_s, $hi_s];
 }
 
 #############################################################################
@@ -2088,7 +2096,7 @@ sub read_state_table_from_file {
 sub parse_json_status {
     my ($input, $fname) = @_;
     
-    my $data = eval { decode_json($input) };
+    my $data = eval { JSON::decode_json($input) };
 
     if (my $err = $@) {
         chomp($err);
@@ -2146,10 +2154,11 @@ sub expand_state_table {
     # We should sort by least specific -> most specific first.
     my @chunks_by_size;
     while (my ($key, $state) = each %$table) {
-        my @ip_list = split(/\s*,\s*/, $key);
-        for my $ip_s (@ip_list) {
-            my $chunk = expand_ip_range($ip_s, $varname) or return;
-            my $chunk_size = $chunk->[3] - $chunk->[2] + 1;
+        print "$key: $state\n";
+        my $ip_list = expand_ip_range($key, $varname) or return;
+        for my $chunk (@$ip_list) {
+            print "CHUNK: @$chunk\n";
+            my $chunk_size = $chunk->[1] - $chunk->[0] + 1;
             push @$chunk, $state;
             push @{$chunks_by_size[$chunk_size]}, $chunk;
         }
@@ -2157,9 +2166,9 @@ sub expand_state_table {
     my %new_table;
     for my $chunk_list (reverse grep { defined } @chunks_by_size) {
         for my $chunk (@$chunk_list) {
-            my ($lo_s, $hi_s, $lo, $hi, $state) = @$chunk;
+            my ($lo, $hi, $lo_s, $hi_s, $state) = @$chunk;
             for (my $ip_i = $lo; $ip_i <= $hi; $ip_i++) {
-                $new_table{int2ip($ip_i)} = $state;
+                $new_table{sprintf("%08x", $ip_i)} = $state;
             }
         }
     }

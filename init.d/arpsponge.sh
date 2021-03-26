@@ -290,19 +290,28 @@ status() {
             if [ -f "$pf" ]
             then
                 read pid cruft <"${pf}"
-                iface=$(basename $(dirname "${pf}"))
+                rundir=$(dirname "${pf}")
+                iface=$(basename "${rundir}")
+                socket="${rundir}/control"
+                status="${rundir}/status"
                 printf "  interface=%-10s pid=%-6s " "${iface}" "${pid}"
                 if ps -p "${pid}" > /dev/null 2>&1
                 then
                     if $isroot
                     then
-                        if kill -USR1 "${pid}" 2>/dev/null
-                        then
-                            sleep 1
+                        out=$(
+                            ${BINDIR}/asctl \
+                                --socket="${socket}" \
+                                -c dump status "${status}" \
+                            2>&1
+                        )
+                        if [ $? -eq 0 ]; then
                             echo "[Ok]"
+                            [ -n "$out" ] && echo "  $out"
                         else
                             retval=1
                             echo "[FAILED]"
+                            [ -n "$out" ] && echo "  $out"
                         fi
                     else
                         echo "[Ok]"

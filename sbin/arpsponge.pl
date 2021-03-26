@@ -1266,7 +1266,9 @@ sub do_status {
     $fh->blocking(0);
 
     ##########################################################################
+    $fh->print("<STATUS>\n");
     $fh->print( get_status_info_s($sponge), "\n" );
+    $fh->print("</STATUS>\n");
     ##########################################################################
     my ($state_table_s, $nalive, $ndead, $npending)
             = get_ip_state_table_s($sponge);

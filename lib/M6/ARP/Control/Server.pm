@@ -440,8 +440,8 @@ sub _cmd_set_static {
         "[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
 
     my $old_s = $sponge->state_name($sponge->get_state($ip));
-    $sponge->set_dead($ip);
-    my $new_s = $sponge->state_name(DEAD());
+    $sponge->set_static($ip);
+    my $new_s = $sponge->state_name(STATIC());
     my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
     return $self->send_ok("ip=$ip\nold=$old_s\nnew=$new_s\nrate=$rate");
 }
