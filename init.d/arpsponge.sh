@@ -44,7 +44,6 @@ export  \
         PROBERATE \
         QUEUE_DEPTH \
         RATE \
-        SOCKET_PERMISSIONS \
         SPONGE_NETWORK \
         STATIC_MODE \
         SWEEP \
@@ -54,7 +53,7 @@ export  \
 # Defaults for all sponges.
 if [ -f "${ETC_DEFAULT}/${PROG}/defaults" ]; then
     . "${ETC_DEFAULT}/${PROG}/defaults"
-    # Make sure the "defaults" file doesn't accidentally overwrites
+    # Make sure the "defaults" file doesn't accidentally overwrite
     # our ETC_DEFAULT.
     ETC_DEFAULT=@ETC_DEFAULT@
 fi
@@ -115,6 +114,7 @@ start_sponge() {
         # files do not disturb the global (default) settings.
         DEVICE=$(basename $file)
         unset NETWORK
+        unset STATIC_STATE_FILE
         . $file
 
         [ -n "${DEVICE}" ]  || fatal "$file: no device specified"
@@ -140,7 +140,6 @@ start_sponge() {
         opts=$(fix_opts_bool "$opts" --sweep-skip-alive "${SWEEP_SKIP_ALIVE}")
         opts=$(fix_opts_bool "$opts" --sweep-at-start "${SWEEP_AT_START}")
 
-        opts=$(fix_opts "$opts" --permissions "${SOCKET_PERMISSIONS}")
         opts=$(fix_opts "$opts" --init "${INIT_MODE}")
         opts=$(fix_opts "$opts" --learning "${LEARNING}")
         opts=$(fix_opts "$opts" --queuedepth "${QUEUE_DEPTH}")
@@ -178,6 +177,13 @@ start_sponge() {
             ${BINDIR}/asctl \
                 --interface="${DEVICE}" \
                 -c load status "${rundir}/status"
+        fi
+
+        if eval_bool "${STATIC_MODE}" && [ -n "${STATIC_STATE_FILE}" ]
+        then
+            ${BINDIR}/asctl \
+                --interface="${DEVICE}" \
+                -c load status --force "${STATIC_STATE_FILE}"
         fi
     )
 }
