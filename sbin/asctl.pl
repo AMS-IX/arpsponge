@@ -272,6 +272,13 @@ END {
     exit_readline();
 }
 
+sub print_output_fh {
+    my ($fh, @l) = @_;
+    my $old_fh = select $fh;
+    print_output(@l);
+    select $old_fh;
+}
+
 sub do_command {
     my ($line, $conn) = @_;
     my %args = (-conn => $conn);
@@ -350,7 +357,6 @@ sub expand_ip_chunk {
         ? $cidr_last
         : $cidr->broadcast->addr;
 
-    print "CHUNK: $lo_s - $hi_s\n";
     return [ip2int($lo_s), ip2int($hi_s), $lo_s, $hi_s];
 }
 
@@ -629,15 +635,13 @@ sub expand_ip_run {
 sub Wrap_GetOptionsFromArray {
     my ($arg, $retval, @spec) = @_;
 
-    if (!defined $arg) {
-        return $retval;
-    }
-    elsif (reftype $arg eq 'ARRAY') {
+    return $retval if !defined $arg;
+
+    if (reftype $arg eq 'ARRAY') {
         return GetOptionsFromArray($arg, @spec) ? $retval : undef;
     }
-    else {
-        return $arg;
-    }
+
+    return $arg;
 }
 
 sub do_quit {
@@ -1175,7 +1179,7 @@ sub shared_show_arp_ip {
 #
 #   Returns:
 #
-#       $opts     - The input hash, but with default values filled in.
+#       $opts     - The input $opts hash, but with default values filled in.
 #       $reply    - The server reply (possibly with IP/MAC addresses
 #                   translated).
 #       $output   - A reference to an array of output records. Each
@@ -1188,10 +1192,10 @@ sub parse_server_reply {
     my $opts  = @_ ? shift : {};
 
     %$opts = (
-            'format' => 1,
-            'raw'    => 0,
-            %$opts,
-        );
+        'format' => 1,
+        'raw'    => 0,
+        %{$opts//{}},
+    );
 
     return if !defined $reply;
 
@@ -1694,7 +1698,7 @@ sub do_set_ip_alive {
 sub do_set_ip_mac {
     my ($conn, $parsed, $args) = @_;
 
-    print "set ip $$args{ip} mac $$args{mac}\n";
+    DEBUG "set ip $$args{ip} mac $$args{mac}\n";
     return do_set_ip_alive($conn, $parsed, $args);
 }
 
@@ -1752,28 +1756,22 @@ sub do_status {
 # $bool = get_static_mode();
 sub get_static_mode {
     my $conn = shift;
-    my $raw = check_send_command($conn, 'get_param') or return;
-
-    my ($opts, $reply, $output, $tag) = parse_server_reply($raw, {raw=>1});
-    return $output->[0]->{static};
+    my ($opts, $reply, $output, $tag) = get_param($conn, {raw=>1});
+    return $output->{static};
 }
 
 # $flags_integer = get_arp_update_flags();
 sub get_arp_update_flags {
     my $conn = shift;
-    my $raw = check_send_command($conn, 'get_param') or return;
-
-    my ($opts, $reply, $output, $tag) = parse_server_reply($raw, {raw=>1});
-    return $output->[0]->{arp_update_flags};
+    my ($opts, $reply, $output, $tag) = get_param($conn, {raw=>1});
+    return $output->{arp_update_flags};
 }
 
 # $log_mask_integer = get_log_mask();
 sub get_log_mask {
     my $conn = shift;
-    my $raw = check_send_command($conn, 'get_param') or return;
-
-    my ($opts, $reply, $output, $tag) = parse_server_reply($raw, {raw=>1});
-    return $output->[0]->{log_mask};
+    my ($opts, $reply, $output, $tag) = get_param($conn, {raw=>1});
+    return $output->{log_mask};
 }
 
 sub do_param {
@@ -1820,6 +1818,24 @@ sub do_param {
     );
 }
 
+# ($opts, $reply, $output, $tag_fmt) = get_param($conn, \%opts);
+#
+#   Helper function for status. Combines check_send_command with
+#   parse_server_reply.
+#
+sub get_param {
+    my ($conn, $opts) = @_;
+
+    return if !$conn;
+
+    my $raw = check_send_command($conn, 'get_param') or return;
+
+    ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
+
+    return ($opts, $reply, $output->[0], $tag);
+}
+
+
 # ($output, $tag_fmt) = get_status($conn, \%opts);
 #
 #   Helper function for status. Similar to the ip/arp thing.
@@ -1863,33 +1879,138 @@ sub get_status {
 sub do_dump_status {
     my ($conn, $parsed, $args) = @_;
 
-    if (my $fname = $args->{'file'}) {
-        my $dummy;
-        # Just pre-check options.
-        my $opts = {
-                'header'  => 1,
-                'format'  => 1,
-                'summary' => 1,
-                'raw'     => 0,
-            };
+    my $fname = $args->{'file'};
 
-        $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-                'header!'  => \$opts->{header},
-                'raw!'     => \$opts->{raw},
-                'format!'  => \$opts->{format},
-                'long!'    => sub { $opts->{summary} = !$_[1] },
-                'summary!' => sub { $opts->{summary} = $_[1] },
-                'nf'       => sub { $opts->{format}  = 0  },
-                'nh'       => sub { $opts->{header}  = 0  },
-            ) or return;
+    if (!defined $fname) {
+        # Old-style dumping (by sending a signal to the daemon).
+        Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
+        ($STATUS) = get_status($conn, {raw=>0, format=>1});
+        my $pid = $STATUS->{'pid'};
+        if (!$pid) {
+            verbose("ERROR\n");
+            return print_error("** no running daemon found");
+        }
+        verbose("sending USR1 signal to $pid: ");
+        if (kill 'USR1', $STATUS->{'pid'}) {
+            verbose("ok\n");
+            return print_output("process $pid signalled");
+        }
+        verbose("ERROR\n");
+        return print_error("** cannot signal $pid: $!");
+    }
 
-        $args->{-options} = $opts;
+    # Dump to a file.
 
-        my $out_fh = IO::File->new(">$fname")
-                        or return print_error("cannot write to $fname: $!");
+    # Just pre-check options.
+    my $opts = {
+        'fmt'     => 'native',
+        'format'  => 1,
+        'header'  => 1,
+        'raw'     => 0,
+        'summary' => 1,
+    };
 
-        my $io = IO::String->new();
-        my $oldhandle = select $io;
+    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
+        #'output-format=s' => \$opts->{fmt},
+        'json'     => sub { $opts->{fmt} = 'json' },
+        'yaml'     => sub { $opts->{fmt} = 'yaml' },
+        'native'   => sub { $opts->{fmt} = 'native' },
+        'format!'  => \$opts->{format},
+        'header!'  => \$opts->{header},
+        'long!'    => sub { $opts->{summary} = !$_[1] },
+        'nf'       => sub { $opts->{format}  = 0  },
+        'nh'       => sub { $opts->{header}  = 0  },
+        'raw!'     => \$opts->{raw},
+        'summary!' => sub { $opts->{summary} = $_[1] },
+    ) or return;
+
+    $args->{-options} = $opts;
+    if ($opts->{fmt} !~ /^(json|yaml|native)$/) {
+        return print_error("invalid dump format '$$opts{fmt}'",
+            "; need 'json', 'yaml', or 'native'");
+    }
+    print_output("FMT: $opts->{fmt}\n");
+
+    my $out_fh;
+    if ($fname eq '-') {
+        open $out_fh, '>&', *STDOUT
+            or return print_error("cannot DUP stdout: $!");
+    }
+    else {
+        open $out_fh, '>', $fname
+            or return print_error("cannot write to $fname: $!");
+    }
+
+    my $output_str;
+    if ($opts->{fmt} eq 'native') {
+         $output_str = format_native_status($conn, $parsed, $args);
+    }
+    else {
+
+        (undef, undef, my $param, undef) = get_param($conn);
+
+        my (undef, undef, $ip_output, undef) =
+            shared_show_arp_ip($conn, 'get_ip');
+
+        my %ip_table;
+        for my $entry (@$ip_output) {
+            my $ip = delete $entry->{ip};
+            delete $entry->{hex_ip};
+            $ip_table{$ip} = $entry;
+            for my $attr (qw( rate state_changed queue last_queried )) {
+                $entry->{$attr} += 0;
+            }
+        }
+
+        my (undef, undef, $arp_output, undef) =
+            shared_show_arp_ip($conn, 'get_arp');
+
+        my %arp_table;
+        for my $entry (@$arp_output) {
+            my $ip = delete $entry->{ip};
+            delete $entry->{hex_ip};
+            delete $entry->{hex_mac};
+            $arp_table{$ip} = $entry;
+            for my $attr (qw( mac_changed )) {
+                $entry->{$attr} += 0;
+            }
+        }
+
+        my $data = {
+            'arpsponge.status' => $STATUS,
+            'arpsponge.parameters' => $param,
+            'arpsponge.state-table' => \%ip_table,
+            'arpsponge.arp-table' => \%arp_table,
+        };
+        
+        if ($opts->{fmt} eq 'json') {
+            print_output("JSON!\n");
+            $output_str = JSON->new->pretty->encode($data);
+        }
+        else {
+            print_output("YAML: $$opts{fmt}\n");
+            $output_str = YAML::Dump($data);
+        }
+    }
+
+    print_output_fh($out_fh, $output_str);
+    $out_fh->autoflush(1);
+
+    if (-f $out_fh) {
+        my $size = ($out_fh->stat)[7];
+        print_output("$size bytes written to $fname");
+    }
+    return $out_fh->close;
+}
+
+
+sub format_native_status {
+    my ($conn, $parsed, $args) = @_;
+
+    my $out_buf = '';
+    open my $out_buf_fh, '>', \$out_buf;
+    my $oldhandle = select $out_buf_fh;
+    {
         print_output("<STATUS>");
         do_show_status($conn, $parsed, $args);
         print_output("</STATUS>");
@@ -1908,31 +2029,9 @@ sub do_dump_status {
                 " pending=$$count{PENDING}",
                 " ARP_entries=$arp_count",
         );
-        select $out_fh;
-        print_output(${$io->string_ref});
-        select $oldhandle;
-        $out_fh->autoflush(1);
-        my $size = ($out_fh->stat)[7];
-        if (-f $out_fh) {
-            print_output("$size bytes written to $fname");
-        }
-        return $out_fh->close;
     }
-    else {
-        Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
-        ($STATUS) = get_status($conn, {raw=>0, format=>1});
-        if (my $pid = $STATUS->{'pid'}) {
-            verbose("sending USR1 signal to $pid: ");
-            if (kill 'USR1', $STATUS->{'pid'}) {
-                verbose("ok\n");
-                return print_output("process $pid signalled");
-            }
-            else {
-                verbose("ERROR\n");
-                return print_error("** cannot signal $pid: $!");
-            }
-        }
-    }
+    select $oldhandle;
+    return $out_buf;
 }
 
 # helper: get state table
@@ -2116,9 +2215,9 @@ sub parse_json_status {
             $data->{"arpsponge.state-table"},
             "$fname/arpsponge.state-table",
         ),
-        expand_arp_table(
+        expand_state_table(
             $data->{"arpsponge.arp-table"},
-            "$fname/arpsponge.state-table",
+            "$fname/arpsponge.arp-table",
         ),
     );
 }
@@ -2153,22 +2252,30 @@ sub expand_state_table {
     # The keys in the state table can be IP addresses or IP ranges.
     # We should sort by least specific -> most specific first.
     my @chunks_by_size;
-    while (my ($key, $state) = each %$table) {
-        print "$key: $state\n";
+    while (my ($key, $val) = each %$table) {
         my $ip_list = expand_ip_range($key, $varname) or return;
+
+        if (ref $val) {
+            if (reftype $val ne 'HASH') {
+                return print_error(
+                    "$varname: '$key' should map to a HASH or a SCALAR\n"
+                );
+            }
+            $val = $val->{state} // $val->{mac};
+        }
+
         for my $chunk (@$ip_list) {
-            print "CHUNK: @$chunk\n";
             my $chunk_size = $chunk->[1] - $chunk->[0] + 1;
-            push @$chunk, $state;
+            push @$chunk, $val;
             push @{$chunks_by_size[$chunk_size]}, $chunk;
         }
     }
     my %new_table;
     for my $chunk_list (reverse grep { defined } @chunks_by_size) {
         for my $chunk (@$chunk_list) {
-            my ($lo, $hi, $lo_s, $hi_s, $state) = @$chunk;
+            my ($lo, $hi, $lo_s, $hi_s, $val) = @$chunk;
             for (my $ip_i = $lo; $ip_i <= $hi; $ip_i++) {
-                $new_table{sprintf("%08x", $ip_i)} = $state;
+                $new_table{sprintf("%08x", $ip_i)} = $val;
             }
         }
     }
@@ -2479,11 +2586,17 @@ A YAML file with the following structure:
 
     ---
     arpsponge.state-table:
-        IP: STATE
+        IP1: STATE
+        IP2:
+            state: STATE
+            ...
         ...
 
     arpsponge.arp-table:
         IP: MAC
+        IP:
+            mac: MAC
+            ...
         ...
 
 =item * B<JSON>
@@ -2492,16 +2605,30 @@ A JSON file with the following structure:
 
     {
         "arpsponge.state-table" : {
-            "IP" : "STATE",
+            "IP1" : "STATE",
+            "IP2" : {
+                "state" : "STATE",
+                ...
+            }
             ...
         },
         "arpsponge.arp-table" : {
-            "IP" : "MAC",
+            "IP1" : "MAC",
+            "IP2" : {
+                "mac" : "MAC",
+                ...
+            }
             ...
         }
     }
 
 =back
+
+Note that the table entries can either map an IP key to a single
+(I<STATE> or I<MAC>) string or to a hash with a C<state> or C<mac>
+key. The former format is more convenient for manually maintained
+files, the latter maintains full compatibility with the B<asctl>
+generated dump files.
 
 For the YAML and JSON formats, I<IP> can be a single IP address
 or a range. Examples:
