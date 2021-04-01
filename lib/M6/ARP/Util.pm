@@ -514,23 +514,28 @@ sub is_valid_ip {
 
 =item X<format_time>B<format_time> ( I<TIME> [, I<SEPARATOR>] )
 
-Convert I<TIME> (seconds since epoch) to a "YYYY-mm-dd@HH:MM:SS"
+Convert I<TIME> (seconds since epoch) to an ISO-8601
 string in the local timezone.
 If I<TIME> is undefined or 0, it returns C<never>.
 
 If I<SEPARATOR> is specified, it is used as the string that
-separates the date part from the time part (by default an at-sign: "@").
+separates the date part from the time part (by default C<T>).
 
-Example: format_time(1300891278)
-returns "2011-03-23@15:41:18"
+Example:
+
+    say format_time(1300891278);
+
+Will print:
+
+    2011-03-23T15:41:18+0100
 
 =cut
 
 sub format_time {
     my ($time, $separator) = @_;
     if (defined $time && $time > 0) {
-        $separator //= '@';
-        return strftime("%Y-%m-%d${separator}%H:%M:%S", localtime($time));
+        $separator //= 'T';
+        return strftime("%F${separator}%T%z", localtime($time));
     }
     return 'never';
 }
