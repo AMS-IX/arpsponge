@@ -23,7 +23,7 @@
 
 $0 =~ s|.*/||g;
 
-use feature ':5.10';
+use 5.010;
 use strict;
 use warnings;
 use Getopt::Long    qw( GetOptions GetOptionsFromArray );
@@ -35,8 +35,10 @@ use NetAddr::IP;
 use Term::ReadLine;
 use IO::File;
 use Scalar::Util    qw( reftype );
-use YAML qw();
+use YAML::XS qw();
 use JSON qw();
+
+$YAML::XS::Boolean = 'JSON::PP';
 
 use M6::ARP::Control::Client;
 use M6::ARP::Event     qw( :standard );
@@ -57,6 +59,76 @@ my $DFL_PROBE_DELAY = 0.1;
 my $MIN_PROBE_DELAY = 0.001;
 my $DFL_PROBE_RATE  = 1/$DFL_PROBE_DELAY;
 my $MAX_PROBE_RATE  = 1/$MIN_PROBE_DELAY;
+
+my %ATTR_TYPE = (
+    ( map { $_ => $_ } qw( arp_update_flags log_level log_mask ) ),
+    ( map { $_ => 'ip' } qw( ip tpa spa network ) ),
+    ( map { $_ => 'mac' } qw( mac tha sha ) ),
+    ( map { $_ => 'boolean' } qw(
+        dummy
+        max_pending
+        passive
+        static
+        sweep_skip_alive
+    ) ),
+    ( map { $_ => 'int' } qw(
+        date
+        learning
+        next_sweep
+        pid
+        prefixlen 
+        proberate 
+        queue_depth
+        started
+        sweep_age
+        sweep_period
+    ) ),
+    ( map { $_ => 'int' } qw(
+        max_rate
+        flood_protection
+    ) ),
+);
+
+my %TYPE_CONVERSION_MAP = (
+    arp_update_flags => {
+        convert => sub { join(',', update_flags_to_str($_[0])) },
+        fmt => '%s',
+    },
+    log_level => {
+        convert => \&log_level_to_string,
+        fmt => '%s',
+    },
+    log_mask => {
+        convert => sub { join(',', event_mask_to_str($_[0])) },
+        fmt => '%s',
+    },
+    boolean => {
+        convert => \&int2bool,
+        fmt => '%s',
+    },
+    int => {
+        convert => sub { $_[0] + 0 },
+        fmt => '%d',
+    },
+    float => {
+        convert => sub { $_[0] + 0 },
+        fmt => '%0.2f',
+    },
+    ip => {
+        convert  => \&hex2ip,
+        save_raw => "hex_%s",
+        fmt => '%s',
+    },
+    mac => {
+        convert => \&hex2mac,
+        save_raw => "hex_%s",
+        fmt => '%s',
+    },
+);
+
+my %VALID_OUTPUT_FORMAT = (
+    map { $_ => $_ } qw( json yaml native raw )
+);
 
 # Values set on the Command Line.
 my $opt_quiet     = 0;
@@ -209,7 +281,7 @@ sub Main {
         $CONN = M6::ARP::Control::Client->create_client($sockname)
                     or die "$sockname: ".M6::ARP::Control::Client->error."\n";
     }
-    ($STATUS) = get_status($CONN, {raw=>0, format=>1});
+    ($STATUS) = get_status($CONN);
     verbose "$$STATUS{id}, v$$STATUS{version} (pid #$$STATUS{pid})\n";
 
     my $exit = 0;
@@ -385,6 +457,60 @@ sub expand_ip_range {
         push @list, $chunk;
     }
     return \@list;
+}
+
+#############################################################################
+sub check_output_format {
+    my ($fmt) = @_;
+    $fmt = lc $fmt;
+    if (my $val = $VALID_OUTPUT_FORMAT{$fmt}) {
+        return $val;
+    }
+
+    my @formats = sort keys %VALID_OUTPUT_FORMAT;
+    my $last_fmt = pop @formats;
+
+    my $fmt_list = join('', map { "'$_', " } @formats);
+    $fmt_list .= "or " if length($fmt_list);
+    $fmt_list .= $last_fmt;
+
+    return print_error("invalid format '$fmt'; need $fmt_list");
+}
+
+#############################################################################
+sub int2bool {
+    my ($val) = @_;
+    return $_[0] ? JSON::true : JSON::false;
+    #return $_[0] ? 'true' : 'false';
+}
+
+#############################################################################
+# ($val, $cv) = convert_attr_value($key, $val);
+sub convert_attr_value {
+    my ($key, $val) = @_;
+    $key =~ tr/-/_/;
+
+    my $type = $ATTR_TYPE{$key}
+        or return ($val, { fmt => '%s' });
+
+    my $cv = $TYPE_CONVERSION_MAP{$type}
+        or return ($val, { fmt => '%s' });
+
+    my %cv = (
+        fmt => '%s',
+        %$cv
+    );
+    my $new_v = $cv{convert}->($val);
+    return ($cv{convert}->($val), \%cv);
+}
+
+#############################################################################
+# $s = format_attr_value($key, $val);
+sub format_attr_value {
+    my ($k, $v) = @_;
+    my ($val, $cv) = convert_attr_value($k, $v);
+
+    return sprintf("$$cv{fmt}", $val);
 }
 
 #############################################################################
@@ -882,12 +1008,15 @@ sub do_inform_about {
 }
 
 sub send_single_inform {
-    my ($conn, $dst, $src) = @_;
+    my ($conn, $dst, $src, $opts) = @_;
+
+    $opts //= {};
 
     my $raw = check_send_command($conn, 'inform', $dst, $src) or return '';
 
-    return '';
-    my ($opts, $reply, $output, $tag) = parse_server_reply($raw);
+    return '' if !$opts->{verbose};
+
+    ($opts, my ($reply, $output, $tag)) = parse_server_reply($raw);
     my $info = $output->[0];
     if (defined $info && defined $info->{'tpa'}) {
         return print_output(sprintf(
@@ -920,18 +1049,16 @@ sub do_show_log {
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
 
+    my $translate = 1;
     Wrap_GetOptionsFromArray($args->{-options}, {},
-                'raw!'     => \(my $raw = 0),
-                'format!'  => \$format,
-                'reverse!' => \(my $reverse = 1),
-                'nf'       => sub { $format = 0 },
-            ) or return;
-
-    $format &&= !$raw;
+        'translate!' => \$translate,
+        'n'          => sub { $translate = 0 },
+        'reverse!'   => \(my $reverse = 1),
+    ) or return;
 
     my @args = defined $args->{'nlines'} ? ($args->{'nlines'}) : ();
     my $log = check_send_command($conn, 'get_log', @args) or return;
-    if ($format) {
+    if ($translate) {
         $log =~ s/^(\S+)\t(\d+)\t/format_time($1,' ')." [$2] "/gme;
     }
     if ($reverse) {
@@ -952,7 +1079,7 @@ sub do_show_uptime {
     my ($conn, $parsed, $args) = @_;
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
 
-    if (($STATUS) = get_status($conn, {raw=>0, format=>1})) {
+    if (($STATUS) = get_status($conn)) {
         print_output(
             sprintf("%s up %s (started: %s)\n",
                 strftime("%H:%M:%S", localtime(time)),
@@ -1040,11 +1167,11 @@ sub do_show_ip {
     my ($opts, $raw, $output, $tag_fmt) =
         shared_show_arp_ip($conn, 'get_ip', $parsed, $args);
 
-    defined $raw or return;
+    return if !defined $raw;
 
     my %count = (ALIVE=>0,DEAD=>0,PENDING=>0,TOTAL=>0);
 
-    if (!$$opts{format}) {
+    if ($$opts{raw}) {
         while ($raw =~ /^state=(\w+)/gm) {
             $count{$1}++;
             $count{TOTAL}++;
@@ -1127,23 +1254,29 @@ sub do_show_ip {
 sub shared_show_arp_ip {
     my ($conn, $command, $parsed, $args) = @_;
     my $opts = {
-            'header'  => 1,
-            'format'  => 1,
-            'summary' => 1,
-            'raw'     => 0,
-        };
+        'header'    => 1,
+        'translate' => 1,
+        'summary'   => 1,
+        'fmt'       => 'native',
+    };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-            'header!'  => \$opts->{header},
-            'raw!'     => \$opts->{raw},
-            'format!'  => \$opts->{format},
-            'long!'    => sub { $opts->{summary} = !$_[1] },
-            'summary!' => sub { $opts->{summary} = $_[1] },
-            'nf'       => sub { $opts->{format}  = 0  },
-            'nh'       => sub { $opts->{header}  = 0  },
-        ) or return;
+        'header!'    => \$opts->{header},
+        'n'          => sub { $opts->{translate} = 0 },
+        'long!'      => sub { $opts->{summary} = !$_[1] },
+        'summary!'   => sub { $opts->{summary} = $_[1] },
+        'nh'         => sub { $opts->{header}  = 0  },
+        'translate!' => \$opts->{translate},
+        'format|f=s' => \$opts->{fmt},
+        (
+            map { $_ => sub { $opts->{fmt} = $_[0] } }
+                keys %VALID_OUTPUT_FORMAT
+        ),
+    ) or return;
 
-    $opts->{format} &&= !$opts->{raw};
+    $args->{-options} = $opts;
+
+    $opts->{fmt} = check_output_format($opts->{fmt}) or return;
 
     my $reply = '';
     if ($args->{'ip'}) {
@@ -1170,9 +1303,6 @@ sub shared_show_arp_ip {
 #
 #   Parameters:
 #
-#       $opts     - Hash ref with options:
-#                        raw    : don't convert IP/MAC addresses (dfl. false).
-#                        format : split up into records (dfl. 1).
 #       $reply    - Raw reply from server.
 #       $key      - Key to store records under. If not given, records will be
 #                   stored in an array.
@@ -1192,43 +1322,29 @@ sub parse_server_reply {
     my $opts  = @_ ? shift : {};
 
     %$opts = (
-        'format' => 1,
-        'raw'    => 0,
+        translate => 1,
         %{$opts//{}},
     );
 
     return if !defined $reply;
 
-    if (!$opts->{raw}) {
-        $reply =~ s/\b(tpa|spa|network|ip)=([\da-f]+)\b/"$1=".hex2ip($2)/gme;
-        $reply =~ s/\b(tha|sha|mac)=([\da-f]+)\b/"$1=".hex2mac($2)/gme;
-        $reply =~ s/\b(arp_update_flags)=(\d+)\b
-                   /"$1=".join(q{,}, update_flags_to_str($2))
-                   /gxme;
-        $reply =~ s/\b(log_level)=(\d+)\b/"$1=".log_level_to_string($2)/gme;
-        $reply =~ s/\b(log_mask)=(\d+)\b
-                   /"$1=".join(q{,}, event_mask_to_str($2))
-                   /gxme;
-    }
-
     my @output;
-    my $taglen  = 0;
+    my $taglen = 0;
     for my $record (split(/\n\n/, $reply)) {
         my %info;
         for my $line (split("\n", $record)) {
-            if ($line =~ /(.*?)=(.*)$/g) {
-                $info{$1} = $2;
+            $line =~ /(?<k>.*?)=(?<v>.*)$/ or next;
+            my ($k, $v) = @+{qw( k v )};
+            if (my $type = $ATTR_TYPE{$k}) {
+                if (my $cv = $TYPE_CONVERSION_MAP{$type}) {
+                    DEBUG "translate $k=$v\n";
+                    if (my $save_k = $cv->{save_raw}) {
+                        $info{sprintf($save_k, $k)} = $v;
+                    }
+                    $v = $cv->{convert}->($v);
+                }
             }
-        }
-
-        if (my $ip = $info{'network'}) {
-            $info{'hex_network'} = ip2hex($ip);
-        }
-        if (my $ip = $info{'ip'}) {
-            $info{'hex_ip'} = ip2hex($ip);
-        }
-        if (my $mac = $info{'mac'}) {
-            $info{'hex_mac'} = mac2hex($mac);
+            $info{$k} = $v;
         }
 
         push @output, \%info;
@@ -1237,9 +1353,13 @@ sub parse_server_reply {
             $taglen = length($_) if length($_) > $taglen;
         }
     }
+
     $taglen++;
     my $tag_fmt = "%-${taglen}s ";
 
+    if ($opts->{translate}) {
+        $reply =~ s/(\w+)=(\w+)/"$1=".format_attr_value($1,$2)/ge;
+    }
     return ($opts, $reply, \@output, $tag_fmt);
 }
 
@@ -1364,29 +1484,11 @@ sub do_set_generic {
     my $new = $output->[0]->{new};
 
     my $fmt = '%s';
-    if ($type eq 'log-level') {
-        $old = log_level_to_string($old);
-        $new = log_level_to_string($new);
-    }
-    elsif ($type eq 'arp-update-flags') {
-        $old = '('.join(',', update_flags_to_str($old)).')';
-        $new = '('.join(',', update_flags_to_str($new)).')';
-    }
-    elsif ($type eq 'log-mask') {
-        $old = '('.join(',', event_mask_to_str($old)).')';
-        $new = '('.join(',', event_mask_to_str($new)).')';
-    }
-    elsif ($type eq 'boolean') {
-        $old = $old ? 'yes' : 'no';
-        $new = $new ? 'yes' : 'no';
-        $fmt = '%s';
-    }
-    elsif ($type eq 'int') {
-        $fmt = '%d';
-    }
-    elsif ($type eq 'float') {
-        $fmt = '%0.2f';
-    }
+    ($old, my $cv) = convert_attr_value($type, $old);
+    ($new) = convert_attr_value($type, $new);
+
+    $fmt = $cv->{fmt};
+
     return print_output(sprintf("%s changed from $fmt to $fmt%s",
                                 $name, $old, $new, $unit));
 }
@@ -1709,26 +1811,43 @@ sub do_set_ip_mac {
 # cmd: status
 sub do_status {
     my ($conn, $parsed, $args) = @_;
-    my $format = 1;
 
-    my $opts = { raw => 0, format => 1 };
+    my $opts = { translate => 1, fmt => 'native' };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-            'raw!'     => \$opts->{raw},
-            'format!'  => \$opts->{format},
-            'nf'       => sub { $opts->{format} = 0 },
-        ) or return;
+        'nf'       => sub { $opts->{format} = 0 },
+        'translate!' => \$opts->{translate},
+        'format|f=s' => \$opts->{fmt},
+        (
+            map { $_ => sub { $opts->{fmt} = $_[0] } }
+                qw( json yaml native raw )
+        ),
+    ) or return;
 
-    $opts->{format} &&= !$opts->{raw};
+    $opts->{fmt} = check_output_format($opts->{fmt}) or return;
 
     my $raw = check_send_command($conn, 'get_status') or return;
 
     ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
 
-    if (!$opts->{format}) {
+
+    if ($opts->{fmt} eq 'raw') {
         return print_output($reply);
     }
+
     my $info = $output->[0];
+
+    for my $k (keys %$info) {
+        delete $info->{$k} if $k =~ /^hex_/;
+    }
+
+    if ($opts->{fmt} eq 'json') {
+        return print_output(JSON->new->pretty->encode($info));
+    }
+    if ($opts->{fmt} eq 'yaml') {
+        return print_output(YAML::XS::Dump($info));
+    }
+
     return print_output(
         sprintf("$tag%s\n", 'id:', $$info{id}),
         sprintf("$tag%d\n", 'pid:', $$info{pid}),
@@ -1775,27 +1894,45 @@ sub get_log_mask {
 }
 
 sub do_param {
+    # TODO: continue with option changing/formatting a la "do_status".
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
 
-    my $opts = { raw => 0, format => 1 };
+    my $opts = { translate => 1, fmt => 'native' };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-            'raw!'     => \$opts->{raw},
-            'format!'  => \$opts->{format},
-            'nf'       => sub { $opts->{format} = 0 },
-        ) or return;
+        'nf'       => sub { $opts->{format} = 0 },
+        'translate!' => \$opts->{translate},
+        'format|f=s' => \$opts->{fmt},
+        (
+            map { $_ => sub { $opts->{fmt} = $_[0] } }
+                qw( json yaml native raw )
+        ),
+    ) or return;
 
-    $opts->{format} &&= !$opts->{raw};
+    $opts->{fmt} = check_output_format($opts->{fmt}) or return;
 
     my $raw = check_send_command($conn, 'get_param') or return;
 
     ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
 
-    if (!$opts->{format}) {
+    if ($opts->{fmt} eq 'raw') {
         return print_output($reply);
     }
+
     my $info = $output->[0];
+
+    for my $k (keys %$info) {
+        delete $info->{$k} if $k =~ /^hex_/;
+    }
+
+    if ($opts->{fmt} eq 'json') {
+        return print_output(JSON->new->pretty->encode($info));
+    }
+    if ($opts->{fmt} eq 'yaml') {
+        return print_output(YAML::XS::Dump($info));
+    }
+
     return print_output(
         sprintf("$tag= %d\n", 'queuedepth', $$info{queue_depth}),
         sprintf("$tag= %0.2f q/min\n", 'max_rate', $$info{max_rate}),
@@ -1843,6 +1980,11 @@ sub get_param {
 sub get_status {
     my ($conn, $opts) = @_;
 
+    my %opts = (
+        translate => 1,
+        %{$opts // {}},
+    );
+
     my $reply;
 
     if ($conn) {
@@ -1857,22 +1999,10 @@ sub get_status {
                ;
     }
 
-    if (!$$opts{raw}) {
-        $reply =~ s/^(network|ip)=([\da-f]+)$/"$1=".hex2ip($2)/gme;
-        $reply =~ s/^(mac)=([\da-f]+)$/"$1=".hex2mac($2)/gme;
-    }
-
-    if (!$$opts{format}) {
-        return ($reply, '%s ');
-    }
-
-    my %info = map { /(.*?)=(.*)/; ($1=>$2) } split("\n", $reply);
-    my $taglen = 0;
-    foreach (keys %info) {
-        $taglen = length($_) if length($_) > $taglen;
-    }
-    $taglen++;
-    return (\%info, "%-${taglen}s ");
+    my ($records, $tag_fmt);
+    ($opts, $reply, $records, $tag_fmt) = parse_server_reply($reply, \%opts);
+    return if ! defined $records;
+    return ($records->[0], $reply, $tag_fmt);
 }
 
 # cmd: dump status [$file]
@@ -1881,10 +2011,11 @@ sub do_dump_status {
 
     my $fname = $args->{'file'};
 
+    ($STATUS, my $raw_status) = get_status($conn, {raw=>0, format=>1});
+
     if (!defined $fname) {
         # Old-style dumping (by sending a signal to the daemon).
         Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
-        ($STATUS) = get_status($conn, {raw=>0, format=>1});
         my $pid = $STATUS->{'pid'};
         if (!$pid) {
             verbose("ERROR\n");
@@ -1904,32 +2035,26 @@ sub do_dump_status {
     # Just pre-check options.
     my $opts = {
         'fmt'     => 'native',
-        'format'  => 1,
         'header'  => 1,
-        'raw'     => 0,
         'summary' => 1,
     };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
         #'output-format=s' => \$opts->{fmt},
-        'json'     => sub { $opts->{fmt} = 'json' },
-        'yaml'     => sub { $opts->{fmt} = 'yaml' },
-        'native'   => sub { $opts->{fmt} = 'native' },
-        'format!'  => \$opts->{format},
         'header!'  => \$opts->{header},
         'long!'    => sub { $opts->{summary} = !$_[1] },
-        'nf'       => sub { $opts->{format}  = 0  },
         'nh'       => sub { $opts->{header}  = 0  },
-        'raw!'     => \$opts->{raw},
         'summary!' => sub { $opts->{summary} = $_[1] },
+        'format|f=s' => \$opts->{fmt},
+        (
+            map { $_ => sub { $opts->{fmt} = $_[0] } }
+                keys %VALID_OUTPUT_FORMAT
+        ),
     ) or return;
 
     $args->{-options} = $opts;
-    if ($opts->{fmt} !~ /^(json|yaml|native)$/) {
-        return print_error("invalid dump format '$$opts{fmt}'",
-            "; need 'json', 'yaml', or 'native'");
-    }
-    print_output("FMT: $opts->{fmt}\n");
+
+    $opts->{fmt} = check_output_format($opts->{fmt}) or return;
 
     my $out_fh;
     if ($fname eq '-') {
@@ -1946,11 +2071,19 @@ sub do_dump_status {
          $output_str = format_native_status($conn, $parsed, $args);
     }
     else {
+        (undef, my $raw_param, my $param, undef) = get_param($conn);
 
-        (undef, undef, my $param, undef) = get_param($conn);
-
-        my (undef, undef, $ip_output, undef) =
+        my (undef, $raw_ip_state, $ip_output, undef) =
             shared_show_arp_ip($conn, 'get_ip');
+
+        my (undef, $raw_arp_state, $arp_output, undef) =
+            shared_show_arp_ip($conn, 'get_arp');
+
+        if ($opts->{fmt} eq 'raw') {
+            print_output(
+                "$raw_status\n$raw_param\n$raw_ip_state\n$raw_arp_state"
+            );
+        }
 
         my %ip_table;
         for my $entry (@$ip_output) {
@@ -1961,9 +2094,6 @@ sub do_dump_status {
                 $entry->{$attr} += 0;
             }
         }
-
-        my (undef, undef, $arp_output, undef) =
-            shared_show_arp_ip($conn, 'get_arp');
 
         my %arp_table;
         for my $entry (@$arp_output) {
@@ -1989,7 +2119,7 @@ sub do_dump_status {
         }
         else {
             print_output("YAML: $$opts{fmt}\n");
-            $output_str = YAML::Dump($data);
+            $output_str = YAML::XS::Dump($data);
         }
     }
 
@@ -2225,7 +2355,7 @@ sub parse_json_status {
 sub parse_yaml_status {
     my ($input, $fname) = @_;
     
-    my $data = eval { YAML::Load($input) };
+    my $data = eval { YAML::XS::Load($input) };
 
     if (my $err = $@) {
         $err =~ s/at \S+ line \d+\.$//;
