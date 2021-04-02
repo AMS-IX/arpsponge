@@ -674,10 +674,18 @@ sub last_error {
 # print_output($msg, ...);
 #
 #   Print output, through $PAGER if interactive.
+#   If any $msg argument is an ARRAY REF, it will be
+#   passed to sprintf().
 #
 sub print_output {
-    my $out = join('', @_);
-       $out .= "\n" if $out !~ /\n\Z/ && length($out);
+    # Cannot use "sprintf(@$_)" as that will result in a string
+    # containing the number of elements of @$_. :-(
+    my $out = join('',
+        map { 
+            ref $_ ? sprintf($$_[0], @{$_}[1..$#$_]) : $_
+        } @_
+    );
+    $out .= "\n" if length($out) && substr($out, -1) ne "\n";
 
     my $ret = 1;
     my $curr_fh = select;

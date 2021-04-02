@@ -61,32 +61,17 @@ my $DFL_PROBE_RATE  = 1/$DFL_PROBE_DELAY;
 my $MAX_PROBE_RATE  = 1/$MIN_PROBE_DELAY;
 
 my %ATTR_TYPE = (
-    ( map { $_ => $_ } qw( arp_update_flags log_level log_mask ) ),
-    ( map { $_ => 'ip' } qw( ip tpa spa network ) ),
+    ( map { $_ => $_    } qw( arp_update_flags log_level log_mask ) ),
+    ( map { $_ => 'ip'  } qw( ip tpa spa network ) ),
     ( map { $_ => 'mac' } qw( mac tha sha ) ),
     ( map { $_ => 'boolean' } qw(
-        dummy
-        max_pending
-        passive
-        static
-        sweep_skip_alive
+        dummy max_pending passive static sweep_skip_alive
     ) ),
     ( map { $_ => 'int' } qw(
-        date
-        learning
-        next_sweep
-        pid
-        prefixlen
-        proberate
-        queue_depth
-        started
-        sweep_age
-        sweep_period
+        date learning next_sweep pid prefixlen proberate queue_depth
+        started sweep_age sweep_period
     ) ),
-    ( map { $_ => 'int' } qw(
-        max_rate
-        flood_protection
-    ) ),
+    ( map { $_ => 'float' } qw( max_rate flood_protection ) ),
 );
 
 my %TYPE_CONVERSION_MAP = (
@@ -481,7 +466,14 @@ sub check_output_format {
 sub int2bool {
     my ($val) = @_;
     return $_[0] ? JSON::true : JSON::false;
-    #return $_[0] ? 'true' : 'false';
+}
+
+sub bool2str {
+    my ($val, $true_suffix, $false_suffix) = @_;
+    if ($val) {
+        return 'true'.($true_suffix // '');
+    }
+    return 'false'.($false_suffix // '');
 }
 
 #############################################################################
@@ -864,11 +856,10 @@ sub do_ping {
             }
             push @rtt, $rtt;
             $nr++;
-            print_output(
-                sprintf("%d bytes from #%d: time=%0.3f ms\n",
-                        length($reply), $$STATUS{pid}, $rtt
-                    )
-            );
+            print_output([
+                "%d bytes from #%d: time=%0.3f ms\n", length($reply),
+                $$STATUS{pid}, $rtt
+            ]);
         }
         else {
             last;
@@ -888,11 +879,12 @@ sub do_ping {
         my $mdev_rtt = 0;
         for my $x (@rtt) { $mdev_rtt += abs($avg_rtt - $x) }
         $mdev_rtt = $mdev_rtt / ($nr ? $nr : 1);
-        print_output("--- $$STATUS{id} ping statistics ---\n",
-            sprintf("%d packets transmitted, %d received, ", $ns, $nr),
-            sprintf("%d%% packet loss, time %dms\n", $loss, $time),
-            sprintf("rtt min/avg/max/mdev = %0.3f/%0.3f/%0.3f/%0.3f ms\n",
-                    $min_rtt, $avg_rtt, $max_rtt, $mdev_rtt)
+        print_output(
+            [ "--- %s ping statistics ---\n", $$STATUS{id}      ],
+            [ "%d packets transmitted, %d received, ", $ns, $nr ],
+            [ "%d%% packet loss, time %dms\n", $loss, $time     ],
+            [ "rtt min/avg/max/mdev = %0.3f/%0.3f/%0.3f/%0.3f ms\n",
+                $min_rtt, $avg_rtt, $max_rtt, $mdev_rtt ]
         );
     }
     return 1;
@@ -1000,9 +992,7 @@ sub do_inform_about {
         $time_estimate = $pairs * $estimate_per_update + 0.5;
         print clr_to_eol() if $INTERACTIVE;
         my $fmt = "%${intlen}d/%${intlen}d updates in %${timelen}d secs";
-        print_output(
-            sprintf($fmt, $count, $total_pairs, time-$start)
-        );
+        print_output([ $fmt, $count, $total_pairs, time-$start ]);
     }
     return 1;
 }
@@ -1019,11 +1009,11 @@ sub send_single_inform {
     ($opts, my ($reply, $output, $tag)) = parse_server_reply($raw);
     my $info = $output->[0];
     if (defined $info && defined $info->{'tpa'}) {
-        return print_output(sprintf(
-                "update sent: [tpa=%s,tha=%s] [spa=%s,sha=%s]",
-                $$info{'tpa'}, $$info{'tha'},
-                $$info{'spa'}, $$info{'sha'},
-            ));
+        return print_output([
+            "update sent: [tpa=%s,tha=%s] [spa=%s,sha=%s]",
+            $$info{'tpa'}, $$info{'tha'},
+            $$info{'spa'}, $$info{'sha'},
+        ]);
     }
     else {
         return print_output($reply);
@@ -1080,13 +1070,13 @@ sub do_show_uptime {
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
 
     if (($STATUS) = get_status($conn)) {
-        print_output(
-            sprintf("%s up %s (started: %s)\n",
+        print_output([
+            "%s up %s (started: %s)\n" => (
                 strftime("%H:%M:%S", localtime(time)),
                 relative_time($STATUS->{'started'}, 0),
                 format_time($STATUS->{'started'}),
             )
-        );
+        ]);
     }
     return;
 }
@@ -1104,47 +1094,58 @@ sub do_show_arp {
         }
     }
 
-    my ($opts, $reply, $output, $tag_fmt) =
+    my ($opts, $reply, $result, $tag_fmt) =
         shared_show_arp_ip($conn, 'get_arp', $parsed, $args);
 
-    defined $output or return;
+    defined $result or return;
 
-    if (!$$opts{format}) {
+    if ($opts->{fmt} eq 'raw') {
         print_output($reply);
         my $count;
         $count++ while ($reply =~ /^ip=/gm);
         return $count;
     }
 
+    if ($opts->{fmt} eq 'json') {
+        $result = { 'arpsponge.arp-table' => $result };
+        return print_output(JSON->new->pretty->encode($result));
+    }
+    if ($opts->{fmt} eq 'yaml') {
+        $result = { 'arpsponge.arp-table' => $result };
+        return print_output(YAML::XS::Dump($result));
+    }
+
     my @output;
     if ($$opts{summary}) {
         if ($$opts{header}) {
-            push @output, sprintf("%-17s %-17s %-11s %s",
-                                  "# MAC", "IP", "Epoch", "Time");
+            push @output, [
+                "%-17s %-17s %-11s %s\n", "# MAC", "IP", "Epoch", "Time"
+            ];
         }
-        for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$output) {
-            push @output,
-                    sprintf("%-17s %-17s %-11d %s",
-                        $$info{mac}, $$info{ip},
-                        $$info{mac_changed},
-                        format_time($$info{mac_changed}),
-                    );
+        for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$result) {
+            push @output, [
+                "%-17s %-17s %-11d %s\n",
+                    $$info{mac}, $$info{ip},
+                    $$info{mac_changed},
+                    format_time($$info{mac_changed}),
+            ];
         }
     }
     else {
-        for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$output) {
-            push @output, join('',
-                sprintf("$tag_fmt%s\n", 'ip:', $$info{ip}),
-                sprintf("$tag_fmt%s\n", 'mac:', $$info{mac}),
-                sprintf("$tag_fmt%s (%s) [%d]\n", 'mac changed:',
+        for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$result) {
+            push @output, (
+                ["$tag_fmt%s\n", 'ip:', $$info{ip} ],
+                ["$tag_fmt%s\n", 'mac:', $$info{mac}],
+                ["$tag_fmt%s (%s) [%d]\n", 'mac changed:',
                         format_time($$info{mac_changed}),
                         relative_time($$info{mac_changed}),
-                        $$info{mac_changed}),
+                        $$info{mac_changed}
+                ],
             );
         }
     }
-    print_output(join("\n", @output));
-    return int(@$output);
+    print_output(@output);
+    return int(@$result);
 }
 
 # cmd: show ip
@@ -1164,14 +1165,14 @@ sub do_show_ip {
         }
     }
 
-    my ($opts, $raw, $output, $tag_fmt) =
+    my ($opts, $raw, $result, $tag_fmt) =
         shared_show_arp_ip($conn, 'get_ip', $parsed, $args);
 
     return if !defined $raw;
 
     my %count = (ALIVE=>0,DEAD=>0,PENDING=>0,TOTAL=>0);
 
-    if ($$opts{raw}) {
+    if ($opts->{fmt} eq 'raw') {
         while ($raw =~ /^state=(\w+)/gm) {
             $count{$1}++;
             $count{TOTAL}++;
@@ -1182,52 +1183,42 @@ sub do_show_ip {
 
     my @output;
     if ($$opts{summary} && $$opts{header}) {
-        push @output, sprintf("%-17s %-12s %7s %12s %7s",
-                                "# IP", "State", "Queue",
-                                "Rate (q/min)", "Updated");
+        push @output, [
+            "%-17s %-12s %7s %12s %7s\n",
+            "# IP", "State", "Queue", "Rate (q/min)", "Updated"
+        ];
     }
 
-    for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$output) {
-        if ($$info{state} =~ /^PENDING/) {
-            $count{PENDING}++;
-        } else {
-            $count{$$info{state}}++;
-        }
+    for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$result) {
+        my $state = $$info{state} =~ s/\(\d+\)$//r;
+        $count{$state}++;
         $count{TOTAL}++;
-        if (defined $filter_state) {
-            if ($filter_state eq 'pending') {
-                next if $$info{state} !~ /^PENDING/;
-            }
-            else {
-                next if lc $$info{state} ne $filter_state;
-            }
-        }
+        next if defined $filter_state && lc $state ne $filter_state;
         if ($$opts{summary}) {
-            push @output,
-                    sprintf("%-17s %-12s %7d %8.3f     %s",
-                            $$info{ip}, $$info{state}, $$info{queue},
-                            $$info{rate},
-                            format_time($$info{state_changed}),
-                    );
+            push @output, [
+                "%-17s %-12s %7d %8.3f     %s\n",
+                $$info{ip}, $$info{state}, $$info{queue}, $$info{rate},
+                format_time($$info{state_changed}),
+            ];
         }
         else {
-            push @output, join('',
-                sprintf("$tag_fmt%s\n", 'ip:', $$info{ip}),
-                sprintf("$tag_fmt%s\n", 'state:', $$info{state}),
-                sprintf("$tag_fmt%d\n", 'queue:', $$info{queue}),
-                sprintf("$tag_fmt%0.2f\n", 'rate:', $$info{rate}),
-                sprintf("$tag_fmt%s (%s) [%d]\n", 'state changed:',
-                        format_time($$info{state_changed}),
-                        relative_time($$info{state_changed}),
-                        $$info{state_changed}),
-                sprintf("$tag_fmt%s (%s) [%d]\n", 'last queried:',
-                        format_time($$info{last_queried}),
-                        relative_time($$info{last_queried}),
-                        $$info{last_queried}),
+            push @output, (
+                [ "$tag_fmt%s\n", 'ip:', $$info{ip} ],
+                [ "$tag_fmt%s\n", 'state:', $$info{state} ],
+                [ "$tag_fmt%d\n", 'queue:', $$info{queue} ],
+                [ "$tag_fmt%0.2f\n", 'rate:', $$info{rate} ],
+                [ "$tag_fmt%s (%s) [%d]\n", 'state changed:',
+                    format_time($$info{state_changed}),
+                    relative_time($$info{state_changed}),
+                    $$info{state_changed} ],
+                [ "$tag_fmt%s (%s) [%d]\n", 'last queried:',
+                    format_time($$info{last_queried}),
+                    relative_time($$info{last_queried}),
+                    $$info{last_queried} ]
             );
         }
     }
-    print_output(join("\n", @output));
+    print_output(@output);
     return \%count;
 }
 
@@ -1703,12 +1694,11 @@ sub do_set_ip_generic {
 
     my $fmt = '%s';
     if ($type eq 'boolean') {
-        $old = $old ? 'yes' : 'no';
-        $new = $new ? 'yes' : 'no';
-        $type = '%s';
+        $old = bool2str($old);
+        $new = bool2str($new);
     }
     elsif ($type eq 'int') {
-        $type = '%d';
+        $fmt = '%d';
     }
     elsif ($type eq 'float') {
         $fmt = '%0.2f';
@@ -1841,6 +1831,7 @@ sub do_status {
         delete $info->{$k} if $k =~ /^hex_/;
     }
 
+    $info = { 'arpsponge.status' => $info };
     if ($opts->{fmt} eq 'json') {
         return print_output(JSON->new->pretty->encode($info));
     }
@@ -1926,6 +1917,7 @@ sub do_param {
         delete $info->{$k} if $k =~ /^hex_/;
     }
 
+    $info = { 'arpsponge.parameters' => $info };
     if ($opts->{fmt} eq 'json') {
         return print_output(JSON->new->pretty->encode($info));
     }
@@ -1934,24 +1926,25 @@ sub do_param {
     }
 
     return print_output(
-        sprintf("$tag= %d\n", 'queuedepth', $$info{queue_depth}),
-        sprintf("$tag= %0.2f q/min\n", 'max_rate', $$info{max_rate}),
-        sprintf("$tag= %0.2f q/sec\n", 'flood_protection',
-            $$info{flood_protection}),
-        sprintf("$tag= %d\n", 'max_pending', $$info{max_pending}),
-        sprintf("$tag= %d secs\n", 'sweep_period', $$info{sweep_period}),
-        sprintf("$tag= %d secs\n", 'sweep_age', $$info{sweep_age}),
-        sprintf("$tag= %s\n", 'sweep_skip_alive',
-            $$info{sweep_skip_alive}?'yes':'no'),
-        sprintf("$tag= %d pkts/sec\n", 'proberate', $$info{proberate}),
-        sprintf("$tag= %s\n", 'learning',
-            $$info{learning}?"yes ($$info{learning} secs)":'no'),
-        sprintf("$tag= %s\n", 'dummy', $$info{dummy}?'yes':'no'),
-        sprintf("$tag= %s\n", 'passive', $$info{passive}?'yes':'no'),
-        sprintf("$tag= %s\n", 'static', $$info{static}?'yes':'no'),
-        sprintf("$tag= %s\n", 'arp_update_flags', $$info{arp_update_flags}),
-        sprintf("$tag= %s\n", 'log_level', $$info{log_level}),
-        sprintf("$tag= %s\n", 'log_mask', $$info{log_mask}),
+        [ "$tag= %d\n"          => 'queuedepth',    $$info{queue_depth} ],
+        [ "$tag= %0.2f q/min\n" => 'max_rate',      $$info{max_rate} ],
+        [ "$tag= %0.2f q/sec\n" => 'flood_protection',
+            $$info{flood_protection} ],
+        [ "$tag= %d\n"          => 'max_pending',   $$info{max_pending} ],
+        [ "$tag= %d secs\n"     => 'sweep_period',  $$info{sweep_period} ],
+        [ "$tag= %d secs\n"     => 'sweep_age',     $$info{sweep_age} ],
+        [ "$tag= %s\n"          => 'sweep_skip_alive',
+            bool2str($$info{sweep_skip_alive}) ],
+        [ "$tag= %d pkts/sec\n" => 'proberate',     $$info{proberate} ],
+        [ "$tag= %s\n"          => 'learning',
+            bool2str($$info{learning}, " ($$info{learning} secs)") ],
+        [ "$tag= %s\n"          => 'dummy',         bool2str($$info{dummy}) ],
+        [ "$tag= %s\n"          => 'passive',       bool2str($$info{passive}) ],
+        [ "$tag= %s\n"          => 'static',        bool2str($$info{static}) ],
+        [ "$tag= %s\n"          => 'arp_update_flags',
+            $$info{arp_update_flags} ],
+        [ "$tag= %s\n"          => 'log_level',     $$info{log_level} ],
+        [ "$tag= %s\n"          => 'log_mask',      $$info{log_mask} ],
     );
 }
 
@@ -2085,26 +2078,8 @@ sub do_dump_status {
             );
         }
 
-        my %ip_table;
-        for my $entry (@$ip_output) {
-            my $ip = delete $entry->{ip};
-            delete $entry->{hex_ip};
-            $ip_table{$ip} = $entry;
-            for my $attr (qw( rate state_changed queue last_queried )) {
-                $entry->{$attr} += 0;
-            }
-        }
-
-        my %arp_table;
-        for my $entry (@$arp_output) {
-            my $ip = delete $entry->{ip};
-            delete $entry->{hex_ip};
-            delete $entry->{hex_mac};
-            $arp_table{$ip} = $entry;
-            for my $attr (qw( mac_changed )) {
-                $entry->{$attr} += 0;
-            }
-        }
+        my $ip_table = convert_ip_output_for_export($ip_output);
+        my $arp_table = convert_arp_output_for_export($arp_output);
 
         my $data = {
             'arpsponge.status' => $STATUS,
@@ -2133,6 +2108,34 @@ sub do_dump_status {
     return $out_fh->close;
 }
 
+sub convert_ip_output_for_export {
+    my ($ip_output) = @_;
+    my %ip_table;
+    for my $entry (@$ip_output) {
+        my $ip = delete $entry->{ip};
+        delete $entry->{hex_ip};
+        $ip_table{$ip} = $entry;
+        for my $attr (qw( rate state_changed queue last_queried )) {
+            $entry->{$attr} += 0;
+        }
+    }
+    return \%ip_table;
+}
+
+sub convert_arp_output_for_export {
+    my ($arp_output) = @_;
+    my %arp_table;
+    for my $entry (@$arp_output) {
+        my $ip = delete $entry->{ip};
+        delete $entry->{hex_ip};
+        delete $entry->{hex_mac};
+        $arp_table{$ip} = $entry;
+        for my $attr (qw( mac_changed )) {
+            $entry->{$attr} += 0;
+        }
+    }
+    return \%arp_table;
+}
 
 sub format_native_status {
     my ($conn, $parsed, $args) = @_;
