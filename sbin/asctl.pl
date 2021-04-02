@@ -76,8 +76,8 @@ my %ATTR_TYPE = (
         learning
         next_sweep
         pid
-        prefixlen 
-        proberate 
+        prefixlen
+        proberate
         queue_depth
         started
         sweep_age
@@ -1862,7 +1862,7 @@ sub do_status {
         sprintf("$tag%s\n", 'IP:', $$info{ip}),
         sprintf("$tag%s\n", 'MAC:', $$info{mac}),
         sprintf("$tag%s", 'next sweep:', format_time($$info{next_sweep})),
-        ($$info{next_sweep} ? 
+        ($$info{next_sweep} ?
             sprintf(" (in %d secs) [%d]",
                 $$info{next_sweep}-$$info{date},
                 $$info{next_sweep})
@@ -2112,7 +2112,7 @@ sub do_dump_status {
             'arpsponge.state-table' => \%ip_table,
             'arpsponge.arp-table' => \%arp_table,
         };
-        
+
         if ($opts->{fmt} eq 'json') {
             print_output("JSON!\n");
             $output_str = JSON->new->pretty->encode($data);
@@ -2324,7 +2324,7 @@ sub read_state_table_from_file {
 
 sub parse_json_status {
     my ($input, $fname) = @_;
-    
+
     my $data = eval { JSON::decode_json($input) };
 
     if (my $err = $@) {
@@ -2354,7 +2354,7 @@ sub parse_json_status {
 
 sub parse_yaml_status {
     my ($input, $fname) = @_;
-    
+
     my $data = eval { YAML::XS::Load($input) };
 
     if (my $err = $@) {
@@ -2765,7 +2765,7 @@ or a range. Examples:
 
     # Single address:
         192.168.0.1
-    
+
     # CIDR notation:
         192.168.0.0/24
 
