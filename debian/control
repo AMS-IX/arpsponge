@@ -18,7 +18,7 @@ Vcs-Browser: https://github.com/AMS-IX/arpsponge
 
 Package: arpsponge
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends},
+Depends: ${misc:Depends},
  perl (>= 5.10.0),
  libnet-pcap-perl (>= 0.16),
  libterm-readline-gnu-perl (>= 1.17),
