@@ -68,10 +68,14 @@ my %ATTR_TYPE = (
         dummy max_pending passive static sweep_skip_alive
     ) ),
     ( map { $_ => 'int' } qw(
-        date learning next_sweep pid prefixlen proberate queue_depth
-        started sweep_age sweep_period
+        tm_date learning tm_next_sweep pid prefixlen proberate queue_depth
+        tm_started sweep_age sweep_period
     ) ),
     ( map { $_ => 'float' } qw( max_rate flood_protection ) ),
+    ( map { $_ => 'date'  } qw(
+        started date mac_changed state_changed last_queried
+        next_sweep
+    ) ),
 );
 
 my %TYPE_CONVERSION_MAP = (
@@ -101,13 +105,19 @@ my %TYPE_CONVERSION_MAP = (
     },
     ip => {
         convert  => \&hex2ip,
-        save_raw => "hex_%s",
+        save_raw => 'hex_%s',
         fmt => '%s',
     },
     mac => {
         convert => \&hex2mac,
-        save_raw => "hex_%s",
+        save_raw => 'hex_%s',
         fmt => '%s',
+    },
+    date => {
+        convert  => \&format_time,
+        fmt      => '%s',
+        save_raw => 'tm_%s',
+        convert_raw => sub { ($_[0] // 0) + 0 },
     },
 );
 
@@ -1073,8 +1083,8 @@ sub do_show_uptime {
         print_output([
             "%s up %s (started: %s)\n" => (
                 strftime("%H:%M:%S", localtime(time)),
-                relative_time($STATUS->{'started'}, 0),
-                format_time($STATUS->{'started'}),
+                relative_time($STATUS->{'tm_started'}, 0),
+                $STATUS->{'started'},
             )
         ]);
     }
@@ -1099,50 +1109,38 @@ sub do_show_arp {
 
     defined $result or return;
 
-    if ($opts->{fmt} eq 'raw') {
-        print_output($reply);
-        my $count;
-        $count++ while ($reply =~ /^ip=/gm);
+    if ($opts->{fmt} ne 'native') {
+        if ($opts->{fmt} eq 'raw') {
+            print_output($reply);
+        }
+
+        my $arp_table = convert_arp_output_for_export($result);
+        my $data = { 'arpsponge.arp-table' => $arp_table };
+
+        if ($opts->{fmt} eq 'json') {
+            print_output(JSON->new->pretty->encode($data));
+        }
+        elsif ($opts->{fmt} eq 'yaml') {
+            print_output(YAML::XS::Dump($data));
+        }
+
+        my $count = () = $reply =~ /^ip=/gm;
         return $count;
     }
 
-    if ($opts->{fmt} eq 'json') {
-        $result = { 'arpsponge.arp-table' => $result };
-        return print_output(JSON->new->pretty->encode($result));
-    }
-    if ($opts->{fmt} eq 'yaml') {
-        $result = { 'arpsponge.arp-table' => $result };
-        return print_output(YAML::XS::Dump($result));
-    }
-
     my @output;
-    if ($$opts{summary}) {
-        if ($$opts{header}) {
-            push @output, [
-                "%-17s %-17s %-11s %s\n", "# MAC", "IP", "Epoch", "Time"
-            ];
-        }
-        for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$result) {
-            push @output, [
-                "%-17s %-17s %-11d %s\n",
-                    $$info{mac}, $$info{ip},
-                    $$info{mac_changed},
-                    format_time($$info{mac_changed}),
-            ];
-        }
+    if ($$opts{header}) {
+        push @output, [
+            "%-17s %-17s %-11s %s\n", "# MAC", "IP", "Epoch", "Time"
+        ];
     }
-    else {
-        for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$result) {
-            push @output, (
-                ["$tag_fmt%s\n", 'ip:', $$info{ip} ],
-                ["$tag_fmt%s\n", 'mac:', $$info{mac}],
-                ["$tag_fmt%s (%s) [%d]\n", 'mac changed:',
-                        format_time($$info{mac_changed}),
-                        relative_time($$info{mac_changed}),
-                        $$info{mac_changed}
-                ],
-            );
-        }
+    for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$result) {
+        push @output, [
+            "%-17s %-17s %-11d %s\n",
+                $$info{mac}, $$info{ip},
+                $$info{tm_mac_changed},
+                $$info{mac_changed},
+        ];
     }
     print_output(@output);
     return int(@$result);
@@ -1171,52 +1169,48 @@ sub do_show_ip {
     return if !defined $raw;
 
     my %count = (ALIVE=>0,DEAD=>0,PENDING=>0,TOTAL=>0);
+    my @filtered;
+    for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$result) {
+        my $state = $$info{state} =~ s/\(\d+\)$//r;
+        $count{$state}++;
+        $count{TOTAL}++;
+        next if defined $filter_state && lc $state ne $filter_state;
+        push @filtered, $info;
+    }
 
     if ($opts->{fmt} eq 'raw') {
-        while ($raw =~ /^state=(\w+)/gm) {
-            $count{$1}++;
-            $count{TOTAL}++;
-        }
         print_output($raw);
         return \%count;
     }
 
+    if ($opts->{fmt} ne 'native') {
+        my $ip_table = convert_ip_output_for_export(\@filtered);
+
+        my $data = { 'arpsponge.state-table' => $ip_table };
+
+        if ($opts->{fmt} eq 'json') {
+            print_output(JSON->new->pretty->encode($data));
+        }
+        else {
+            print_output(YAML::XS::Dump($data));
+        }
+        return \%count;
+    }
+
     my @output;
-    if ($$opts{summary} && $$opts{header}) {
+    if ($$opts{header}) {
         push @output, [
             "%-17s %-12s %7s %12s %7s\n",
             "# IP", "State", "Queue", "Rate (q/min)", "Updated"
         ];
     }
 
-    for my $info (sort { $$a{hex_ip} cmp $$b{hex_ip} } @$result) {
-        my $state = $$info{state} =~ s/\(\d+\)$//r;
-        $count{$state}++;
-        $count{TOTAL}++;
-        next if defined $filter_state && lc $state ne $filter_state;
-        if ($$opts{summary}) {
-            push @output, [
-                "%-17s %-12s %7d %8.3f     %s\n",
-                $$info{ip}, $$info{state}, $$info{queue}, $$info{rate},
-                format_time($$info{state_changed}),
-            ];
-        }
-        else {
-            push @output, (
-                [ "$tag_fmt%s\n", 'ip:', $$info{ip} ],
-                [ "$tag_fmt%s\n", 'state:', $$info{state} ],
-                [ "$tag_fmt%d\n", 'queue:', $$info{queue} ],
-                [ "$tag_fmt%0.2f\n", 'rate:', $$info{rate} ],
-                [ "$tag_fmt%s (%s) [%d]\n", 'state changed:',
-                    format_time($$info{state_changed}),
-                    relative_time($$info{state_changed}),
-                    $$info{state_changed} ],
-                [ "$tag_fmt%s (%s) [%d]\n", 'last queried:',
-                    format_time($$info{last_queried}),
-                    relative_time($$info{last_queried}),
-                    $$info{last_queried} ]
-            );
-        }
+    for my $info (@filtered) {
+        push @output, [
+            "%-17s %-12s %7d %8.3f     %s\n",
+            $$info{ip}, $$info{state}, $$info{queue}, $$info{rate},
+            $$info{state_changed},
+        ];
     }
     print_output(@output);
     return \%count;
@@ -1247,15 +1241,12 @@ sub shared_show_arp_ip {
     my $opts = {
         'header'    => 1,
         'translate' => 1,
-        'summary'   => 1,
         'fmt'       => 'native',
     };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
         'header!'    => \$opts->{header},
         'n'          => sub { $opts->{translate} = 0 },
-        'long!'      => sub { $opts->{summary} = !$_[1] },
-        'summary!'   => sub { $opts->{summary} = $_[1] },
         'nh'         => sub { $opts->{header}  = 0  },
         'translate!' => \$opts->{translate},
         'format|f=s' => \$opts->{fmt},
@@ -1278,11 +1269,9 @@ sub shared_show_arp_ip {
                         return check_send_command($conn, "$command $_[0]");
                     }
                 );
-        $opts->{summary} //= ($arg_count > 1);
     }
     else {
         $reply = check_send_command($conn, $command);
-        $opts->{summary} //= 1;
     }
 
     return parse_server_reply($reply, $opts);
@@ -1328,8 +1317,8 @@ sub parse_server_reply {
             my ($k, $v) = @+{qw( k v )};
             if (my $type = $ATTR_TYPE{$k}) {
                 if (my $cv = $TYPE_CONVERSION_MAP{$type}) {
-                    DEBUG "translate $k=$v\n";
                     if (my $save_k = $cv->{save_raw}) {
+                        $v = $cv->{convert_raw}->($v) if $cv->{convert_raw};
                         $info{sprintf($save_k, $k)} = $v;
                     }
                     $v = $cv->{convert}->($v);
@@ -1820,7 +1809,6 @@ sub do_status {
 
     ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
 
-
     if ($opts->{fmt} eq 'raw') {
         return print_output($reply);
     }
@@ -1831,32 +1819,29 @@ sub do_status {
         delete $info->{$k} if $k =~ /^hex_/;
     }
 
-    $info = { 'arpsponge.status' => $info };
+    my $data = { 'arpsponge.status' => $info };
     if ($opts->{fmt} eq 'json') {
-        return print_output(JSON->new->pretty->encode($info));
+        return print_output(JSON->new->pretty->encode($data));
     }
     if ($opts->{fmt} eq 'yaml') {
-        return print_output(YAML::XS::Dump($info));
+        return print_output(YAML::XS::Dump($data));
     }
 
     return print_output(
-        sprintf("$tag%s\n", 'id:', $$info{id}),
-        sprintf("$tag%d\n", 'pid:', $$info{pid}),
-        sprintf("$tag%s\n", 'version:', $$info{version}),
-        sprintf("$tag%s [%d]\n", 'date:',
-                format_time($$info{date}), $$info{date}),
-        sprintf("$tag%s [%d]\n", 'started:',
-                format_time($$info{started}), $$info{started}),
-        sprintf("$tag%s/%d\n", 'network:',
-                $$info{network}, $$info{prefixlen}),
-        sprintf("$tag%s\n", 'interface:', $$info{interface}),
-        sprintf("$tag%s\n", 'IP:', $$info{ip}),
-        sprintf("$tag%s\n", 'MAC:', $$info{mac}),
-        sprintf("$tag%s", 'next sweep:', format_time($$info{next_sweep})),
-        ($$info{next_sweep} ?
+        [ "$tag%s\n", 'id:', $$info{id} ],
+        [ "$tag%d\n", 'pid:', $$info{pid} ],
+        [ "$tag%s\n", 'version:', $$info{version} ],
+        [ "$tag%s [%d]\n", 'date:', $$info{date}, $$info{tm_date} ],
+        [ "$tag%s [%d]\n", 'started:', $$info{started}, $$info{tm_started} ],
+        [ "$tag%s/%d\n", 'network:', $$info{network}, $$info{prefixlen} ],
+        [ "$tag%s\n", 'interface:', $$info{interface} ],
+        [ "$tag%s\n", 'IP:', $$info{ip} ],
+        [ "$tag%s\n", 'MAC:', $$info{mac} ],
+        [ "$tag%s", 'next sweep:', $$info{next_sweep} ],
+        ($$info{tm_next_sweep} ?
             sprintf(" (in %d secs) [%d]",
-                $$info{next_sweep}-$$info{date},
-                $$info{next_sweep})
+                $$info{tm_next_sweep}-$$info{date},
+                $$info{tm_next_sweep})
             : ''
         ),
         "\n",
@@ -1885,14 +1870,13 @@ sub get_log_mask {
 }
 
 sub do_param {
-    # TODO: continue with option changing/formatting a la "do_status".
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
 
     my $opts = { translate => 1, fmt => 'native' };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        'nf'       => sub { $opts->{format} = 0 },
+        'nf'         => sub { $opts->{format} = 0 },
         'translate!' => \$opts->{translate},
         'format|f=s' => \$opts->{fmt},
         (
@@ -2029,7 +2013,6 @@ sub do_dump_status {
     my $opts = {
         'fmt'     => 'native',
         'header'  => 1,
-        'summary' => 1,
     };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
@@ -2037,7 +2020,6 @@ sub do_dump_status {
         'header!'  => \$opts->{header},
         'long!'    => sub { $opts->{summary} = !$_[1] },
         'nh'       => sub { $opts->{header}  = 0  },
-        'summary!' => sub { $opts->{summary} = $_[1] },
         'format|f=s' => \$opts->{fmt},
         (
             map { $_ => sub { $opts->{fmt} = $_[0] } }
@@ -2084,16 +2066,14 @@ sub do_dump_status {
         my $data = {
             'arpsponge.status' => $STATUS,
             'arpsponge.parameters' => $param,
-            'arpsponge.state-table' => \%ip_table,
-            'arpsponge.arp-table' => \%arp_table,
+            'arpsponge.state-table' => $ip_table,
+            'arpsponge.arp-table' => $arp_table,
         };
 
         if ($opts->{fmt} eq 'json') {
-            print_output("JSON!\n");
             $output_str = JSON->new->pretty->encode($data);
         }
         else {
-            print_output("YAML: $$opts{fmt}\n");
             $output_str = YAML::XS::Dump($data);
         }
     }
@@ -2115,7 +2095,7 @@ sub convert_ip_output_for_export {
         my $ip = delete $entry->{ip};
         delete $entry->{hex_ip};
         $ip_table{$ip} = $entry;
-        for my $attr (qw( rate state_changed queue last_queried )) {
+        for my $attr (qw( rate tm_state_changed queue tm_last_queried )) {
             $entry->{$attr} += 0;
         }
     }
@@ -2130,7 +2110,7 @@ sub convert_arp_output_for_export {
         delete $entry->{hex_ip};
         delete $entry->{hex_mac};
         $arp_table{$ip} = $entry;
-        for my $attr (qw( mac_changed )) {
+        for my $attr (qw( tm_mac_changed )) {
             $entry->{$attr} += 0;
         }
     }
@@ -3150,14 +3130,76 @@ Most C<show> commands accept the following options:
 
 =over
 
-=item X<--raw>X<--noraw>B<--raw>, B<--noraw>
+=item B<--translate>, B<--no-translate>
+X<--translate>X<--no-translate>
 
-Don't translate timestamps, IP addresses or MAC addresses. Implies
-C<--noformat>.
+Don't translate timestamps, IP addresses or MAC addresses. Only effective in combination with C<--format=raw>.
 
-=item X<--format>B<--format>
+=item B<--format>={B<native>|I<raw>|I<json>|I<yaml>}
 
-=item X<--nf>X<--noformat>B<--nf>, B<--noformat>
+Select the output format:
+
+=over
+
+=item C<native>
+
+Produce human-readable output (typically in table format).
+This is the default.
+
+=item C<raw>
+
+Print the raw response from the L<arpsponge> daemon.
+
+=item C<json>, C<yaml>
+
+JSON and YAML formats, resp.
+
+Date values are presented as ISO-8601 date strings. The corresponding
+"epoch" values (seconds since midnight 1 January 1970), are included
+with a C<tm_> prefix:
+
+  {
+    "arpsponge.status" : {
+      "id"              : "arpsponge",
+      "pid"             : 30396,
+      "version"         : "3.22~1.gbp512f74",
+      "date"            : "2021-04-06T15:16:14+0200",
+      "tm_date"         : 1617714974,
+      "started"         : "2021-03-30T16:47:25+0200",
+      "tm_started"      : 1617115645,
+      "network"         : "192.168.122.0",
+      "interface"       : "enp1s0",
+      "ip"              : "192.168.122.234",
+      "prefixlen"       : 24,
+      "mac"             : "52:54:00:1e:a5:c2",
+      "next_sweep"      : "never",
+      "tm_next_sweep"   : 0
+    }
+  }
+
+  ---
+  arpsponge.status:
+    id            : arpsponge
+    pid           : 30396
+    version       : 3.22~1.gbp512f74
+    date          : 2021-04-06T15: 18:35+0200
+    tm_date       : 1617715115
+    started       : 2021-03-30T16:47:25+0200
+    tm_started    : 1617115645
+    network       : 192.168.122.0
+    interface     : enp1s0
+    ip            : 192.168.122.234
+    prefixlen     : 24
+    mac           : 52:54:00:1e:a5:c2
+    next_sweep    : never
+    tm_next_sweep : 0
+
+=back
+
+=item B<--raw>, B<--json>, B<--yaml>
+X<--raw>X<--json>X<--yaml>
+
+Shortcuts for C<--format=X>.
 
 =back
 
@@ -3186,6 +3228,5 @@ Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011.
 
 =head1 COPYRIGHT
 
-Copyright 2011-2016, AMS-IX B.V.
+Copyright 2011-2021, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
-
