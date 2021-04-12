@@ -1,6 +1,6 @@
-arpsponge (3.22~2.gbpfc750a) UNRELEASED; urgency=medium
+arpsponge (3.22~3.gbp9d7316) UNRELEASED; urgency=medium
 
-  ** SNAPSHOT build @fc750ae1c07a39e360914b04ed8ca8aa4ff45781 **
+  ** SNAPSHOT build @9d7316bb53b56ccbb5fe35de94cb87b0d582e4c3 **
 
   * Major features:
     * "interfaces.d" feature in init script.
@@ -23,7 +23,7 @@ arpsponge (3.22~2.gbpfc750a) UNRELEASED; urgency=medium
     * Refactor print_output for sprintf() convenience.
     * Add proper type conversion for date timestamps.
 
- -- Steven Bakker <steven.bakker@ams-ix.net>  Tue, 06 Apr 2021 15:36:34 +0200
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 12 Apr 2021 10:15:40 +0200
 
 arpsponge (3.21) unstable; urgency=medium
 
