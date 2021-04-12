@@ -42,7 +42,8 @@ my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
     set_queuedepth set_max_rate set_max_pending set_learning
     set_proberate set_flood_protection set_dummy
     set_sweep_age set_sweep_sec set_sweep_skip_alive
-    set_alive set_dead set_pending
+    set_alive set_dead set_pending set_static
+    set_static_mode set_passive_mode
     set_arp_update_flags
     set_log_level set_log_mask
     probe inform
@@ -201,6 +202,8 @@ sub _get_param_info_s {
         sprintf("%s=%d\n", 'proberate', $proberate),
         sprintf("%s=%d\n", 'learning', $s->user('learning')),
         sprintf("%s=%d\n", 'dummy', int($s->is_dummy)),
+        sprintf("%s=%d\n", 'passive', $s->user('passive')),
+        sprintf("%s=%d\n", 'static', $s->user('static')),
         sprintf("%s=%d\n", 'arp_update_flags', $s->arp_update_flags),
         sprintf("%s=%d\n", 'log_level', log_level()),
         sprintf("%s=%d\n", 'log_mask', event_mask()),
@@ -424,6 +427,25 @@ sub _cmd_set_pending {
     return $self->send_ok("ip=$ip\nold=$old_s\nnew=$new_s\nrate=$rate");
 }
 
+sub _cmd_set_static {
+    my ($self, $sponge, $cmd, @args) = @_;
+    if (@args != 1) {
+        return $self->send_error("$cmd <IP>");
+    }
+    my $ip = $args[0];
+    if ( ! $sponge->is_my_network($ip) ) {
+        return $self->send_error(hex2ip($ip), ": address out of range");
+    }
+    $self->_log_ctl(
+        "[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
+
+    my $old_s = $sponge->state_name($sponge->get_state($ip));
+    $sponge->set_static($ip);
+    my $new_s = $sponge->state_name(STATIC());
+    my $rate = sprintf("%0.1f", $sponge->queue->rate($ip) // 0.0);
+    return $self->send_ok("ip=$ip\nold=$old_s\nnew=$new_s\nrate=$rate");
+}
+
 sub _cmd_set_dead {
     my ($self, $sponge, $cmd, @args) = @_;
     if (@args != 1) {
@@ -620,6 +642,34 @@ sub _cmd_set_dummy {
     my $old = $sponge->is_dummy;
     $sponge->is_dummy($int);
     $int    = $sponge->is_dummy;
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
+}
+
+sub _cmd_set_static_mode {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $int = is_valid_int($args[0], -min=>0, -max=>1);
+    if (!defined $int) {
+        return $self->send_error("$cmd {0|1}");
+    }
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
+    my $old = $sponge->user('static');
+    $sponge->user('static', $int);
+    $int    = $sponge->user('static');
+    return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
+}
+
+sub _cmd_set_passive_mode {
+    my ($self, $sponge, $cmd, @args) = @_;
+
+    my $int = is_valid_int($args[0], -min=>0, -max=>1);
+    if (!defined $int) {
+        return $self->send_error("$cmd {0|1}");
+    }
+    $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
+    my $old = $sponge->user('passive');
+    $sponge->user('passive', $int);
+    $int    = $sponge->user('passive');
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
 }
 

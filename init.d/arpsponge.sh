@@ -45,6 +45,7 @@ export  \
         QUEUE_DEPTH \
         RATE \
         SPONGE_NETWORK \
+        STATIC_MODE \
         SWEEP \
         SWEEP_AT_START \
         SWEEP_SKIP_ALIVE
@@ -52,7 +53,7 @@ export  \
 # Defaults for all sponges.
 if [ -f "${ETC_DEFAULT}/${PROG}/defaults" ]; then
     . "${ETC_DEFAULT}/${PROG}/defaults"
-    # Make sure the "defaults" file doesn't accidentally overwrites
+    # Make sure the "defaults" file doesn't accidentally overwrite
     # our ETC_DEFAULT.
     ETC_DEFAULT=@ETC_DEFAULT@
 fi
@@ -113,6 +114,7 @@ start_sponge() {
         # files do not disturb the global (default) settings.
         DEVICE=$(basename $file)
         unset NETWORK
+        unset STATIC_STATE_FILE
         . $file
 
         [ -n "${DEVICE}" ]  || fatal "$file: no device specified"
@@ -132,6 +134,7 @@ start_sponge() {
 
         opts=$(fix_opts_bool "$opts" --dummy "${DUMMY_MODE}")
         opts=$(fix_opts_bool "$opts" --passive "${PASSIVE_MODE}")
+        opts=$(fix_opts_bool "$opts" --static "${STATIC_MODE}")
         opts=$(fix_opts_bool "$opts" --sponge-network "${SPONGE_NETWORK}")
         opts=$(fix_opts_bool "$opts" --gratuitous "${GRATUITOUS}")
         opts=$(fix_opts_bool "$opts" --sweep-skip-alive "${SWEEP_SKIP_ALIVE}")
@@ -174,6 +177,13 @@ start_sponge() {
             ${BINDIR}/asctl \
                 --interface="${DEVICE}" \
                 -c load status "${rundir}/status"
+        fi
+
+        if eval_bool "${STATIC_MODE}" && [ -n "${STATIC_STATE_FILE}" ]
+        then
+            ${BINDIR}/asctl \
+                --interface="${DEVICE}" \
+                -c load status --force "${STATIC_STATE_FILE}"
         fi
     )
 }
@@ -288,19 +298,28 @@ status() {
             if [ -f "$pf" ]
             then
                 read pid cruft <"${pf}"
-                iface=$(basename $(dirname "${pf}"))
+                rundir=$(dirname "${pf}")
+                iface=$(basename "${rundir}")
+                socket="${rundir}/control"
+                status="${rundir}/status"
                 printf "  interface=%-10s pid=%-6s " "${iface}" "${pid}"
                 if ps -p "${pid}" > /dev/null 2>&1
                 then
                     if $isroot
                     then
-                        if kill -USR1 "${pid}" 2>/dev/null
-                        then
-                            sleep 1
+                        out=$(
+                            ${BINDIR}/asctl \
+                                --socket="${socket}" \
+                                -c dump status "${status}" \
+                            2>&1
+                        )
+                        if [ $? -eq 0 ]; then
                             echo "[Ok]"
+                            [ -n "$out" ] && echo "  $out"
                         else
                             retval=1
                             echo "[FAILED]"
+                            [ -n "$out" ] && echo "  $out"
                         fi
                     else
                         echo "[Ok]"

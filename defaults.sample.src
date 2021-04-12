@@ -10,6 +10,8 @@
 
 #DUMMY_MODE=true
 
+PERMISSIONS=root:root:660
+
 INIT_MODE=@DFL_INIT@
 LEARNING=@DFL_LEARN@
 
@@ -39,6 +41,14 @@ DISABLED=false
 # Can also be specified on a per-interface basis.
 PASSIVE_MODE=false
 
+# Whether or not to automatically (un)sponge.
+# If set to "true", the sponge will *not* automatically
+# sponge or unsponge addresses, i.e. you have to manually
+# specify this with "asctl set ip" commands, or by loading
+# a status table.
+# Can also be specified on a per-interface basis.
+STATIC_MODE=false
+
 # Which events to log.
 # Valid events: io, alien, spoof, static, sponge, ctl, state, all, none
 # See also arpsponge(8).
@@ -49,21 +59,30 @@ LOGMASK=all
 
 #############################################################################
 #
-# Now, for every ethX you want to monitor, create a "ethX" file in 
-# /etc/default/arpsponge, containing at least:
+# Now, for every IFNAME you want to monitor, create an "IFNAME" file in 
+# /etc/default/arpsponge/interfaces.d, containing at least:
 #
 # 	NETWORK=prefix/len
 #
+# Optional:
+#
+#   STATIC_STATE_FILE=config_file_path
+#   DEVICE=ifname
+#
 # e.g.:
 #
-#	echo "NETWORK=192.168.1.0/24" > /etc/default/arpsponge/eth0
+#	echo "NETWORK=192.168.1.0/24" > /etc/default/arpsponge/interfaces.d/eth0
 #
 # or even:
 #
-#	echo "NETWORK=192.168.1.0/24" > /etc/default/arpsponge/eth-fake
-#	echo "DEVICE=lo" >> /etc/default/arpsponge/eth-fake
+#	dd of=/etc/default/arpsponge/interfaces.d/loopy <<EOF
+#	DEVICE=lo
+#	NETWORK=192.168.1.0/24
+#	EOF
 #
 # Each of the variables above can be specified too and will be used
 # for this single instance of the sponge only.
+#
+# See also the arpsponge(8) man page.
 #
 #############################################################################

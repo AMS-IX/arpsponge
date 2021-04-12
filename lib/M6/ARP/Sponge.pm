@@ -553,8 +553,23 @@ sub set_dead {
 
     $self->gratuitous_arp($ip) if $self->gratuitous;
     $self->set_state($ip, DEAD);
-    # This is the place where we could send a gratuitous ARP for
-    # the sponged address to shut up all other queriers.
+}
+
+###############################################################################
+# $sponge->set_static($ip);
+#
+#    Set $ip's state to STATIC (i.e. "permanently sponged").
+#
+###############################################################################
+sub set_static {
+    my ($self, $ip) = @_;
+    my $rate = $self->queue->rate($ip) // 0.0;
+
+    event_notice(EVENT_SPONGE,
+        "static sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
+
+    $self->gratuitous_arp($ip) if $self->gratuitous;
+    $self->set_state($ip, STATIC);
 }
 
 ###############################################################################

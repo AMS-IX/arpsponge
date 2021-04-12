@@ -1,3 +1,30 @@
+arpsponge (3.22~3.gbp9d7316) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @9d7316bb53b56ccbb5fe35de94cb87b0d582e4c3 **
+
+  * Major features:
+    * "interfaces.d" feature in init script.
+    * Static mode support
+        * Controlled by STATIC_MODE and STATIC_STATE_FILE in the
+          configuration file(s).
+    * JSON and YAML export options for "show {ip|arp|status|parameters}"
+      and "dump status".
+
+  * Other enhancements:
+    * Fix time format to be ISO-8601 compliant.
+    * "defaults" sample file:
+        * Fix per-interface section.
+    * Refactoring of init script.
+    * Whitespace fixes (trailing space, mixed indent) in various places.
+    * Add dependencies for FreeBSD.
+
+  * Refactoring:
+    * Rework output formatting.
+    * Refactor print_output for sprintf() convenience.
+    * Add proper type conversion for date timestamps.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 12 Apr 2021 10:15:40 +0200
+
 arpsponge (3.21) unstable; urgency=medium
 
   * Fix time display if no sweep is set.

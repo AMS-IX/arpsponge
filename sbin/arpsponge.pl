@@ -92,6 +92,7 @@ Options:
   --control=socket        - location of the control socket (<rundir>/control)
   --[no]daemon            - put process in background
   --dummy                 - simulate sponging; turns off syslog
+  --static                - do NOT do any automatic (un)sponging
   --passive               - do NOT source any ARP queries
   --flood-protection=n    - protect against floods from single sources;
                             queries from a source coming in faster than
@@ -169,6 +170,7 @@ sub Main {
         'daemon!'             => \(my $daemon),
         'dummy!'              => \(my $dummy),
         'passive!'            => \(my $passive),
+        'static!'             => \(my $static),
         'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
         'gratuitous!'         => \(my $gratuitous),
         'help|?'              => sub { print $::USAGE; exit 0 },
@@ -290,6 +292,7 @@ sub Main {
         probesleep       => 1.0/$proberate,
         sweep_skip_alive => $sweep_skip_alive,
         passive          => $passive,
+        static           => $static,
     );
 
     if ($sponge->my_ip eq $IPv4_ADDR_NONE) {
@@ -920,14 +923,18 @@ sub do_sweep {
 sub update_state {
     my ($sponge, $src_ip, $src_mac) = @_;
 
-    if ($sponge->get_state($src_ip) != STATIC) {
-        $sponge->set_alive($src_ip, $src_mac);
-        return;
+    my $state = $sponge->get_state($src_ip);
+    $state = STATIC if $state != ALIVE && $sponge->user('static');
+
+    if ($state == STATIC) {
+        event_warning(EVENT_STATIC,
+            "traffic from STATIC sponged IP: src.mac=%s src.ip=%s",
+            hex2mac($src_mac), hex2ip($src_ip),
+        );
     }
-    event_warning(EVENT_STATIC,
-        "traffic from STATIC sponged IP: src.mac=%s src.ip=%s",
-        hex2mac($src_mac), hex2ip($src_ip),
-    );
+
+    $sponge->set_alive($src_ip, $src_mac);
+    return;
 }
 
 ###############################################################################
@@ -1050,12 +1057,13 @@ sub process_pkt {
                 hex2mac($src_mac), hex2ip($dst_ip)
             );
 
+
         # Mmmh, don't let go completely yet... If all is well,
         # we'll soon start seeing "real" traffic from this
         # address...
         my $state = $sponge->get_state($dst_ip);
         if (defined $state && $state != ALIVE) {
-            $sponge->set_pending($dst_ip, 0);
+            $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
         }
         return;
     }
@@ -1108,7 +1116,7 @@ sub process_pkt {
 
     if (!defined $state) {
         # State is not defined (yet), so make it pending.
-        $state = $sponge->set_pending($dst_ip, 0);
+        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
         return;
     }
 
@@ -1130,7 +1138,7 @@ sub process_pkt {
     my $fp_rate = $sponge->flood_protection;
     if (!$fp_rate) {
         # No flood protection, so just set address to pending.
-        $state = $sponge->set_pending($dst_ip, 0);
+        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
     }
 
     # In case of flood protection, reduce the queue
@@ -1147,9 +1155,8 @@ sub process_pkt {
     if ($sponge->queue->is_full($dst_ip) &&
         $r2 > $sponge->max_rate)
     {
-        $state = $sponge->set_pending($dst_ip, 0);
+        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
     }
-
 
     return;
 }
@@ -1259,7 +1266,9 @@ sub do_status {
     $fh->blocking(0);
 
     ##########################################################################
+    $fh->print("<STATUS>\n");
     $fh->print( get_status_info_s($sponge), "\n" );
+    $fh->print("</STATUS>\n");
     ##########################################################################
     my ($state_table_s, $nalive, $ndead, $npending)
             = get_ip_state_table_s($sponge);
@@ -1313,6 +1322,8 @@ I<Options>:
     --queuedepth=n
     --rate=r
     --rundir=path
+    --[no-]passive
+    --[no-]static
     --sponge-network
     --statusfile=file
     --sweep=interval/threshold
@@ -1426,6 +1437,20 @@ it, passive mode is automatically turned on, but warnings will be generated
 periodically. To get rid of these, restart the daemon with
 L<--passive|/--passive>.
 
+Note that this only disables active probing by the program; sponging and
+unsponging will still happen automatically.
+
+=head2 Static Mode
+
+When running in "static mode", the program will learn IP/MAC address mappings,
+and periodically sweep, but it will I<never> automatically sponge or unsponge.
+
+Instead, sponging and unsponging will have to be done manually (through
+L<asctl|/asctl>).
+
+In static mode, if any events occur that would normally result in I<unsponging>
+an IP address, a warning will be logged instead.
+
 =head1 OPTIONS
 
 =over
@@ -1531,7 +1556,21 @@ X<--passive>
 X<--no-passive>
 
 Run (don't run) in passive mode. When passive mode is activated, the
-sponge will I<never> send ARP queries from its own IP address. See
+sponge will I<never> send ARP queries from its own IP address.
+
+See L<Passive Mode|/Passive Mode> above.
+
+=item B<--static>
+X<--static>
+
+=item B<--no-static>
+X<--no-static>
+
+Run (don't run) in static mode. When static mode is activated,
+sponging and unsponging will I<never> happen automatically. Instead,
+sponging and unsponging will have to be done manually (through L<asctl|/asctl>).
+
+See L<Static Mode|/Static Mode> above.
 
 =item B<--dummy>
 X<--dummy>
@@ -2033,6 +2072,10 @@ How many seconds to spend in learning mode.
 
 The argument to C<--pending>.
 
+=item I<PASSIVE_MODE> (boolean)
+
+Whether or not to turn on the L<--passive|/--passive> flag.
+
 =item I<PERMISSIONS>
 
 The argument to C<--permissions>.
@@ -2055,6 +2098,10 @@ Directory root that holds state information for the various sponge
 instances. The script will create the directory if it doesn't exist yet.
 Together with the interface (I<$INTERFACE>) this is used to specify the
 I<rundir> to the sponge ("B<--rundir>=I<$SPONGE_VAR>/I<$INTERFACE>").
+
+=item I<STATIC_MODE> (boolean)
+
+Whether or not to turn on the L<--static|/--static> flag.
 
 =item I<SWEEP>
 
@@ -2083,6 +2130,14 @@ This specifies the network for which to sponge.
 By default, the init script will use the configuration file's name
 as the device name, but this can be overridden with the I<DEVICE>
 variable.
+
+=item I<STATIC_STATE_FILE> (string)
+
+If I<STATIC_MODE> is true, this variable can be used to specify
+a file with a status dump to load on (re)start of the ARP sponge.
+
+See L<asctl's "load status" command|"asctl/load status"> for more
+information.
 
 =back
 
