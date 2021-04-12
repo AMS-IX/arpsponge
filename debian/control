@@ -4,14 +4,17 @@ Priority: optional
 Maintainer: Steven Bakker <steven.bakker@ams-ix.net>
 Build-Depends: debhelper (>= 9),
  perl (>= 5.10.0),
- libnet-pcap-perl (>= 0.16),
- libterm-readline-gnu-perl (>= 1.17),
- libterm-readkey-perl (>= 2.30),
- libnetaddr-ip-perl (>= 4.028),
- libreadonly-perl (>= 1.02),
  libio-string-perl (>= 1.08),
  libipc-run-perl (>= 0.92),
- libnet-arp-perl (>= 1.0)
+ libjson-perl (>= 2.61-1),
+ libnetaddr-ip-perl (>= 4.028),
+ libnet-arp-perl (>= 1.0),
+ libnet-pcap-perl (>= 0.16),
+ libreadonly-perl (>= 1.02),
+ libscalar-list-utils-perl (>= 1:1.55-1),
+ libterm-readkey-perl (>= 2.30),
+ libterm-readline-gnu-perl (>= 1.17),
+ libyaml-libyaml-perl (>= 0.41-6)
 Standards-Version: 4.3.0.3
 Vcs-Git: https://github.com/AMS-IX/arpsponge.git
 Vcs-Browser: https://github.com/AMS-IX/arpsponge
@@ -19,17 +22,19 @@ Vcs-Browser: https://github.com/AMS-IX/arpsponge
 Package: arpsponge
 Architecture: all
 Depends: ${misc:Depends},
+ net-tools,
  perl (>= 5.10.0),
- libnet-pcap-perl (>= 0.16),
- libterm-readline-gnu-perl (>= 1.17),
- libterm-readkey-perl (>= 2.30),
- libnetaddr-ip-perl (>= 4.028),
- libreadonly-perl (>= 1.02),
- libreadonly-xs-perl (>= 1.04),
  libio-string-perl (>= 1.08),
  libipc-run-perl (>= 0.92),
+ libjson-perl (>= 2.61-1),
+ libnetaddr-ip-perl (>= 4.028),
  libnet-arp-perl (>= 1.0),
- net-tools,
+ libnet-pcap-perl (>= 0.16),
+ libreadonly-perl (>= 1.02),
+ libscalar-list-utils-perl (>= 1:1.55-1),
+ libterm-readkey-perl (>= 2.30),
+ libterm-readline-gnu-perl (>= 1.17),
+ libyaml-libyaml-perl (>= 0.41-6)
 Description: Nifty ARP sponge.
  Nifty ARP sponge featuring gratuitous ARP, sweeping, reporting, etc.
  Also keeps an internal ARP table which can be dumped to a file. The
