@@ -1,6 +1,4 @@
-arpsponge (3.22~3.gbp9d7316) UNRELEASED; urgency=medium
-
-  ** SNAPSHOT build @9d7316bb53b56ccbb5fe35de94cb87b0d582e4c3 **
+arpsponge (3.22) unstable; urgency=medium
 
   * Major features:
     * "interfaces.d" feature in init script.
@@ -19,11 +17,11 @@ arpsponge (3.22~3.gbp9d7316) UNRELEASED; urgency=medium
     * Add dependencies for FreeBSD.
 
   * Refactoring:
-    * Rework output formatting.
+    * Rework output formatting, properly converting attributes.
     * Refactor print_output for sprintf() convenience.
     * Add proper type conversion for date timestamps.
 
- -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 12 Apr 2021 10:15:40 +0200
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 12 Apr 2021 17:16:27 +0200
 
 arpsponge (3.21) unstable; urgency=medium
 
