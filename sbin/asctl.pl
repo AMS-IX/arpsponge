@@ -61,17 +61,19 @@ my $DFL_PROBE_RATE  = 1/$DFL_PROBE_DELAY;
 my $MAX_PROBE_RATE  = 1/$MIN_PROBE_DELAY;
 
 my %ATTR_TYPE = (
-    ( map { $_ => $_    } qw( arp_update_flags log_level log_mask ) ),
+    ( map { $_ => $_    } qw( arp_update_flags log_level log_mask state ) ),
     ( map { $_ => 'ip'  } qw( ip tpa spa network ) ),
     ( map { $_ => 'mac' } qw( mac tha sha ) ),
     ( map { $_ => 'boolean' } qw(
         dummy max_pending passive static sweep_skip_alive
     ) ),
     ( map { $_ => 'int' } qw(
-        tm_date learning tm_next_sweep pid prefixlen proberate queue_depth
-        tm_started sweep_age sweep_period
+        tm_date learning tm_next_sweep pid prefixlen proberate
+        queue queue_depth tm_started sweep_age sweep_period
     ) ),
-    ( map { $_ => 'float' } qw( max_rate flood_protection ) ),
+    ( map { $_ => 'float' } qw(
+        flood_protection max_rate rate
+    ) ),
     ( map { $_ => 'date'  } qw(
         started date mac_changed state_changed last_queried
         next_sweep
@@ -79,6 +81,9 @@ my %ATTR_TYPE = (
 );
 
 my %TYPE_CONVERSION_MAP = (
+    state => {
+        fmt => '%s',
+    },
     arp_update_flags => {
         convert => sub { join(',', update_flags_to_str($_[0])) },
         fmt => '%s',
@@ -499,6 +504,7 @@ sub convert_attr_value {
         or return ($val, { fmt => '%s' });
 
     my %cv = (
+        convert => sub { $_[0] },
         fmt => '%s',
         %$cv
     );
@@ -1114,7 +1120,7 @@ sub do_show_arp {
             print_output($reply);
         }
 
-        my $arp_table = convert_arp_output_for_export($result);
+        my $arp_table = convert_arp_output_for_export($result, $opts);
         my $data = { 'arpsponge.arp-table' => $arp_table };
 
         if ($opts->{fmt} eq 'json') {
@@ -1184,7 +1190,7 @@ sub do_show_ip {
     }
 
     if ($opts->{fmt} ne 'native') {
-        my $ip_table = convert_ip_output_for_export(\@filtered);
+        my $ip_table = convert_ip_output_for_export(\@filtered, $opts);
 
         my $data = { 'arpsponge.state-table' => $ip_table };
 
@@ -1241,15 +1247,17 @@ sub shared_show_arp_ip {
     my $opts = {
         'header'    => 1,
         'translate' => 1,
+        'extended'  => 0,
         'fmt'       => 'native',
     };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        'header!'    => \$opts->{header},
-        'n'          => sub { $opts->{translate} = 0 },
-        'nh'         => sub { $opts->{header}  = 0  },
-        'translate!' => \$opts->{translate},
-        'format|f=s' => \$opts->{fmt},
+        'header!'     => \$opts->{header},
+        'n'           => sub { $opts->{translate} = 0 },
+        'nh'          => sub { $opts->{header}  = 0  },
+        'translate!'  => \$opts->{translate},
+        'extended|x!' => \$opts->{extended},
+        'format|f=s'  => \$opts->{fmt},
         (
             map { $_ => sub { $opts->{fmt} = $_[0] } }
                 keys %VALID_OUTPUT_FORMAT
@@ -1317,11 +1325,13 @@ sub parse_server_reply {
             my ($k, $v) = @+{qw( k v )};
             if (my $type = $ATTR_TYPE{$k}) {
                 if (my $cv = $TYPE_CONVERSION_MAP{$type}) {
-                    if (my $save_k = $cv->{save_raw}) {
-                        $v = $cv->{convert_raw}->($v) if $cv->{convert_raw};
-                        $info{sprintf($save_k, $k)} = $v;
+                    if ($cv->{convert}) {
+                        if (my $save_k = $cv->{save_raw}) {
+                            $v = $cv->{convert_raw}->($v) if $cv->{convert_raw};
+                            $info{sprintf($save_k, $k)} = $v;
+                        }
+                        $v = $cv->{convert}->($v);
                     }
-                    $v = $cv->{convert}->($v);
                 }
             }
             $info{$k} = $v;
@@ -1791,12 +1801,13 @@ sub do_set_ip_mac {
 sub do_status {
     my ($conn, $parsed, $args) = @_;
 
-    my $opts = { translate => 1, fmt => 'native' };
+    my $opts = { translate => 1, fmt => 'native', extended => 0 };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        'nf'       => sub { $opts->{format} = 0 },
-        'translate!' => \$opts->{translate},
-        'format|f=s' => \$opts->{fmt},
+        'nf'          => sub { $opts->{format} = 0 },
+        'translate!'  => \$opts->{translate},
+        'extended|x!' => \$opts->{extended},
+        'format|f=s'  => \$opts->{fmt},
         (
             map { $_ => sub { $opts->{fmt} = $_[0] } }
                 qw( json yaml native raw )
@@ -1815,16 +1826,16 @@ sub do_status {
 
     my $info = $output->[0];
 
-    for my $k (keys %$info) {
-        delete $info->{$k} if $k =~ /^hex_/;
-    }
+    if ($opts->{fmt} ne 'native') {
+        delete %{$info}{grep { /^hex_/ } keys %$info};
+        delete %{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
 
-    my $data = { 'arpsponge.status' => $info };
-    if ($opts->{fmt} eq 'json') {
-        return print_output(JSON->new->pretty->encode($data));
-    }
-    if ($opts->{fmt} eq 'yaml') {
-        return print_output(YAML::XS::Dump($data));
+        my $data = { 'arpsponge.status' => $info };
+        return print_output(
+            $opts->{fmt} eq 'json'
+                ? JSON->new->pretty->encode($data)
+                : YAML::XS::Dump($data)
+        );
     }
 
     return print_output(
@@ -1873,12 +1884,13 @@ sub do_param {
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
 
-    my $opts = { translate => 1, fmt => 'native' };
+    my $opts = { translate => 1, fmt => 'native', extended => 0 };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        'nf'         => sub { $opts->{format} = 0 },
-        'translate!' => \$opts->{translate},
-        'format|f=s' => \$opts->{fmt},
+        'nf'          => sub { $opts->{format} = 0 },
+        'translate!'  => \$opts->{translate},
+        'extended|x!' => \$opts->{extended},
+        'format|f=s'  => \$opts->{fmt},
         (
             map { $_ => sub { $opts->{fmt} = $_[0] } }
                 qw( json yaml native raw )
@@ -1897,16 +1909,16 @@ sub do_param {
 
     my $info = $output->[0];
 
-    for my $k (keys %$info) {
-        delete $info->{$k} if $k =~ /^hex_/;
-    }
+    if ($opts->{fmt} ne 'native') {
+        delete %{$info}{grep { /^hex_/ } keys %$info};
+        delete %{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
 
-    $info = { 'arpsponge.parameters' => $info };
-    if ($opts->{fmt} eq 'json') {
-        return print_output(JSON->new->pretty->encode($info));
-    }
-    if ($opts->{fmt} eq 'yaml') {
-        return print_output(YAML::XS::Dump($info));
+        my $data = { 'arpsponge.parameters' => $info };
+        return print_output(
+            $opts->{fmt} eq 'json'
+                ? JSON->new->pretty->encode($data)
+                : YAML::XS::Dump($data)
+        );
     }
 
     return print_output(
@@ -2060,8 +2072,8 @@ sub do_dump_status {
             );
         }
 
-        my $ip_table = convert_ip_output_for_export($ip_output);
-        my $arp_table = convert_arp_output_for_export($arp_output);
+        my $ip_table = convert_ip_output_for_export($ip_output, $opts);
+        my $arp_table = convert_arp_output_for_export($arp_output, $opts);
 
         my $data = {
             'arpsponge.status' => $STATUS,
@@ -2089,28 +2101,33 @@ sub do_dump_status {
 }
 
 sub convert_ip_output_for_export {
-    my ($ip_output) = @_;
+    my ($ip_output, $opts) = @_;
     my %ip_table;
+
     for my $entry (@$ip_output) {
         my $ip = delete $entry->{ip};
-        delete $entry->{hex_ip};
-        $ip_table{$ip} = $entry;
-        for my $attr (qw( rate tm_state_changed queue tm_last_queried )) {
+        delete %{$entry}{grep { /^hex_/ } keys %$entry};
+        delete %{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
+        for my $attr (grep { /^tm_/ } keys %$entry) {
             $entry->{$attr} += 0;
         }
+        for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$entry) {
+            $entry->{$attr} += 0;
+        }
+        $ip_table{$ip} = $entry;
     }
     return \%ip_table;
 }
 
 sub convert_arp_output_for_export {
-    my ($arp_output) = @_;
+    my ($arp_output, $opts) = @_;
     my %arp_table;
     for my $entry (@$arp_output) {
         my $ip = delete $entry->{ip};
-        delete $entry->{hex_ip};
-        delete $entry->{hex_mac};
+        delete %{$entry}{grep { /^hex_/ } keys %$entry};
+        delete %{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
         $arp_table{$ip} = $entry;
-        for my $attr (qw( tm_mac_changed )) {
+        for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$entry) {
             $entry->{$attr} += 0;
         }
     }
@@ -3154,9 +3171,9 @@ Print the raw response from the L<arpsponge> daemon.
 
 JSON and YAML formats, resp.
 
-Date values are presented as ISO-8601 date strings. The corresponding
-"epoch" values (seconds since midnight 1 January 1970), are included
-with a C<tm_> prefix:
+Date values are presented as ISO-8601 date strings.
+
+Example:
 
   {
     "arpsponge.status" : {
@@ -3164,16 +3181,13 @@ with a C<tm_> prefix:
       "pid"             : 30396,
       "version"         : "3.22~1.gbp512f74",
       "date"            : "2021-04-06T15:16:14+0200",
-      "tm_date"         : 1617714974,
       "started"         : "2021-03-30T16:47:25+0200",
-      "tm_started"      : 1617115645,
       "network"         : "192.168.122.0",
       "interface"       : "enp1s0",
       "ip"              : "192.168.122.234",
       "prefixlen"       : 24,
       "mac"             : "52:54:00:1e:a5:c2",
       "next_sweep"      : "never",
-      "tm_next_sweep"   : 0
     }
   }
 
@@ -3183,15 +3197,32 @@ with a C<tm_> prefix:
     pid           : 30396
     version       : 3.22~1.gbp512f74
     date          : 2021-04-06T15: 18:35+0200
-    tm_date       : 1617715115
     started       : 2021-03-30T16:47:25+0200
-    tm_started    : 1617115645
     network       : 192.168.122.0
     interface     : enp1s0
     ip            : 192.168.122.234
     prefixlen     : 24
     mac           : 52:54:00:1e:a5:c2
     next_sweep    : never
+
+If C<--extended> is specified as well, the "epoch" values (seconds
+since midnight 1 January 1970), are included as well, with a C<tm_>
+prefix:
+
+  {
+    "arpsponge.status" : {
+      ...
+      "tm_date"         : 1617714974,
+      "tm_started"      : 1617115645,
+      "tm_next_sweep"   : 0
+    }
+  }
+
+  ---
+  arpsponge.status:
+    ...
+    tm_date       : 1617715115
+    tm_started    : 1617115645
     tm_next_sweep : 0
 
 =back
