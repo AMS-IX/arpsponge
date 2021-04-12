@@ -70,6 +70,7 @@ my %ATTR_TYPE = (
     ( map { $_ => 'int' } qw(
         tm_date learning tm_next_sweep pid prefixlen proberate
         queue queue_depth tm_started sweep_age sweep_period
+        tm_mac_changed
     ) ),
     ( map { $_ => 'float' } qw(
         flood_protection max_rate rate
