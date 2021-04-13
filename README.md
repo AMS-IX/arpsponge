@@ -81,5 +81,5 @@ pkg install gmake \
     perl5 \
     p5-Net-Pcap p5-Readonly p5-NetAddr-IP p5-IO-String \
     p5-Net-Arp p5-Term-ReadKey p5-Term-ReadLine-Gnu p5-IPC-Run \
-    p5-YAML p5-JSON
+    p5-YAML p5-YAML-LibYAML p5-JSON
 ```
