@@ -41,19 +41,20 @@ Depending on your O/S distribution and version of Perl, some or all of these may
 
 ### DEBIAN
 
-  1. Edit config.mk (see below)
+  1. Edit config.mk if necessary (see below)
   2. Run `make dpkg`
   3. `dpkg --install *.deb`
 
 ### OTHER SYSTEMS
 
-  1. Look at the start of `config.mk` and pick the correct value for `DISTRO`; this will pick sane defaults for the variables below.
-  2. Override (or delete) `DFL_SOCK_GROUP` in the `OVERRIDES` section.
-  3. Make sure the following variables are set correctly, either by the `DISTRO` selection or by overriding them.
+  1. The `config.mk` should be able to detect your OS/distro automatically. If not, you may need to edit `config.mk` and set an explicit  value.
+  2. Make sure the following variables are set correctly, either by the `DISTRO` selection or by overriding them.
     * `PERL`
     * `IFCONFIG`
     * `SPONGE_VAR`
-  4. If you want, you can override any of the variables below:
+    * `RUNDIR`
+    * `ETC_DEFAULT`
+  3. If you want, you can override any of the variables below:
     * `DIRPREFIX`
     * `BINPREFIX`
     * `DOCPREFIX`

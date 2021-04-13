@@ -27,18 +27,40 @@
 #DISTRO := fedora
 #DISTRO := redhat
 #DISTRO := ubuntu
-DISTRO = debian
+#DISTRO := debian
 
-ifeq (${DISTRO}, freebsd)
+ifeq (${DISTRO},)
+  $(info Detecting DISTRO and OS...)
+  OS := $(shell uname -s | tr [:upper:] [:lower:])
+  DISTRO := ?
+  ifeq (${OS}, linux)
+    DISTRO := $(shell grep -E "^ID =" /etc/os-release | awk "{ print $2 }")
+	$(info DISTRO = ${DISTRO})
+  else
+    _is_bsd := $(shell echo ${OS} | grep -E bsd)
+    ifneq (${_is_bsd},)
+      DISTRO := ${OS}
+      DISTRO_FLAVOR := ${OS}
+      OS := bsd
+    endif
+  endif
+  $(info OS = ${OS})
+  $(info DISTRO = ${DISTRO})
+endif
+
+# Defaults apply for Linux
+PERL                    = /usr/bin/perl
+LIBROOT                 = $(DIRPREFIX)/lib/perl5
+IFCONFIG                = /sbin/ifconfig
+OWNER                   = root
+GROUP                   = root
+DFL_SOCK_GROUP          = adm
+RUNDIR				    = /run
+ETC_DEFAULT             = /etc/default
+
+ifeq (${DISTRO},freebsd)
   OS                      = bsd
   DISTRO_FLAVOR           = freebsd
-  PERL                    = /usr/local/bin/perl
-  LIBROOT                 = $(DIRPREFIX)/lib/perl5/site_perl
-  IFCONFIG                = /sbin/ifconfig
-  OWNER                   = root
-  GROUP                   = wheel
-  DFL_SOCK_GROUP          = wheel
-  ETC_DEFAULT             = /etc/defaults
 else ifneq (, $(filter ${DISTRO},fedora redhat))
   OS                      = linux
   DISTRO_FLAVOR           = redhat
@@ -49,24 +71,27 @@ else
   $(error unknown DISTRO "${DISTRO}")
 endif
 
-ifeq (${OS}, linux)
-  PERL                    = /usr/bin/perl
-  LIBROOT                 = $(DIRPREFIX)/lib/perl5
-  IFCONFIG                = /sbin/ifconfig
-  OWNER                   = root
-  GROUP                   = root
+ifeq (${OS},bsd)
+  PERL                    = /usr/local/bin/perl
+  LIBROOT                 = $(DIRPREFIX)/lib/perl5/site_perl
+  GROUP                   = wheel
   DFL_SOCK_GROUP          = wheel
-  ETC_DEFAULT             = /etc/default
+  RUNDIR				  = /var/run
+  ifeq (${DISTRO},openbsd)
+    # OpenBSD has no /etc/default or /etc/defaults :-(
+    ETC_DEFAULT           = /etc
+  else
+    ETC_DEFAULT           = /etc/defaults
+  endif
+else ifeq (${OS},linux)
   ifeq (${DISTRO_FLAVOR},debian)
-    LIBROOT               = $(DIRPREFIX)/lib/site_perl
+	LIBROOT               = $(DIRPREFIX)/lib/site_perl
   endif
 endif
 
 # ---------------------------------------------------------------------------
 # OVERRIDES
 # ---------------------------------------------------------------------------
-
-DFL_SOCK_GROUP		= noc
 
 # ---------------------------------------------------------------------------
 # SPONGE DEFAULTS

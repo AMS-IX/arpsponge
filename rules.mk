@@ -187,11 +187,11 @@ auto/$(AUTO1)/%/autosplit.ix : $(AUTO1)/%.pm
 	@PERLLIB=$$PERLLIB:$(TOPDIR)/lib; export PERLLIB; \
 	    $(TOOLDIR)/autosplit ./auto $<
 
-%-all		:	; cd $* ; $(MAKE) all
-%-install	:	; cd $* ; $(MAKE) install
-%-uninstall	:	; cd $* ; $(MAKE) uninstall
-%-autosplit	:	; cd $* ; $(MAKE) autosplit
-%-clean		:	; cd $* ; $(MAKE) clean
+%-all		:	; cd $* ; $(MAKE) DISTRO=${DISTRO} all
+%-install	:	; cd $* ; $(MAKE) DISTRO=${DISTRO} install
+%-uninstall	:	; cd $* ; $(MAKE) DISTRO=${DISTRO} uninstall
+%-autosplit	:	; cd $* ; $(MAKE) DISTRO=${DISTRO} autosplit
+%-clean		:	; cd $* ; $(MAKE) DISTRO=${DISTRO} clean
 
 all		:	$(TARGETS)
 
