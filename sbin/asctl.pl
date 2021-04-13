@@ -29,7 +29,6 @@ use warnings;
 use Getopt::Long    qw( GetOptions GetOptionsFromArray );
 use POSIX           qw( strftime floor );
 use Pod::Usage;
-use IO::String;
 use Time::HiRes     qw( time sleep );
 use NetAddr::IP;
 use Term::ReadLine;
@@ -68,9 +67,14 @@ my %ATTR_TYPE = (
         dummy max_pending passive static sweep_skip_alive
     ) ),
     ( map { $_ => 'int' } qw(
-        tm_date learning tm_next_sweep pid prefixlen proberate
-        queue queue_depth tm_started sweep_age sweep_period
-        tm_mac_changed
+        learning pid prefixlen proberate
+        queue queue_depth sweep_age sweep_period
+        tm_date tm_last_queried tm_mac_changed
+        tm_next_sweep tm_started tm_state_changed
+        raw_arp_update_flags
+        raw_log_level
+        raw_log_mask
+        raw_boolean
     ) ),
     ( map { $_ => 'float' } qw(
         flood_protection max_rate rate
@@ -87,18 +91,22 @@ my %TYPE_CONVERSION_MAP = (
     },
     arp_update_flags => {
         convert => sub { join(',', update_flags_to_str($_[0])) },
+        save_raw => 'raw_%s',
         fmt => '%s',
     },
     log_level => {
         convert => \&log_level_to_string,
+        save_raw => 'raw_%s',
         fmt => '%s',
     },
     log_mask => {
         convert => sub { join(',', event_mask_to_str($_[0])) },
+        save_raw => 'raw_%s',
         fmt => '%s',
     },
     boolean => {
         convert => \&int2bool,
+        save_raw => 'raw_%s',
         fmt => '%s',
     },
     int => {
@@ -358,7 +366,7 @@ sub do_command {
     my @parsed = ();
 
     if (parse_line($line, \@parsed, \%args)) {
-        my $func_name = "do @parsed";
+        my $func_name = "cmd @parsed";
         $func_name =~ s/[\s-]+/_/g;
         DEBUG "func_name: $func_name";
         my $func; eval '$func = \&'.$func_name;
@@ -546,7 +554,7 @@ sub expand_ip_filter {
         if ($have_mac || ($state eq 'ALL' && $state ne 'DEAD')) {
             # Make sure the addresses all have valid MACs.
             my ($opts, $reply, $arp_table, $tag_fmt) =
-                shared_show_arp_ip($CONN, 'get_arp', [], {});
+                shared_show_arp_ip($CONN, 'get_arp');
             my %mac = map { ($_->{'hex_ip'}, $_->{'mac'}) } @$arp_table;
             @list = grep { exists $mac{$_} && $mac{$_} ne $ETH_ADDR_NONE }
                          @list;
@@ -779,7 +787,7 @@ sub Wrap_GetOptionsFromArray {
     return $arg;
 }
 
-sub do_quit {
+sub cmd_quit {
     my ($conn, $parsed, $args) = @_;
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
     my $reply = check_send_command($conn, 'quit') or return;
@@ -811,7 +819,7 @@ sub do_help_pod {
     return print_output($out);
 }
 
-sub do_help {
+sub cmd_help {
     my ($conn, $parsed, $args) = @_;
     my $pod = 0;
     Wrap_GetOptionsFromArray($$args{-options}, {}, 'pod' => \$pod) or return;
@@ -844,7 +852,7 @@ sub do_help {
     return print_output($out);
 }
 
-sub do_ping {
+sub cmd_ping {
     my ($conn, $parsed, $args) = @_;
 
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
@@ -907,7 +915,7 @@ sub do_ping {
     return 1;
 }
 
-sub do_inform_about {
+sub cmd_inform_about {
     my ($conn, $parsed, $args) = @_;
 
     my $opts = {};
@@ -1007,7 +1015,7 @@ sub do_inform_about {
 
     if ($count > 1 || $INTERACTIVE) {
         $time_estimate = $pairs * $estimate_per_update + 0.5;
-        print clr_to_eol() if $INTERACTIVE;
+        print "\r".clr_to_eol() if $INTERACTIVE;
         my $fmt = "%${intlen}d/%${intlen}d updates in %${timelen}d secs";
         print_output([ $fmt, $count, $total_pairs, time-$start ]);
     }
@@ -1042,17 +1050,19 @@ sub send_single_inform {
 ###############################################################################
 
 # cmd: show status
-sub do_show_status {
-    return do_status(@_);
+sub cmd_show_status {
+    my ($conn, $parsed, $args) = @_;
+    return do_show_status($conn, $args);
 }
 
 # cmd: show status
-sub do_show_parameters {
-    return do_param(@_);
+sub cmd_show_parameters {
+    my ($conn, $parsed, $args) = @_;
+    return do_show_parameters($conn, $args);
 }
 
 # cmd: show log
-sub do_show_log {
+sub cmd_show_log {
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
 
@@ -1075,14 +1085,14 @@ sub do_show_log {
 }
 
 # cmd: show version
-sub do_show_version {
+sub cmd_show_version {
     my ($conn, $parsed, $args) = @_;
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
     return print_output($STATUS->{'version'}."\n");
 }
 
 # cmd: show uptime
-sub do_show_uptime {
+sub cmd_show_uptime {
     my ($conn, $parsed, $args) = @_;
     Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
 
@@ -1099,8 +1109,13 @@ sub do_show_uptime {
 }
 
 # cmd: show arp
-sub do_show_arp {
+sub cmd_show_arp {
     my ($conn, $parsed, $args) = @_;
+    do_show_arp($conn, $args);
+}
+
+sub do_show_arp {
+    my ($conn, $args) = @_;
 
     my $filter_state;
     my $ip = $args->{'ip'};
@@ -1112,7 +1127,7 @@ sub do_show_arp {
     }
 
     my ($opts, $reply, $result, $tag_fmt) =
-        shared_show_arp_ip($conn, 'get_arp', $parsed, $args);
+        shared_show_arp_ip($conn, 'get_arp', $args);
 
     defined $result or return;
 
@@ -1154,8 +1169,13 @@ sub do_show_arp {
 }
 
 # cmd: show ip
-sub do_show_ip {
+sub cmd_show_ip {
     my ($conn, $parsed, $args) = @_;
+    do_show_ip($conn, $args);
+}
+
+sub do_show_ip {
+    my ($conn, $args) = @_;
 
     my $filter_state;
     my $ip = $args->{'ip'};
@@ -1171,7 +1191,7 @@ sub do_show_ip {
     }
 
     my ($opts, $raw, $result, $tag_fmt) =
-        shared_show_arp_ip($conn, 'get_ip', $parsed, $args);
+        shared_show_arp_ip($conn, 'get_ip', $args);
 
     return if !defined $raw;
 
@@ -1224,7 +1244,7 @@ sub do_show_ip {
 }
 
 # ($opts, $raw, $records, $tag_fmt) =
-#       shared_show_arp_ip($conn, $command, $parsed, $args);
+#       shared_show_arp_ip($conn, $command, $args);
 #
 #   Executes the specified command and parses the result, translating
 #   hex strings to ip and mac addresses where necessary.
@@ -1232,7 +1252,6 @@ sub do_show_ip {
 #   Parameters:
 #       $conn       connection handle
 #       $command    base command to execute
-#       $parsed     ref to list of already parsed words
 #       $args       ref to hash with parameters
 #
 #   Return values:
@@ -1244,7 +1263,7 @@ sub do_show_ip {
 #                   e.g. "%-20s".
 #
 sub shared_show_arp_ip {
-    my ($conn, $command, $parsed, $args) = @_;
+    my ($conn, $command, $args) = @_;
     my $opts = {
         'header'    => 1,
         'translate' => 1,
@@ -1359,7 +1378,7 @@ sub parse_server_reply {
 ###############################################################################
 
 # cmd: clear ip
-sub do_clear_ip {
+sub cmd_clear_ip {
     my ($conn, $parsed, $args) = @_;
 
     my $ip = $args->{'ip'};
@@ -1371,14 +1390,14 @@ sub do_clear_ip {
     }
 
     return expand_ip_run($ip,
-                  sub {
-                      return check_send_command($conn, "clear_ip $_[0]");
-                  }
-                );
+        sub {
+            return check_send_command($conn, "clear_ip $_[0]");
+        }
+    );
 }
 
 # cmd: clear arp
-sub do_clear_arp {
+sub cmd_clear_arp {
     my ($conn, $parsed, $args) = @_;
 
     my $ip = $args->{'ip'};
@@ -1386,10 +1405,10 @@ sub do_clear_arp {
     Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
 
     return expand_ip_run($ip,
-                  sub {
-                      return check_send_command($conn, "clear_arp $_[0]");
-                  }
-                );
+        sub {
+            return check_send_command($conn, "clear_arp $_[0]");
+        }
+    );
 }
 
 ###############################################################################
@@ -1397,7 +1416,7 @@ sub do_clear_arp {
 ###############################################################################
 
 # cmd: probe
-sub do_probe {
+sub cmd_probe {
     my ($conn, $parsed, $args) = @_;
 
     my $ip = $args->{'ip'};
@@ -1485,7 +1504,7 @@ sub do_set_generic {
 }
 
 # cmd: set queuedepth
-sub do_set_queuedepth {
+sub cmd_set_queuedepth {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1496,7 +1515,7 @@ sub do_set_queuedepth {
 }
 
 # cmd: set arp-update-flags
-sub do_set_arp_update_flags {
+sub cmd_set_arp_update_flags {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1507,7 +1526,7 @@ sub do_set_arp_update_flags {
 }
 
 # cmd: set log-level
-sub do_set_log_level {
+sub cmd_set_log_level {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1518,7 +1537,7 @@ sub do_set_log_level {
 }
 
 # cmd: set log-mask
-sub do_set_log_mask {
+sub cmd_set_log_mask {
     my ($conn, $parsed, $args) = @_;
 
     event_mask( get_log_mask($conn) );
@@ -1533,7 +1552,7 @@ sub do_set_log_mask {
 }
 
 # cmd: set max_pending
-sub do_set_max_pending {
+sub cmd_set_max_pending {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1545,7 +1564,7 @@ sub do_set_max_pending {
 }
 
 # cmd: set max_rate
-sub do_set_max_rate {
+sub cmd_set_max_rate {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1557,7 +1576,7 @@ sub do_set_max_rate {
 }
 
 # cmd: set learning
-sub do_set_learning {
+sub cmd_set_learning {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1569,7 +1588,7 @@ sub do_set_learning {
 }
 
 # cmd: set flood_protection
-sub do_set_flood_protection {
+sub cmd_set_flood_protection {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1581,7 +1600,7 @@ sub do_set_flood_protection {
 }
 
 # cmd: set proberate
-sub do_set_proberate {
+sub cmd_set_proberate {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1593,7 +1612,7 @@ sub do_set_proberate {
 }
 
 # cmd: set dummy
-sub do_set_dummy {
+sub cmd_set_dummy {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1604,7 +1623,7 @@ sub do_set_dummy {
 }
 
 # cmd: set passive
-sub do_set_passive {
+sub cmd_set_passive {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1616,7 +1635,7 @@ sub do_set_passive {
 }
 
 # cmd: set static
-sub do_set_static {
+sub cmd_set_static {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1628,7 +1647,7 @@ sub do_set_static {
 }
 
 # cmd: set sweep period
-sub do_set_sweep_period {
+sub cmd_set_sweep_period {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1641,7 +1660,7 @@ sub do_set_sweep_period {
 }
 
 # cmd: set sweep age
-sub do_set_sweep_age {
+sub cmd_set_sweep_age {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1653,7 +1672,7 @@ sub do_set_sweep_age {
 }
 
 # cmd: set sweep_skip_alive
-sub do_set_sweep_skip_alive {
+sub cmd_set_sweep_skip_alive {
     my ($conn, $parsed, $args) = @_;
 
     do_set_generic(-conn    => $conn,
@@ -1709,7 +1728,7 @@ sub do_set_ip_generic {
 }
 
 # cmd: set ip pending
-sub do_set_ip_pending {
+sub cmd_set_ip_pending {
     my ($conn, $parsed, $args) = @_;
 
     DEBUG "set ip pending";
@@ -1727,7 +1746,7 @@ sub do_set_ip_pending {
 }
 
 # cmd: set ip dead
-sub do_set_ip_dead {
+sub cmd_set_ip_dead {
     my ($conn, $parsed, $args) = @_;
 
     return expand_ip_run($args->{'ip'},
@@ -1742,7 +1761,7 @@ sub do_set_ip_dead {
 }
 
 # cmd: set ip static
-sub do_set_ip_static {
+sub cmd_set_ip_static {
     my ($conn, $parsed, $args) = @_;
 
     return expand_ip_run($args->{'ip'},
@@ -1757,13 +1776,13 @@ sub do_set_ip_static {
 }
 
 # cmd: sponge
-sub do_sponge { &do_set_ip_dead }
+sub cmd_sponge { &cmd_set_ip_dead }
 
 # cmd: unsponge
-sub do_unsponge { &do_set_ip_alive }
+sub cmd_unsponge { &cmd_set_ip_alive }
 
 # cmd: set ip alive
-sub do_set_ip_alive {
+sub cmd_set_ip_alive {
     my ($conn, $parsed, $args) = @_;
 
     DEBUG "set ip alive $$args{ip} mac="
@@ -1787,20 +1806,19 @@ sub do_set_ip_alive {
 # cmd: set ip mac
 #
 #   Alias for "set ip alive" with a mandatory MAC argument.
-sub do_set_ip_mac {
+sub cmd_set_ip_mac {
     my ($conn, $parsed, $args) = @_;
 
     DEBUG "set ip $$args{ip} mac $$args{mac}\n";
-    return do_set_ip_alive($conn, $parsed, $args);
+    return cmd_set_ip_alive($conn, $parsed, $args);
 }
 
 ###############################################################################
 # STATUS command
 ###############################################################################
 
-# cmd: status
-sub do_status {
-    my ($conn, $parsed, $args) = @_;
+sub do_show_status {
+    my ($conn, $args) = @_;
 
     my $opts = { translate => 1, fmt => 'native', extended => 0 };
 
@@ -1817,19 +1835,20 @@ sub do_status {
 
     $opts->{fmt} = check_output_format($opts->{fmt}) or return;
 
-    my $raw = check_send_command($conn, 'get_status') or return;
-
-    ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
+    my ($info, $reply, $tag) = get_status($conn, $opts);
+    return if ! defined $info;
 
     if ($opts->{fmt} eq 'raw') {
         return print_output($reply);
     }
 
-    my $info = $output->[0];
-
     if ($opts->{fmt} ne 'native') {
         delete %{$info}{grep { /^hex_/ } keys %$info};
-        delete %{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
+        delete %{$info}{grep { /^(?:tm|raw)_/ } keys %$info} if !$opts->{extended};
+
+        for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$info) {
+            $info->{$attr} += 0;
+        }
 
         my $data = { 'arpsponge.status' => $info };
         return print_output(
@@ -1863,26 +1882,26 @@ sub do_status {
 # $bool = get_static_mode();
 sub get_static_mode {
     my $conn = shift;
-    my ($opts, $reply, $output, $tag) = get_param($conn, {raw=>1});
-    return $output->{static};
+    my ($opts, $reply, $output, $tag) = get_param($conn);
+    return $output->{raw_static};
 }
 
 # $flags_integer = get_arp_update_flags();
 sub get_arp_update_flags {
     my $conn = shift;
-    my ($opts, $reply, $output, $tag) = get_param($conn, {raw=>1});
-    return $output->{arp_update_flags};
+    my ($opts, $reply, $output, $tag) = get_param($conn);
+    return $output->{raw_arp_update_flags};
 }
 
 # $log_mask_integer = get_log_mask();
 sub get_log_mask {
     my $conn = shift;
-    my ($opts, $reply, $output, $tag) = get_param($conn, {raw=>1});
-    return $output->{log_mask};
+    my ($opts, $reply, $output, $tag) = get_param($conn);
+    return $output->{raw_log_mask};
 }
 
-sub do_param {
-    my ($conn, $parsed, $args) = @_;
+sub do_show_parameters {
+    my ($conn, $args) = @_;
     my $format = 1;
 
     my $opts = { translate => 1, fmt => 'native', extended => 0 };
@@ -1900,19 +1919,19 @@ sub do_param {
 
     $opts->{fmt} = check_output_format($opts->{fmt}) or return;
 
-    my $raw = check_send_command($conn, 'get_param') or return;
-
-    ($opts, my $reply, my $output, my $tag) = parse_server_reply($raw, $opts);
+    ($opts, my $reply, my $info, my $tag) = get_param($conn, $opts);
 
     if ($opts->{fmt} eq 'raw') {
         return print_output($reply);
     }
 
-    my $info = $output->[0];
-
     if ($opts->{fmt} ne 'native') {
         delete %{$info}{grep { /^hex_/ } keys %$info};
-        delete %{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
+        delete %{$info}{grep { /^(?:tm|raw)_/ } keys %$info} if !$opts->{extended};
+
+        for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$info) {
+            $info->{$attr} += 0;
+        }
 
         my $data = { 'arpsponge.parameters' => $info };
         return print_output(
@@ -1996,23 +2015,24 @@ sub get_status {
 }
 
 # cmd: dump status [$file]
-sub do_dump_status {
+sub cmd_dump_status {
     my ($conn, $parsed, $args) = @_;
 
     my $fname = $args->{'file'};
 
-    ($STATUS, my $raw_status) = get_status($conn, {raw=>0, format=>1});
-
     if (!defined $fname) {
+        my ($status, $raw_status) = get_status($conn);
+        return if !defined $status;
+
         # Old-style dumping (by sending a signal to the daemon).
         Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
-        my $pid = $STATUS->{'pid'};
+        my $pid = $status->{'pid'};
         if (!$pid) {
             verbose("ERROR\n");
             return print_error("** no running daemon found");
         }
         verbose("sending USR1 signal to $pid: ");
-        if (kill 'USR1', $STATUS->{'pid'}) {
+        if (kill 'USR1', $status->{'pid'}) {
             verbose("ok\n");
             return print_output("process $pid signalled");
         }
@@ -2024,16 +2044,18 @@ sub do_dump_status {
 
     # Just pre-check options.
     my $opts = {
-        'fmt'     => 'native',
-        'header'  => 1,
+        'fmt'      => 'native',
+        'header'   => 1,
+        'extended' => 0,
     };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
         #'output-format=s' => \$opts->{fmt},
-        'header!'  => \$opts->{header},
-        'long!'    => sub { $opts->{summary} = !$_[1] },
-        'nh'       => sub { $opts->{header}  = 0  },
-        'format|f=s' => \$opts->{fmt},
+        'header!'     => \$opts->{header},
+        'long!'       => sub { $opts->{summary} = !$_[1] },
+        'nh'          => sub { $opts->{header}  = 0  },
+        'extended|x!' => sub { $opts->{header}  = 0  },
+        'format|f=s'  => \$opts->{fmt},
         (
             map { $_ => sub { $opts->{fmt} = $_[0] } }
                 keys %VALID_OUTPUT_FORMAT
@@ -2044,6 +2066,9 @@ sub do_dump_status {
 
     $opts->{fmt} = check_output_format($opts->{fmt}) or return;
 
+    my $output_str = prepare_dump_status_output($conn, $args);
+    return if !defined $output_str;
+
     my $out_fh;
     if ($fname eq '-') {
         open $out_fh, '>&', *STDOUT
@@ -2052,43 +2077,6 @@ sub do_dump_status {
     else {
         open $out_fh, '>', $fname
             or return print_error("cannot write to $fname: $!");
-    }
-
-    my $output_str;
-    if ($opts->{fmt} eq 'native') {
-         $output_str = format_native_status($conn, $parsed, $args);
-    }
-    else {
-        (undef, my $raw_param, my $param, undef) = get_param($conn);
-
-        my (undef, $raw_ip_state, $ip_output, undef) =
-            shared_show_arp_ip($conn, 'get_ip');
-
-        my (undef, $raw_arp_state, $arp_output, undef) =
-            shared_show_arp_ip($conn, 'get_arp');
-
-        if ($opts->{fmt} eq 'raw') {
-            print_output(
-                "$raw_status\n$raw_param\n$raw_ip_state\n$raw_arp_state"
-            );
-        }
-
-        my $ip_table = convert_ip_output_for_export($ip_output, $opts);
-        my $arp_table = convert_arp_output_for_export($arp_output, $opts);
-
-        my $data = {
-            'arpsponge.status' => $STATUS,
-            'arpsponge.parameters' => $param,
-            'arpsponge.state-table' => $ip_table,
-            'arpsponge.arp-table' => $arp_table,
-        };
-
-        if ($opts->{fmt} eq 'json') {
-            $output_str = JSON->new->pretty->encode($data);
-        }
-        else {
-            $output_str = YAML::XS::Dump($data);
-        }
     }
 
     print_output_fh($out_fh, $output_str);
@@ -2101,6 +2089,57 @@ sub do_dump_status {
     return $out_fh->close;
 }
 
+sub prepare_dump_status_output {
+    my ($conn, $args) = @_;
+
+    my $opts = $args->{-options};
+
+    if ($opts->{fmt} eq 'native') {
+         return format_native_status($conn, $args);
+    }
+
+    my ($status, $raw_status) = get_status($conn, $opts);
+    return if !defined $status;
+
+    (undef, my $raw_param, my $param, undef) = get_param($conn, $opts);
+    return if !defined $param;
+
+    my (undef, $raw_ip_state, $ip_output, undef) =
+        shared_show_arp_ip($conn, 'get_ip');
+    return if !defined $ip_output;
+
+    my (undef, $raw_arp_state, $arp_output, undef) =
+        shared_show_arp_ip($conn, 'get_arp');
+    return if !defined $arp_output;
+
+    if ($opts->{fmt} eq 'raw') {
+        return "$raw_status\n$raw_param\n$raw_ip_state\n$raw_arp_state";
+    }
+
+    delete %{$status}{grep { /^hex_/ } keys %$status};
+    delete %{$status}{grep { /^(?:tm|raw)_/ } keys %$status} if !$opts->{extended};
+
+    for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$status) {
+        $status->{$attr} += 0;
+    }
+
+    my $ip_table = convert_ip_output_for_export($ip_output, $opts);
+    my $arp_table = convert_arp_output_for_export($arp_output, $opts);
+
+    my $data = {
+        'arpsponge.status' => $status,
+        'arpsponge.parameters' => $param,
+        'arpsponge.state-table' => $ip_table,
+        'arpsponge.arp-table' => $arp_table,
+    };
+
+    if ($opts->{fmt} eq 'json') {
+        return JSON->new->pretty->encode($data);
+    }
+
+    return YAML::XS::Dump($data);
+}
+
 sub convert_ip_output_for_export {
     my ($ip_output, $opts) = @_;
     my %ip_table;
@@ -2109,9 +2148,6 @@ sub convert_ip_output_for_export {
         my $ip = delete $entry->{ip};
         delete %{$entry}{grep { /^hex_/ } keys %$entry};
         delete %{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
-        for my $attr (grep { /^tm_/ } keys %$entry) {
-            $entry->{$attr} += 0;
-        }
         for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$entry) {
             $entry->{$attr} += 0;
         }
@@ -2136,23 +2172,23 @@ sub convert_arp_output_for_export {
 }
 
 sub format_native_status {
-    my ($conn, $parsed, $args) = @_;
+    my ($conn, $args) = @_;
 
     my $out_buf = '';
     open my $out_buf_fh, '>', \$out_buf;
     my $oldhandle = select $out_buf_fh;
     {
         print_output("<STATUS>");
-        do_show_status($conn, $parsed, $args);
+        do_show_status($conn, $args);
         print_output("</STATUS>");
         print_output("\n<PARAM>");
-        do_show_parameters($conn, $parsed, $args);
+        do_show_parameters($conn, $args);
         print_output("</PARAM>");
         print_output("\n<STATE>");
-        my $count = do_show_ip($conn, $parsed, $args);
+        my $count = do_show_ip($conn, $args);
         print_output("</STATE>");
         print_output("\n<ARP-TABLE>");
-        my $arp_count = do_show_arp($conn, $parsed, $args);
+        my $arp_count = do_show_arp($conn, $args);
         print_output("</ARP-TABLE>");
         print_output(
                 "\nalive=$$count{ALIVE}",
@@ -2187,7 +2223,7 @@ sub get_state_table {
 }
 
 # cmd: load status $file
-sub do_load_status {
+sub cmd_load_status {
     my ($conn, $parsed, $args) = @_;
 
     my $opts = { force => 0 };
