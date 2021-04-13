@@ -466,7 +466,7 @@ sub term_width {
 }
 
 sub clr_to_eol {
-    $CLR_TO_EOL //= readpipe('tput el 2>/dev/null');
+    $CLR_TO_EOL //= (readpipe('tput el 2>/dev/null') || "\033[K");
     return $CLR_TO_EOL;
 }
 
