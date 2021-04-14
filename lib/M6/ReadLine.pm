@@ -76,7 +76,6 @@ our $PAGER        = join(' ', qw(
                              --quit-if-one-screen
                     ));
 
-my $CLR_TO_EOL    = undef;
 my $ERROR         = undef;
 
 our %TYPES = (
@@ -466,8 +465,12 @@ sub term_width {
 }
 
 sub clr_to_eol {
-    $CLR_TO_EOL //= (readpipe('tput ce 2>/dev/null') || "\033[K");
-    return $CLR_TO_EOL;
+    state $clr_to_eol = (
+        readpipe('tput el 2>/dev/null') ||
+        readpipe('tput ce 2>/dev/null') ||
+        "\033[K"
+    );
+    return $clr_to_eol;
 }
 
 # $fmt = fmt_text($prefix, $text, $maxlen, $indent);
