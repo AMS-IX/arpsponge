@@ -1,7 +1,7 @@
 #!make
 # ============================================================================
 #
-#  CONFIG.MK:	Installation preferences
+#  CONFIG.MK: Installation preferences
 #
 #   Copyright 2005-2016 AMS-IX B.V.; All rights reserved.
 #
@@ -30,12 +30,12 @@
 #DISTRO := debian
 
 ifeq (${DISTRO},)
+  $(info --------------------------)
   $(info Detecting DISTRO and OS...)
   OS := $(shell uname -s | tr [:upper:] [:lower:])
   DISTRO := ?
   ifeq (${OS}, linux)
-    DISTRO := $(shell grep -E "^ID =" /etc/os-release | awk "{ print $2 }")
-	$(info DISTRO = ${DISTRO})
+    DISTRO := $(shell grep -E "^ID=" /etc/os-release | cut -f2 -d=)
   else
     _is_bsd := $(shell echo ${OS} | grep -E bsd)
     ifneq (${_is_bsd},)
@@ -44,8 +44,9 @@ ifeq (${DISTRO},)
       OS := bsd
     endif
   endif
-  $(info OS = ${OS})
-  $(info DISTRO = ${DISTRO})
+  $(info > OS     = ${OS})
+  $(info > DISTRO = ${DISTRO})
+  $(info --------------------------)
 endif
 
 # Defaults apply for Linux
@@ -55,7 +56,7 @@ IFCONFIG                = /sbin/ifconfig
 OWNER                   = root
 GROUP                   = root
 DFL_SOCK_GROUP          = adm
-RUNDIR				    = /run
+RUNDIR                  = /run
 ETC_DEFAULT             = /etc/default
 
 ifeq (${DISTRO},freebsd)
@@ -76,7 +77,7 @@ ifeq (${OS},bsd)
   LIBROOT                 = $(DIRPREFIX)/lib/perl5/site_perl
   GROUP                   = wheel
   DFL_SOCK_GROUP          = wheel
-  RUNDIR				  = /var/run
+  RUNDIR                  = /var/run
   ifeq (${DISTRO},openbsd)
     # OpenBSD has no /etc/default or /etc/defaults :-(
     ETC_DEFAULT           = /etc
@@ -85,7 +86,7 @@ ifeq (${OS},bsd)
   endif
 else ifeq (${OS},linux)
   ifeq (${DISTRO_FLAVOR},debian)
-	LIBROOT               = $(DIRPREFIX)/lib/site_perl
+    LIBROOT               = $(DIRPREFIX)/lib/site_perl
   endif
 endif
 
