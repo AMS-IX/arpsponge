@@ -64,10 +64,10 @@ my %ATTR_TYPE = (
     ( map { $_ => 'ip'  } qw( ip tpa spa network ) ),
     ( map { $_ => 'mac' } qw( mac tha sha ) ),
     ( map { $_ => 'boolean' } qw(
-        dummy max_pending passive static sweep_skip_alive
+        dummy passive static sweep_skip_alive
     ) ),
     ( map { $_ => 'int' } qw(
-        learning pid prefixlen proberate
+        learning max_pending pid prefixlen proberate
         queue queue_depth sweep_age sweep_period
         tm_date tm_last_queried tm_mac_changed
         tm_next_sweep tm_started tm_state_changed
@@ -75,6 +75,10 @@ my %ATTR_TYPE = (
         raw_log_level
         raw_log_mask
         raw_boolean
+        raw_sweep_skip_alive
+        raw_static
+        raw_dummy
+        raw_passive
     ) ),
     ( map { $_ => 'float' } qw(
         flood_protection max_rate rate
@@ -92,21 +96,25 @@ my %TYPE_CONVERSION_MAP = (
     arp_update_flags => {
         convert => sub { join(',', update_flags_to_str($_[0])) },
         save_raw => 'raw_%s',
+        convert_raw => sub { ($_[0] // 0) + 0 },
         fmt => '%s',
     },
     log_level => {
         convert => \&log_level_to_string,
         save_raw => 'raw_%s',
+        convert_raw => sub { ($_[0] // 0) + 0 },
         fmt => '%s',
     },
     log_mask => {
         convert => sub { join(',', event_mask_to_str($_[0])) },
         save_raw => 'raw_%s',
+        convert_raw => sub { ($_[0] // 0) + 0 },
         fmt => '%s',
     },
     boolean => {
         convert => \&int2bool,
         save_raw => 'raw_%s',
+        convert_raw => sub { ($_[0] // 0) + 0 },
         fmt => '%s',
     },
     int => {
@@ -486,6 +494,17 @@ sub check_output_format {
     return print_error("invalid format '$fmt'; need $fmt_list");
 }
 
+sub mk_output_format_options {
+    my ($opts, $key) = @_;
+
+    return (
+        'format|f=s'  => \$opts->{fmt},
+        map {
+            "$_|".substr($_, 0, 1) => sub { $opts->{fmt} = $_[0] }
+        } keys %VALID_OUTPUT_FORMAT
+    );
+}
+
 #############################################################################
 sub int2bool {
     my ($val) = @_;
@@ -780,6 +799,8 @@ sub Wrap_GetOptionsFromArray {
 
     return $retval if !defined $arg;
 
+    Getopt::Long::Configure('bundling');
+
     if (reftype $arg eq 'ARRAY') {
         return GetOptionsFromArray($arg, @spec) ? $retval : undef;
     }
@@ -1066,16 +1087,14 @@ sub cmd_show_log {
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
 
-    my $translate = 1;
     Wrap_GetOptionsFromArray($args->{-options}, {},
-        'translate!' => \$translate,
-        'n'          => sub { $translate = 0 },
-        'reverse!'   => \(my $reverse = 1),
+        'notranslate|no-translate|n' => \(my $notranslate = 0),
+        'reverse|r!'                 => \(my $reverse = 1),
     ) or return;
 
     my @args = defined $args->{'nlines'} ? ($args->{'nlines'}) : ();
     my $log = check_send_command($conn, 'get_log', @args) or return;
-    if ($translate) {
+    if (!$notranslate) {
         $log =~ s/^(\S+)\t(\d+)\t/format_time($1,' ')." [$2] "/gme;
     }
     if ($reverse) {
@@ -1266,22 +1285,15 @@ sub shared_show_arp_ip {
     my ($conn, $command, $args) = @_;
     my $opts = {
         'header'    => 1,
-        'translate' => 1,
         'extended'  => 0,
         'fmt'       => 'native',
     };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
         'header!'     => \$opts->{header},
-        'n'           => sub { $opts->{translate} = 0 },
-        'nh'          => sub { $opts->{header}  = 0  },
-        'translate!'  => \$opts->{translate},
+        'nh|H'        => sub { $opts->{header}  = 0  },
         'extended|x!' => \$opts->{extended},
-        'format|f=s'  => \$opts->{fmt},
-        (
-            map { $_ => sub { $opts->{fmt} = $_[0] } }
-                keys %VALID_OUTPUT_FORMAT
-        ),
+        mk_output_format_options($opts, 'fmt'),
     ) or return;
 
     $args->{-options} = $opts;
@@ -1354,23 +1366,15 @@ sub parse_server_reply {
                     }
                 }
             }
+            $taglen = length($k) if length($k) > $taglen;
             $info{$k} = $v;
         }
 
         push @output, \%info;
-
-        foreach (keys %info) {
-            $taglen = length($_) if length($_) > $taglen;
-        }
     }
 
     $taglen++;
-    my $tag_fmt = "%-${taglen}s ";
-
-    if ($opts->{translate}) {
-        $reply =~ s/(\w+)=(\w+)/"$1=".format_attr_value($1,$2)/ge;
-    }
-    return ($opts, $reply, \@output, $tag_fmt);
+    return ($opts, $reply, \@output, "%-${taglen}s ");
 }
 
 ###############################################################################
@@ -1820,17 +1824,11 @@ sub cmd_set_ip_mac {
 sub do_show_status {
     my ($conn, $args) = @_;
 
-    my $opts = { translate => 1, fmt => 'native', extended => 0 };
+    my $opts = { fmt => 'native', extended => 0 };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        'nf'          => sub { $opts->{format} = 0 },
-        'translate!'  => \$opts->{translate},
         'extended|x!' => \$opts->{extended},
-        'format|f=s'  => \$opts->{fmt},
-        (
-            map { $_ => sub { $opts->{fmt} = $_[0] } }
-                qw( json yaml native raw )
-        ),
+        mk_output_format_options($opts, 'fmt'),
     ) or return;
 
     $opts->{fmt} = check_output_format($opts->{fmt}) or return;
@@ -1843,12 +1841,8 @@ sub do_show_status {
     }
 
     if ($opts->{fmt} ne 'native') {
-        delete %{$info}{grep { /^hex_/ } keys %$info};
-        delete %{$info}{grep { /^(?:tm|raw)_/ } keys %$info} if !$opts->{extended};
-
-        for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$info) {
-            $info->{$attr} += 0;
-        }
+        delete %{$info}{grep { /^(?:hex|raw)_/ } keys %$info};
+        delete %{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
 
         my $data = { 'arpsponge.status' => $info };
         return print_output(
@@ -1904,17 +1898,12 @@ sub do_show_parameters {
     my ($conn, $args) = @_;
     my $format = 1;
 
-    my $opts = { translate => 1, fmt => 'native', extended => 0 };
+    my $opts = { fmt => 'native', extended => 0 };
 
     $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
         'nf'          => sub { $opts->{format} = 0 },
-        'translate!'  => \$opts->{translate},
         'extended|x!' => \$opts->{extended},
-        'format|f=s'  => \$opts->{fmt},
-        (
-            map { $_ => sub { $opts->{fmt} = $_[0] } }
-                qw( json yaml native raw )
-        ),
+        mk_output_format_options($opts, 'fmt'),
     ) or return;
 
     $opts->{fmt} = check_output_format($opts->{fmt}) or return;
@@ -1926,12 +1915,8 @@ sub do_show_parameters {
     }
 
     if ($opts->{fmt} ne 'native') {
-        delete %{$info}{grep { /^hex_/ } keys %$info};
-        delete %{$info}{grep { /^(?:tm|raw)_/ } keys %$info} if !$opts->{extended};
-
-        for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$info) {
-            $info->{$attr} += 0;
-        }
+        delete %{$info}{grep { /^(?:hex|raw)_/ } keys %$info};
+        delete %{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
 
         my $data = { 'arpsponge.parameters' => $info };
         return print_output(
@@ -1989,11 +1974,6 @@ sub get_param {
 sub get_status {
     my ($conn, $opts) = @_;
 
-    my %opts = (
-        translate => 1,
-        %{$opts // {}},
-    );
-
     my $reply;
 
     if ($conn) {
@@ -2009,7 +1989,7 @@ sub get_status {
     }
 
     my ($records, $tag_fmt);
-    ($opts, $reply, $records, $tag_fmt) = parse_server_reply($reply, \%opts);
+    ($opts, $reply, $records, $tag_fmt) = parse_server_reply($reply, $opts);
     return if ! defined $records;
     return ($records->[0], $reply, $tag_fmt);
 }
@@ -2054,12 +2034,8 @@ sub cmd_dump_status {
         'header!'     => \$opts->{header},
         'long!'       => sub { $opts->{summary} = !$_[1] },
         'nh'          => sub { $opts->{header}  = 0  },
-        'extended|x!' => sub { $opts->{header}  = 0  },
-        'format|f=s'  => \$opts->{fmt},
-        (
-            map { $_ => sub { $opts->{fmt} = $_[0] } }
-                keys %VALID_OUTPUT_FORMAT
-        ),
+        'extended|x!' => \$opts->{extended},
+        mk_output_format_options($opts, 'fmt'),
     ) or return;
 
     $args->{-options} = $opts;
@@ -2116,11 +2092,9 @@ sub prepare_dump_status_output {
         return "$raw_status\n$raw_param\n$raw_ip_state\n$raw_arp_state";
     }
 
-    delete %{$status}{grep { /^hex_/ } keys %$status};
-    delete %{$status}{grep { /^(?:tm|raw)_/ } keys %$status} if !$opts->{extended};
-
-    for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$status) {
-        $status->{$attr} += 0;
+    for my $hash ($status, $param) {
+        delete %{$hash}{grep { /^(?:hex|raw)_/ } keys %$hash};
+        delete %{$hash}{grep { /^tm_/ } keys %$hash} if !$opts->{extended};
     }
 
     my $ip_table = convert_ip_output_for_export($ip_output, $opts);
@@ -2146,11 +2120,8 @@ sub convert_ip_output_for_export {
 
     for my $entry (@$ip_output) {
         my $ip = delete $entry->{ip};
-        delete %{$entry}{grep { /^hex_/ } keys %$entry};
+        delete %{$entry}{grep { /^(?:hex|raw)_/ } keys %$entry};
         delete %{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
-        for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$entry) {
-            $entry->{$attr} += 0;
-        }
         $ip_table{$ip} = $entry;
     }
     return \%ip_table;
@@ -2161,12 +2132,9 @@ sub convert_arp_output_for_export {
     my %arp_table;
     for my $entry (@$arp_output) {
         my $ip = delete $entry->{ip};
-        delete %{$entry}{grep { /^hex_/ } keys %$entry};
+        delete %{$entry}{grep { /^(?:hex|raw)_/ } keys %$entry};
         delete %{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
         $arp_table{$ip} = $entry;
-        for my $attr (grep { $ATTR_TYPE{$_} =~ /^(?:int|float)$/ } keys %$entry) {
-            $entry->{$attr} += 0;
-        }
     }
     return \%arp_table;
 }
@@ -3183,11 +3151,6 @@ Sponge/unsponge given IP(s); see also C<set ip alive> and C<set ip dead>.
 Most C<show> commands accept the following options:
 
 =over
-
-=item B<--translate>, B<--no-translate>
-X<--translate>X<--no-translate>
-
-Don't translate timestamps, IP addresses or MAC addresses. Only effective in combination with C<--format=raw>.
 
 =item B<--format>={B<native>|I<raw>|I<json>|I<yaml>}
 
