@@ -34,6 +34,7 @@ use Term::ReadKey;
 use NetAddr::IP;
 use M6::ARP::Util qw( :all );
 use Data::Dumper;
+use Getopt::Long    qw( GetOptionsFromArray );
 use M6::ARP::Sponge qw( :flags );
 use Scalar::Util qw( reftype );
 
@@ -258,7 +259,7 @@ sub parse_line {
     my ($line, $parsed, $args) = @_;
     chomp($line);
     my @words = split(' ', $line);
-    $args->{'-options'} = [];
+    $args->{'-options'} = {};
     return parse_words(\@words, { words => $SYNTAX }, $parsed, $args);
 }
 
@@ -279,8 +280,16 @@ sub parse_words {
     # Command line options (--something, -s), are stored
     # in the '-options' array in %$args. They'll be parsed
     # later on.
-    while (@$words && $$words[0] =~ /^-{1,2}./) {
-        push @{$args->{-options}}, shift @$words;
+
+    #while (@$words && $$words[0] =~ /^-{1,2}./) {
+    #   push @{$args->{-options}}, shift @$words;
+    #}
+
+    if (@$words && $words->[0] =~ /^-./) {
+        if (my $opt_spec = $syntax->{opts}) {
+            Getopt::Long::Configure('bundling');
+            GetOptionsFromArray($words, $args->{-options}, @$opt_spec) or return;
+        }
     }
 
     if (my $word_list = $syntax->{words}) {
@@ -594,15 +603,17 @@ sub _compile_branch {
 
     if (substr($word,0,1) ne '$') {
         # We have a literal.
-        my $w = $curr->{words} = $curr->{words} // {};
-        $curr = $w->{$word} = $w->{$word} // {};
+        my $w = $curr->{words} //= {};
+        $curr = $w->{$word} //= {};
+    }
+    elsif ($word eq '$-') {
+        $curr->{opts} = $spec->{opts} // [];
     }
     else {
         # We have a variable.
         my $optional = $word =~ s/^(.*)\?$/$1/;
         my $varname = substr($word,1);
-        $curr->{arg} //= {};
-        my $a = $curr->{arg};
+        my $a = $curr->{arg} //= {};
         %$a = ( %$a, %{$spec->{$word}} );
         $a->{name}     = $varname;
         $a->{optional} = $optional;

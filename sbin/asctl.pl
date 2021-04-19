@@ -29,6 +29,7 @@ use warnings;
 use Getopt::Long    qw( GetOptions GetOptionsFromArray );
 use POSIX           qw( strftime floor );
 use Pod::Usage;
+use Pod::Text::Termcap;
 use Time::HiRes     qw( time sleep );
 use NetAddr::IP;
 use Term::ReadLine;
@@ -170,54 +171,97 @@ sub DEBUG(@)   { print_error(@_) if $opt_debug; }
 
 my @IP_STATES = qw(all alive dead pending static none);
 my %Syntax = (
-    'quit' => { '?'       => 'Disconnect and quit.', },
-    'help' => { '?'       => 'Show command summary.', },
+    'quit $-' => { '?'       => 'Disconnect and quit.', },
+    'help $-' => { '?'       => 'Show command summary.',
+        opts => [ 'pod|p' ]
+    },
     'ping $count? $delay?' => {
         '?'       => '"ping" the daemon, display response RTT.',
         '$count'  => { type=>'int',   min=>1,    default=>1 },
         '$delay'  => { type=>'float', min=>0.01, default=>1 }, },
-    'clear ip $ip'   => {
+    'clear ip $- $ip'   => {
         '?'       => 'Clear state table for given IP(s).',
         '$ip'     => { type=>'ip-any'    } },
-    'clear arp $ip'  => {
+    'clear arp $- $ip'  => {
         '?'       => 'Clear ARP table for given IP(s).',
         '$ip'     => { type=>'ip-range'  } },
-    'load status $file' => {
+    'load status $- $file' => {
         '?'        => 'Load IP/ARP state from dump file.',
-        '$file'   => { type=>'filename' }, },
-    'dump status $file?' => {
+        '$file'   => { type=>'filename' },
+        'opts'    => [ 'force|f' ], },
+    'dump status $- $file?' => {
         '?'        => 'Either dump daemon status to <file>,'
                      .' or signal the daemon to dump to its'
                      .' "standard" location (user needs'
                      .' privileges to send signals to the'
                      .' daemon process).',
-        '$file'   => { type=>'filename' }, },
-    'probe $ip'   => {
+        '$file'   => { type=>'filename' },
+        'opts'    => [
+            'header|h!',
+            'H',
+            'extended|x!',
+            mk_output_format_options_2(),
+        ],
+    },
+    'probe $- $ip'   => {
         '?'       => 'Send ARP requests for given IP(s).',
-        '$ip'     => { type=>'ip-range'  } },
-    'show ip $ip?'   => {
+        '$ip'     => { type=>'ip-range'  },
+        'opts' => [ 'delay|d=f', 'rate|r=f', 'verbose|v' ],
+    },
+    'show ip $- $ip?'   => {
         '?'       => 'Show state table for given IP(s).',
-        '$ip'     => { type=>'ip-filter' } },
-    'show arp $ip?'  => {
+        '$ip'     => { type=>'ip-filter' },
+        'opts'    => [
+            'header|h!', 'H',
+            'extended|x!',
+            mk_output_format_options_2()
+        ],
+    },
+    'show arp $- $ip?'  => {
         '?'       => 'Show ARP table for given IP(s).',
-        '$ip'     => { type=>'ip-any'    } },
-    'show parameters' => { '?' => 'Show daemon parameters.'   },
-    'show status'  => { '?' => 'Show daemon status.'   },
-    'show version' => { '?' => 'Show daemon version.'  },
-    'show uptime'  => { '?' => 'Show daemon uptime.'   },
-    'show log $nlines?' => {
+        '$ip'     => { type=>'ip-any'    },
+        'opts'    => [
+            'header|h!', 'H',
+            'extended|x!',
+            mk_output_format_options_2()
+        ],
+    },
+    'show parameters $-' => {
+        '?'    => 'Show daemon parameters.',
+        'opts' => [
+            'extended|x!',
+            mk_output_format_options_2()
+        ],
+    },
+    'show status $-'  => {
+        '?'    => 'Show daemon status.',
+        'opts' => [
+            'extended|x!',
+            mk_output_format_options_2()
+        ],
+    },
+    'show version $-' => { '?' => 'Show daemon version.'  },
+    'show uptime $-'  => { '?' => 'Show daemon uptime.'   },
+    'show log $- $nlines?' => {
         '?'       => 'Show daemon log (most recent <nlines>).',
-        '$nlines' => { type=>'int', min=>1 }, },
-    'sponge $ip' => {
+        '$nlines' => { type=>'int', min=>1 },
+        'opts'    => [
+            'raw-timestamps|n',
+            'reverse|r!', 'R',
+        ],
+    },
+    'sponge $- $ip' => {
         '?'       => 'Sponge given IP(s); see also "set ip dead".',
         '$ip'     => { type=>'ip-range' } },
-    'unsponge $ip' => {
+    'unsponge $- $ip' => {
         '?'       => 'Unsponge given IP(s); see also "set ip alive".',
         '$ip'     => { type=>'ip-range' } },
-    'inform $dst_ip about $src_ip' => {
+    'inform $- $dst_ip about $src_ip' => {
         '?'       => 'Force <dst_ip> to update its ARP entry for <src_ip>.',
         '$dst_ip' => { type=>'ip-filter' },
-        '$src_ip' => { type=>'ip-filter' } },
+        '$src_ip' => { type=>'ip-filter' },
+        'opts' => [ 'delay|d=f', 'rate|r=f', 'verbose|v' ],
+    },
     'set arp_update_flags $flags' => {
         '?'       => q{Set the methods (comma-separated list) by which the}
                     .q{ sponge is to update its neighbors' ARP caches},
@@ -477,6 +521,30 @@ sub expand_ip_range {
 }
 
 #############################################################################
+sub check_output_format_2 {
+    my ($opts) = @_;
+
+    my $fmt = $opts->{format};
+    if ($fmt) {
+        if (my $val = $VALID_OUTPUT_FORMAT{lc $fmt}) {
+            return $val;
+        }
+        my @formats = sort keys %VALID_OUTPUT_FORMAT;
+        my $last_fmt = pop @formats;
+
+        my $fmt_list = join('', map { "'$_', " } @formats);
+        $fmt_list .= "or " if length($fmt_list);
+        $fmt_list .= $last_fmt;
+
+        return print_error("invalid format '$fmt'; need $fmt_list");
+    }
+
+    for my $k (sort keys %VALID_OUTPUT_FORMAT) {
+        return $VALID_OUTPUT_FORMAT{$k};
+    }
+    return 'native';
+}
+
 sub check_output_format {
     my ($fmt) = @_;
     $fmt = lc $fmt;
@@ -498,10 +566,17 @@ sub mk_output_format_options {
     my ($opts, $key) = @_;
 
     return (
-        'format|f=s'  => \$opts->{fmt},
+        'format|f=s'  => \$opts->{format},
         map {
-            "$_|".substr($_, 0, 1) => sub { $opts->{fmt} = $_[0] }
+            "$_|".substr($_, 0, 1) => sub { $opts->{format} = $_[0] }
         } keys %VALID_OUTPUT_FORMAT
+    );
+}
+
+sub mk_output_format_options_2 {
+    return (
+        'format|f=s',
+        map { "$_|".substr($_, 0, 1) } keys %VALID_OUTPUT_FORMAT
     );
 }
 
@@ -794,36 +869,38 @@ sub expand_ip_run {
     return do_ip_run($list, @_);
 }
 
-sub Wrap_GetOptionsFromArray {
-    my ($arg, $retval, @spec) = @_;
-
-    return $retval if !defined $arg;
-
-    Getopt::Long::Configure('bundling');
-
-    if (reftype $arg eq 'ARRAY') {
-        return GetOptionsFromArray($arg, @spec) ? $retval : undef;
-    }
-
-    return $arg;
-}
-
 sub cmd_quit {
     my ($conn, $parsed, $args) = @_;
-    Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
     my $reply = check_send_command($conn, 'quit') or return;
     return print_output($reply);
 }
 
-sub do_help_pod {
-    my $maxlen = 72;
-    my $out = qq{=head1 COMMAND SUMMARY\n\n}
-            . qq{=over\n}
-            ;
+
+sub cmd_help {
+    my ($conn, $parsed, $args) = @_;
+
+    my %optinfo;
+    while (my ($cmd, $info) = each %Syntax) {
+        my $opts = $info->{opts} || next;
+        for my $spec (@$opts) {
+            $spec =~ s/[\!\+]//g;
+            my ($name, $val) = split(/=/, $spec, 2);
+            my @names = split(/\|/, $name);
+            my $pod = length($names[0]) == 1 ? "B<-$names[0]>" : "B<--$names[0]>";
+            $pod .= "=I<$val>" if $val;
+            my $txt = "--$names[0]";
+            $txt .= "=$val" if $val;
+            push @{$optinfo{$cmd}{pod}}, "[$pod]";
+            push @{$optinfo{$cmd}{txt}}, "[$txt]";
+        }
+    }
 
     my %help;
     for my $cmd (keys %Syntax) {
         my $text = $cmd;
+        my $opts = $optinfo{$cmd}{pod} // [];
+        my $opt_text = join(' ', @$opts);
+        $text =~ s/(\s*)\$-(\s*)/length($opt_text) ? "$1$opt_text$2" : $2/ge;
         $text =~ s/(^|\s)([a-z][\w\-]*)/$1B<$2>/g;
         $text =~ s/\$(\S+)\?/[I<$1>]/g;
         $text =~ s/\$(\S+)/I<$1>/g;
@@ -831,52 +908,32 @@ sub do_help_pod {
         $help{$text} = $Syntax{$cmd}->{'?'};
     }
 
+    my $maxlen = 72;
+    my $pod = qq{=head1 COMMAND SUMMARY\n\n}
+            . qq{=over 32\n}
+            ;
+
     for my $cmd (sort keys %help) {
-        $out .= qq{\n=item $cmd\n\n}
+        $pod .= qq{\n=item $cmd\n\n}
               . fmt_text('', $help{$cmd}, $maxlen, 0)
               ;
     }
-    $out .= "\n=back\n";
-    return print_output($out);
-}
+    $pod .= "\n=back\n";
 
-sub cmd_help {
-    my ($conn, $parsed, $args) = @_;
-    my $pod = 0;
-    Wrap_GetOptionsFromArray($$args{-options}, {}, 'pod' => \$pod) or return;
-
-    if ($pod) {
-        return do_help_pod();
+    if ($args->{-options}->{pod}) {
+        return print_output($pod);
     }
 
-    my $maxlen = term_width() - 4;
-    my $out = "=" x $maxlen;
-    my $head = uc " $0 command summary ";
-    substr($out, (length($out)-length($head))/2, length($head)) = $head;
-    $out .= "\n";
+    my $output;
+    my $pod_parser = Pod::Text::Termcap->new( width => (term_width() - 1) );
+    $pod_parser->output_string(\$output);
+    $pod_parser->parse_string_document($pod);
 
-    my %help;
-    my $indent = 0;
-    for my $cmd (keys %Syntax) {
-        my $text = $cmd;
-        $text =~ s/\$(\S+)\?/[<$1>]/g;
-        $text =~ s/\$(\S+)/<$1>/g;
-        $text =~ s/(\S+\|\S+)/\($1\)/g;
-        $help{$text} = $Syntax{$cmd}->{'?'};
-        $indent = length($text) if length($text) > $indent;
-    }
-    $indent += 2;
-
-    for my $cmd (sort keys %help) {
-        $out .= fmt_text($cmd, $help{$cmd}, $maxlen, $indent);
-    }
-    return print_output($out);
+    return print_output($output);
 }
 
 sub cmd_ping {
     my ($conn, $parsed, $args) = @_;
-
-    Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
 
     my $count = $args->{'count'};
     my $delay = $args->{'delay'};
@@ -939,14 +996,8 @@ sub cmd_ping {
 sub cmd_inform_about {
     my ($conn, $parsed, $args) = @_;
 
-    my $opts = {};
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-            'delay=f'  => \$opts->{'delay'},
-            'rate=f'   => \$opts->{'rate'},
-        ) or return;
-
-    my $delay = $$opts{'delay'};
-    my $rate  = $$opts{'rate'};
+    my $delay = $args->{-options}{'delay'};
+    my $rate  = $args->{-options}{'rate'};
 
     my $dfl_probe_delay = $DFL_PROBE_DELAY / 10;
     my $dfl_probe_rate  = 1/$dfl_probe_delay;
@@ -1025,7 +1076,7 @@ sub cmd_inform_about {
                     $pairs--;
                     $count++;
                     return '' if $dst eq $_[0];
-                    send_single_inform($conn, $dst, $_[0]);
+                    send_single_inform($conn, $dst, $_[0], $args->{-options});
                     sleep($delay);
                     $estimate_per_update = (time-$start) / $count;
                     return '';
@@ -1087,10 +1138,9 @@ sub cmd_show_log {
     my ($conn, $parsed, $args) = @_;
     my $format = 1;
 
-    Wrap_GetOptionsFromArray($args->{-options}, {},
-        'notranslate|no-translate|n' => \(my $notranslate = 0),
-        'reverse|r!'                 => \(my $reverse = 1),
-    ) or return;
+    my $opts = $args->{-options};
+    my $notranslate = $opts->{'raw-timestamps'};
+    my $reverse = ($opts->{reverse} // 1) && !$opts->{R};
 
     my @args = defined $args->{'nlines'} ? ($args->{'nlines'}) : ();
     my $log = check_send_command($conn, 'get_log', @args) or return;
@@ -1106,14 +1156,12 @@ sub cmd_show_log {
 # cmd: show version
 sub cmd_show_version {
     my ($conn, $parsed, $args) = @_;
-    Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
     return print_output($STATUS->{'version'}."\n");
 }
 
 # cmd: show uptime
 sub cmd_show_uptime {
     my ($conn, $parsed, $args) = @_;
-    Wrap_GetOptionsFromArray($$args{-options}, {}) or return;
 
     if (($STATUS) = get_status($conn)) {
         print_output([
@@ -1150,18 +1198,18 @@ sub do_show_arp {
 
     defined $result or return;
 
-    if ($opts->{fmt} ne 'native') {
-        if ($opts->{fmt} eq 'raw') {
+    if ($opts->{format} ne 'native') {
+        if ($opts->{format} eq 'raw') {
             print_output($reply);
         }
 
         my $arp_table = convert_arp_output_for_export($result, $opts);
         my $data = { 'arpsponge.arp-table' => $arp_table };
 
-        if ($opts->{fmt} eq 'json') {
+        if ($opts->{format} eq 'json') {
             print_output(JSON->new->pretty->encode($data));
         }
-        elsif ($opts->{fmt} eq 'yaml') {
+        elsif ($opts->{format} eq 'yaml') {
             print_output(YAML::XS::Dump($data));
         }
 
@@ -1170,7 +1218,7 @@ sub do_show_arp {
     }
 
     my @output;
-    if ($$opts{header}) {
+    if ($$opts{header} && !$$opts{H}) {
         push @output, [
             "%-17s %-17s %-11s %s\n", "# MAC", "IP", "Epoch", "Time"
         ];
@@ -1224,17 +1272,17 @@ sub do_show_ip {
         push @filtered, $info;
     }
 
-    if ($opts->{fmt} eq 'raw') {
+    if ($opts->{format} eq 'raw') {
         print_output($raw);
         return \%count;
     }
 
-    if ($opts->{fmt} ne 'native') {
+    if ($opts->{format} ne 'native') {
         my $ip_table = convert_ip_output_for_export(\@filtered, $opts);
 
         my $data = { 'arpsponge.state-table' => $ip_table };
 
-        if ($opts->{fmt} eq 'json') {
+        if ($opts->{format} eq 'json') {
             print_output(JSON->new->pretty->encode($data));
         }
         else {
@@ -1244,7 +1292,7 @@ sub do_show_ip {
     }
 
     my @output;
-    if ($$opts{header}) {
+    if ($$opts{header} && !$$opts{H}) {
         push @output, [
             "%-17s %-12s %7s %12s %7s\n",
             "# IP", "State", "Queue", "Rate (q/min)", "Updated"
@@ -1283,22 +1331,10 @@ sub do_show_ip {
 #
 sub shared_show_arp_ip {
     my ($conn, $command, $args) = @_;
-    my $opts = {
-        'header'    => 1,
-        'extended'  => 0,
-        'fmt'       => 'native',
-    };
 
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        'header!'     => \$opts->{header},
-        'nh|H'        => sub { $opts->{header}  = 0  },
-        'extended|x!' => \$opts->{extended},
-        mk_output_format_options($opts, 'fmt'),
-    ) or return;
+    my $opts = $args->{-options};
 
-    $args->{-options} = $opts;
-
-    $opts->{fmt} = check_output_format($opts->{fmt}) or return;
+    $opts->{format} = check_output_format_2($opts) or return;
 
     my $reply = '';
     if ($args->{'ip'}) {
@@ -1341,11 +1377,6 @@ sub parse_server_reply {
     my $reply = shift;
     my $opts  = @_ ? shift : {};
 
-    %$opts = (
-        translate => 1,
-        %{$opts//{}},
-    );
-
     return if !defined $reply;
 
     my @output;
@@ -1387,8 +1418,6 @@ sub cmd_clear_ip {
 
     my $ip = $args->{'ip'};
 
-    Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
-
     if ($ip eq 'all') {
         return check_send_command($conn, 'clear_ip_all');
     }
@@ -1405,8 +1434,6 @@ sub cmd_clear_arp {
     my ($conn, $parsed, $args) = @_;
 
     my $ip = $args->{'ip'};
-
-    Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
 
     return expand_ip_run($ip,
         sub {
@@ -1425,11 +1452,7 @@ sub cmd_probe {
 
     my $ip = $args->{'ip'};
 
-    my $opts = {};
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-            'delay=f'  => \$opts->{'delay'},
-            'rate=f'   => \$opts->{'rate'},
-        ) or return;
+    my $opts = $args->{-options};
 
     my $delay = $$opts{'delay'};
     my $rate  = $$opts{'rate'};
@@ -1486,8 +1509,6 @@ sub do_set_generic {
     my $command   = $opts{-command} // "set_$name";
 
     $command =~ s/[-\s]+/_/g;
-
-    Wrap_GetOptionsFromArray($opts{-options}, {}) or return;
 
     my $raw = check_send_command($conn, $command, $arg) or return;
 
@@ -1705,8 +1726,6 @@ sub do_set_ip_generic {
 
     $command =~ s/[-\s]+/_/g;
 
-    Wrap_GetOptionsFromArray($opts{-options}, {}) or return;
-
     my @command_args = ($command, $ip);
     push(@command_args, $arg) if defined $arg;
     my $raw = check_send_command($conn, @command_args) or return;
@@ -1824,29 +1843,23 @@ sub cmd_set_ip_mac {
 sub do_show_status {
     my ($conn, $args) = @_;
 
-    my $opts = { fmt => 'native', extended => 0 };
-
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        'extended|x!' => \$opts->{extended},
-        mk_output_format_options($opts, 'fmt'),
-    ) or return;
-
-    $opts->{fmt} = check_output_format($opts->{fmt}) or return;
+    my $opts = $args->{-options};
+    $opts->{format} = check_output_format_2($opts) or return;
 
     my ($info, $reply, $tag) = get_status($conn, $opts);
     return if ! defined $info;
 
-    if ($opts->{fmt} eq 'raw') {
+    if ($opts->{format} eq 'raw') {
         return print_output($reply);
     }
 
-    if ($opts->{fmt} ne 'native') {
+    if ($opts->{format} ne 'native') {
         delete @{$info}{grep { /^(?:hex|raw)_/ } keys %$info};
         delete @{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
 
         my $data = { 'arpsponge.status' => $info };
         return print_output(
-            $opts->{fmt} eq 'json'
+            $opts->{format} eq 'json'
                 ? JSON->new->pretty->encode($data)
                 : YAML::XS::Dump($data)
         );
@@ -1898,29 +1911,22 @@ sub do_show_parameters {
     my ($conn, $args) = @_;
     my $format = 1;
 
-    my $opts = { fmt => 'native', extended => 0 };
-
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        'nf'          => sub { $opts->{format} = 0 },
-        'extended|x!' => \$opts->{extended},
-        mk_output_format_options($opts, 'fmt'),
-    ) or return;
-
-    $opts->{fmt} = check_output_format($opts->{fmt}) or return;
+    my $opts = $args->{-options};
+    $opts->{format} = check_output_format_2($opts) or return;
 
     ($opts, my $reply, my $info, my $tag) = get_param($conn, $opts);
 
-    if ($opts->{fmt} eq 'raw') {
+    if ($opts->{format} eq 'raw') {
         return print_output($reply);
     }
 
-    if ($opts->{fmt} ne 'native') {
+    if ($opts->{format} ne 'native') {
         delete @{$info}{grep { /^(?:hex|raw)_/ } keys %$info};
         delete @{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
 
         my $data = { 'arpsponge.parameters' => $info };
         return print_output(
-            $opts->{fmt} eq 'json'
+            $opts->{format} eq 'json'
                 ? JSON->new->pretty->encode($data)
                 : YAML::XS::Dump($data)
         );
@@ -2004,8 +2010,11 @@ sub cmd_dump_status {
         my ($status, $raw_status) = get_status($conn);
         return if !defined $status;
 
+        if (keys %{$args->{-options}}) {
+            return print_error("dump status without file name accepts no options");
+        }
+
         # Old-style dumping (by sending a signal to the daemon).
-        Wrap_GetOptionsFromArray($args->{-options}, {}) or return;
         my $pid = $status->{'pid'};
         if (!$pid) {
             verbose("ERROR\n");
@@ -2021,26 +2030,7 @@ sub cmd_dump_status {
     }
 
     # Dump to a file.
-
-    # Just pre-check options.
-    my $opts = {
-        'fmt'      => 'native',
-        'header'   => 1,
-        'extended' => 0,
-    };
-
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-        #'output-format=s' => \$opts->{fmt},
-        'header!'     => \$opts->{header},
-        'long!'       => sub { $opts->{summary} = !$_[1] },
-        'nh'          => sub { $opts->{header}  = 0  },
-        'extended|x!' => \$opts->{extended},
-        mk_output_format_options($opts, 'fmt'),
-    ) or return;
-
-    $args->{-options} = $opts;
-
-    $opts->{fmt} = check_output_format($opts->{fmt}) or return;
+    $args->{-options}{format} = check_output_format_2($args->{-options}) or return;
 
     my $output_str = prepare_dump_status_output($conn, $args);
     return if !defined $output_str;
@@ -2070,7 +2060,7 @@ sub prepare_dump_status_output {
 
     my $opts = $args->{-options};
 
-    if ($opts->{fmt} eq 'native') {
+    if ($opts->{format} eq 'native') {
          return format_native_status($conn, $args);
     }
 
@@ -2088,7 +2078,7 @@ sub prepare_dump_status_output {
         shared_show_arp_ip($conn, 'get_arp');
     return if !defined $arp_output;
 
-    if ($opts->{fmt} eq 'raw') {
+    if ($opts->{format} eq 'raw') {
         return "$raw_status\n$raw_param\n$raw_ip_state\n$raw_arp_state";
     }
 
@@ -2107,7 +2097,7 @@ sub prepare_dump_status_output {
         'arpsponge.arp-table' => $arp_table,
     };
 
-    if ($opts->{fmt} eq 'json') {
+    if ($opts->{format} eq 'json') {
         return JSON->new->pretty->encode($data);
     }
 
@@ -2194,11 +2184,7 @@ sub get_state_table {
 sub cmd_load_status {
     my ($conn, $parsed, $args) = @_;
 
-    my $opts = { force => 0 };
-
-    $opts = Wrap_GetOptionsFromArray($args->{-options}, $opts,
-            'force!'   => \$opts->{force},
-        ) or return;
+    my $opts = $args->{-options};
 
     my $fname = $args->{'file'};
 
@@ -2599,9 +2585,9 @@ Signals to the program that whatever follows the C<--command> option should be
 considered as input to the program. This is useful if you want to specify
 options to the program's commands. The following are sort of equivalent:
 
-  asctl -c show status --no-format
-  asctl -- show status --no-format
-  asctl 'show status --no-format'
+  asctl -c show status --json
+  asctl -- show status --json
+  asctl 'show status --json'
 
 Note that you cannot specify C<--command> without at least one argument.
 
