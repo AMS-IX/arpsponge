@@ -281,10 +281,6 @@ sub parse_words {
     # in the '-options' array in %$args. They'll be parsed
     # later on.
 
-    #while (@$words && $$words[0] =~ /^-{1,2}./) {
-    #   push @{$args->{-options}}, shift @$words;
-    #}
-
     if (@$words && $words->[0] =~ /^-./) {
         if (my $opt_spec = $syntax->{opts}) {
             Getopt::Long::Configure('bundling');
