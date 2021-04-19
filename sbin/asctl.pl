@@ -1841,8 +1841,8 @@ sub do_show_status {
     }
 
     if ($opts->{fmt} ne 'native') {
-        delete %{$info}{grep { /^(?:hex|raw)_/ } keys %$info};
-        delete %{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
+        delete @{$info}{grep { /^(?:hex|raw)_/ } keys %$info};
+        delete @{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
 
         my $data = { 'arpsponge.status' => $info };
         return print_output(
@@ -1915,8 +1915,8 @@ sub do_show_parameters {
     }
 
     if ($opts->{fmt} ne 'native') {
-        delete %{$info}{grep { /^(?:hex|raw)_/ } keys %$info};
-        delete %{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
+        delete @{$info}{grep { /^(?:hex|raw)_/ } keys %$info};
+        delete @{$info}{grep { /^tm_/ } keys %$info} if !$opts->{extended};
 
         my $data = { 'arpsponge.parameters' => $info };
         return print_output(
@@ -2093,8 +2093,8 @@ sub prepare_dump_status_output {
     }
 
     for my $hash ($status, $param) {
-        delete %{$hash}{grep { /^(?:hex|raw)_/ } keys %$hash};
-        delete %{$hash}{grep { /^tm_/ } keys %$hash} if !$opts->{extended};
+        delete @{$hash}{grep { /^(?:hex|raw)_/ } keys %$hash};
+        delete @{$hash}{grep { /^tm_/ } keys %$hash} if !$opts->{extended};
     }
 
     my $ip_table = convert_ip_output_for_export($ip_output, $opts);
@@ -2120,8 +2120,8 @@ sub convert_ip_output_for_export {
 
     for my $entry (@$ip_output) {
         my $ip = delete $entry->{ip};
-        delete %{$entry}{grep { /^(?:hex|raw)_/ } keys %$entry};
-        delete %{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
+        delete @{$entry}{grep { /^(?:hex|raw)_/ } keys %$entry};
+        delete @{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
         $ip_table{$ip} = $entry;
     }
     return \%ip_table;
@@ -2132,8 +2132,8 @@ sub convert_arp_output_for_export {
     my %arp_table;
     for my $entry (@$arp_output) {
         my $ip = delete $entry->{ip};
-        delete %{$entry}{grep { /^(?:hex|raw)_/ } keys %$entry};
-        delete %{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
+        delete @{$entry}{grep { /^(?:hex|raw)_/ } keys %$entry};
+        delete @{$entry}{grep { /^tm_/ } keys %$entry} if !$opts->{extended};
         $arp_table{$ip} = $entry;
     }
     return \%arp_table;
