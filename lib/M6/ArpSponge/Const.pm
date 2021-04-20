@@ -17,7 +17,7 @@
 # S.Bakker, 2011;
 #
 ###############################################################################
-package M6::ARP::Const;
+package M6::ArpSponge::Const;
 
 use strict;
 

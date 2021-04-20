@@ -1,6 +1,6 @@
 #===============================================================================
 #
-#       Module:  M6::ReadLine
+#       Module:  M6::ArpSponge::ReadLine
 #         File:  ReadLine.pm
 #
 #  Description:  parse/validate/completion for programs that use ReadLine.
@@ -23,7 +23,7 @@
 #
 #===============================================================================
 
-package M6::ReadLine;
+package M6::ArpSponge::ReadLine;
 
 use strict;
 use warnings;
@@ -32,10 +32,10 @@ use base qw( Exporter );
 use Term::ReadLine;
 use Term::ReadKey;
 use NetAddr::IP;
-use M6::ARP::Util qw( :all );
+use M6::ArpSponge::Util qw( :all );
 use Data::Dumper;
 use Getopt::Long    qw( GetOptionsFromArray );
-use M6::ARP::Sponge qw( :flags );
+use M6::ArpSponge::Sponge qw( :flags );
 use Scalar::Util qw( reftype );
 
 BEGIN {
@@ -747,15 +747,15 @@ __END__
 
 =head1 NAME
 
-M6::ReadLine - AMS-IX extensions on top of Term::ReadLine
+M6::ArpSponge::ReadLine - AMS-IX extensions on top of Term::ReadLine
 
 =head1 SYNOPSIS
 
- use M6::ReadLine qw( :all );
+ use M6::ArpSponge::ReadLine qw( :all );
 
  init_readline(
             'history_lines' => 1000,
-            'completion'    => \&M6::ReadLine::complete_line,
+            'completion'    => \&M6::ArpSponge::ReadLine::complete_line,
             'name'          => $prog,
             'history_file'  => "$::ENV{HOME}/.${prog}_history";
         );

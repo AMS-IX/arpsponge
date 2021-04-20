@@ -18,7 +18,7 @@
 # S.Bakker, 2011;
 #
 ###############################################################################
-package M6::ARP::Log;
+package M6::ArpSponge::Log;
 
 use strict;
 
@@ -150,7 +150,7 @@ sub log_debug   { print_log_level(LOG_DEBUG,    @_) }
 # add_notify($fh);
 #
 #   Add $fh to the list of notification handles. $fh is assumed
-#   to be a M6::ARP::Control::Server reference.
+#   to be a M6::ArpSponge::Control::Server reference.
 #
 #   Returns the $fh argument.
 #
@@ -165,7 +165,7 @@ sub add_notify {
 # remove_notify($fh);
 #
 #   Remove $fh from the list of notification handles. $fh is assumed
-#   to be a M6::ARP::Control::Server reference.
+#   to be a M6::ArpSponge::Control::Server reference.
 #
 #   Returns the $fh argument.
 #

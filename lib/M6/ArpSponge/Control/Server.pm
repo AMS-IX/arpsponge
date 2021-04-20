@@ -17,17 +17,17 @@
 # S.Bakker, 2011
 #
 ###############################################################################
-package M6::ARP::Control::Server;
+package M6::ArpSponge::Control::Server;
 
 use strict;
-use base qw( M6::ARP::Control::Base );
+use base qw( M6::ArpSponge::Control::Base );
 
 use IO::Socket;
-use M6::ARP::Const     qw( :states :flags );
-use M6::ARP::Util      qw( :all );
-use M6::ARP::NetPacket qw( :vars );
-use M6::ARP::Log       qw( :func :macros );
-use M6::ARP::Event     qw( :func :macros );
+use M6::ArpSponge::Const     qw( :states :flags );
+use M6::ArpSponge::Util      qw( :all );
+use M6::ArpSponge::NetPacket qw( :vars );
+use M6::ArpSponge::Log       qw( :func :macros );
+use M6::ArpSponge::Event     qw( :func :macros );
 use Time::HiRes        qw( time );
 
 use POSIX qw( strftime );
@@ -49,7 +49,7 @@ my %Command_Dispatch = map { $_ => "_cmd_$_" } qw(
     probe inform
 );
 
-# my $server = M6::ARP::Control::Server->create_server(
+# my $server = M6::ArpSponge::Control::Server->create_server(
 #                   $socketname [, $maxclients]
 #              );
 #
@@ -72,7 +72,7 @@ sub create_server {
     bless $self, $type;
 }
 
-# my $obj = M6::ARP::Control::Server->new($socketname [, $maxclients]);
+# my $obj = M6::ArpSponge::Control::Server->new($socketname [, $maxclients]);
 #
 #   Convenience wrapper around new().
 #
@@ -219,7 +219,7 @@ sub _get_status_info_s {
     my $learning   = $sponge->user('learning');
 
     my @response = (
-        sprintf("%s=%s\n", 'id', $M6::ARP::Log::Syslog_Ident),
+        sprintf("%s=%s\n", 'id', $M6::ArpSponge::Log::Syslog_Ident),
         sprintf("%s=%d\n", 'pid', $$),
         sprintf("%s=%s\n", 'version', $sponge->user('version')),
         sprintf("%s=%d\n", 'date', $now),
@@ -785,16 +785,16 @@ __END__
 
 =head1 NAME
 
-M6::ARP::Control::Server - server implementation for arpsponge control
+M6::ArpSponge::Control::Server - server implementation for arpsponge control
 
 =head1 SYNOPSIS
 
- use M6::ARP::Control::Server;
+ use M6::ArpSponge::Control::Server;
 
- $server = M6::ARP::Control::Server->create_server($socket_file);
+ $server = M6::ArpSponge::Control::Server->create_server($socket_file);
 
  # Alternative method (equivalent to above):
- $server = M6::ARP::Control::Server->new(
+ $server = M6::ArpSponge::Control::Server->new(
                     Local  => $socket_file,
                     Type   => SOCK_STREAM,
                     Listen => 5
@@ -823,7 +823,7 @@ L<arpsponge>(8)
 control connection.
 
 The
-C<M6::ARP::Control::Server>
+C<M6::ArpSponge::Control::Server>
 class is designed with single-threaded servers in mind that use a
 C<select()> loop to detect input on a socket. Hence, the default
 I/O mode on these objects is non-blocking.
@@ -861,10 +861,10 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ARP::Sponge>(3),
-L<M6::ARP::Control>(3),
-L<M6::ARP::Control::Base>(3),
-L<M6::ARP::Control::Client>(3),
+L<M6::ArpSponge::Sponge>(3),
+L<M6::ArpSponge::Control>(3),
+L<M6::ArpSponge::Control::Base>(3),
+L<M6::ArpSponge::Control::Client>(3),
 L<IO::Socket|IO::Socket>(3),
 L<arpsponge|arpsponge>(8), L<asctl>(1).
 

@@ -26,7 +26,7 @@ use IPC::Run qw( run );
 use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
                   pcap_get_selectable_fd pcap_setnonblock );
 
-use M6::ARP::NetPacket  qw( :all );
+use M6::ArpSponge::NetPacket  qw( :all );
 use NetAddr::IP         qw( :lower );
 
 use Time::HiRes         qw( time sleep );
@@ -39,12 +39,12 @@ use IO::String;
 use IO::Select;
 use IO::Socket;
 
-use M6::ARP::Sponge;
-use M6::ARP::Log        qw( :standard );
-use M6::ARP::Event      qw( :standard );
-use M6::ARP::Const      qw( :all );
-use M6::ARP::Util       qw( :all );
-use M6::ARP::Control::Server;
+use M6::ArpSponge::Sponge;
+use M6::ArpSponge::Log        qw( :standard );
+use M6::ArpSponge::Event      qw( :standard );
+use M6::ArpSponge::Const      qw( :all );
+use M6::ArpSponge::Util       qw( :all );
+use M6::ArpSponge::Control::Server;
 
 ###############################################################################
 
@@ -260,7 +260,7 @@ sub Main {
     ####################################################################
     $| = ($verbose > 0 ? 1 : 0);
 
-    my $sponge = new M6::ARP::Sponge(
+    my $sponge = new M6::ArpSponge::Sponge(
             verbose          => $verbose,
             is_dummy         => $dummy,
             queuedepth       => $queuedepth,
@@ -410,8 +410,8 @@ sub create_control_socket {
         }
     }
 
-    my $control_fh = M6::ARP::Control::Server->create_server($Control_Socket)
-                        or log_fatal "%s", M6::ARP::Control->error;
+    my $control_fh = M6::ArpSponge::Control::Server->create_server($Control_Socket)
+                        or log_fatal "%s", M6::ArpSponge::Control->error;
 
     $sponge->user(control => $control_fh);
 
@@ -946,7 +946,7 @@ sub update_state {
 #
 #    Process sniffed packets. The "$sponge" parameter is what was passed
 #    as the "user data" parameter to the pcap_dispatch() call. In our
-#    case, that is the M6::ARP::Sponge instance, a.k.a. "$sponge".
+#    case, that is the M6::ArpSponge::Sponge instance, a.k.a. "$sponge".
 #
 ###############################################################################
 sub process_pkt {

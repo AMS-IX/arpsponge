@@ -17,11 +17,11 @@
 # S.Bakker, 2011
 #
 ###############################################################################
-package M6::ARP::Control::Base;
+package M6::ArpSponge::Control::Base;
 
 use strict;
 use base qw( IO::Socket::UNIX );
-use M6::ARP::Control;
+use M6::ArpSponge::Control;
 
 use IO::Socket;
 
@@ -29,11 +29,11 @@ BEGIN {
     our $VERSION = '0.03';
 }
 
-sub error { return M6::ARP::Control->error() };
+sub error { return M6::ArpSponge::Control->error() };
 
 sub _set_error {
     my ($self, @args) = @_;
-    return M6::ARP::Control->_set_error(@args);
+    return M6::ArpSponge::Control->_set_error(@args);
 }
 
 # $handle = $handle->_send_data("something\n", ...);
@@ -74,7 +74,7 @@ sub _send_data {
 #   implements a non-blocking read on a socket, regardless of
 #   what the current blocking mode on the socket is. Returns
 #   "undef" if there is no data. Tries to read no more than
-#   $M6::ARP::Control::BUFSIZ bytes, but may run over that if
+#   $M6::ArpSponge::Control::BUFSIZ bytes, but may run over that if
 #   the last character is not a newline.
 #
 #       $data = $handle->_get_data($blocking);
@@ -86,7 +86,7 @@ sub _get_data {
 
     my $buf;
     my $old_blocking = $self->blocking($blocking);
-    my $n = $self->sysread($buf, $M6::ARP::Control::BUFSIZ);
+    my $n = $self->sysread($buf, $M6::ArpSponge::Control::BUFSIZ);
 
     if ($buf !~ /\n\Z/) {
         my $char;
@@ -108,13 +108,13 @@ __END__
 
 =head1 NAME
 
-M6::ARP::Control::Base - base class for arpsponge control communications
+M6::ArpSponge::Control::Base - base class for arpsponge control communications
 
 =head1 SYNOPSIS
 
  package SomeSocket;
 
- use base qw( M6::ARP::Control::Base );
+ use base qw( M6::ArpSponge::Control::Base );
 
  sub do_something {
     my $self = shift;
@@ -150,9 +150,9 @@ sockets.
 
 This object class is only supposed to be used as a base class
 from which other (usable) classes are derived, see
-L<M6::ARP::Control::Server|/M6::ARP::Control::Server>
+L<M6::ArpSponge::Control::Server|/M6::ArpSponge::Control::Server>
 and
-L<M6::ARP::Control::Client|/M6::ARP::Control::Client>.
+L<M6::ArpSponge::Control::Client|/M6::ArpSponge::Control::Client>.
 
 It is a fairly thin wrapper around L<IO::Socket::UNIX>(3p),
 implementing some defaults and handling exceptions (most
@@ -172,7 +172,7 @@ inherits from L<IO::Socket::UNIX>(3).
 Callable as an object or class method. Returns the most recent
 error string.
 
-Wrapper around L<M6::ARP::Control/error>.
+Wrapper around L<M6::ArpSponge::Control/error>.
 
 =item X<_set_error>B<_set_error> ( I<MESSAGE>, ... )
 
@@ -183,7 +183,7 @@ it can be used efficiently as:
         return $self->_set_error("something bad happened: $!");
     }
 
-Wrapper around L<M6::ARP::Control/_set_error>.
+Wrapper around L<M6::ArpSponge::Control/_set_error>.
 
 =item X<_send_data>B<_send_data> ( I<DATA>, ... )
 
@@ -216,7 +216,7 @@ Specify a true value for the I<BLOCKING> parameter
 if you want the call to block for input.
 
 In case there is data, it will read all the available data up to
-L<$M6::ARP::Control::BUFSIZ|M6::ARP::Control/$M6::ARP:Control::BUFSIZ>
+L<$M6::ArpSponge::Control::BUFSIZ|M6::ArpSponge::Control/$M6::ArpSponge:Control::BUFSIZ>
 bytes.
 
 Tries to read no more than I<BUFSIZ> characters, but may run over that
@@ -230,9 +230,9 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ARP::Control>(3),
-L<M6::ARP::Control::Server>(3),
-L<M6::ARP::Control::Client>(3),
+L<M6::ArpSponge::Control>(3),
+L<M6::ArpSponge::Control::Server>(3),
+L<M6::ArpSponge::Control::Client>(3),
 L<IO::Socket|IO::Socket>(3).
 L<arpsponge|arpsponge>(8).
 

@@ -20,6 +20,7 @@ INSTALLFILES		=	\
 		$(INSTALLDIR)/Log.pm \
 		$(INSTALLDIR)/NetPacket.pm \
 		$(INSTALLDIR)/Queue.pm \
+		$(INSTALLDIR)/ReadLine.pm \
 		$(INSTALLDIR)/Sponge.pm \
 		$(INSTALLDIR)/Table.pm \
 		$(INSTALLDIR)/Util.pm

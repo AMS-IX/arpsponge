@@ -40,13 +40,13 @@ use JSON qw();
 
 $YAML::XS::Boolean = 'JSON::PP';
 
-use M6::ARP::Control::Client;
-use M6::ARP::Event     qw( :standard );
-use M6::ARP::Log       qw( :standard :macros );
-use M6::ARP::Util      qw( :all );
-use M6::ReadLine       qw( :all );
-use M6::ARP::Const     qw( :all );
-use M6::ARP::NetPacket qw( :vars );
+use M6::ArpSponge::Control::Client;
+use M6::ArpSponge::Event     qw( :standard );
+use M6::ArpSponge::Log       qw( :standard :macros );
+use M6::ArpSponge::Util      qw( :all );
+use M6::ArpSponge::ReadLine       qw( :all );
+use M6::ArpSponge::Const     qw( :all );
+use M6::ArpSponge::NetPacket qw( :vars );
 
 my $SPONGE_VAR      = '@SPONGE_VAR@';
 my $CONN            = undef;
@@ -339,8 +339,8 @@ sub Main {
 
     verbose "connecting to arpsponge on $sockname\n";
     if (!$opt_test) {
-        $CONN = M6::ARP::Control::Client->create_client($sockname)
-                    or die "$sockname: ".M6::ARP::Control::Client->error."\n";
+        $CONN = M6::ArpSponge::Control::Client->create_client($sockname)
+                    or die "$sockname: ".M6::ArpSponge::Control::Client->error."\n";
     }
     ($STATUS) = get_status($CONN);
     verbose "$$STATUS{id}, v$$STATUS{version} (pid #$$STATUS{pid})\n";
@@ -354,7 +354,7 @@ sub Main {
         $exit = $ERR != 0;
     }
     else {
-        $M6::ReadLine::IP_NETWORK =
+        $M6::ArpSponge::ReadLine::IP_NETWORK =
             NetAddr::IP->new("$$STATUS{network}/$$STATUS{prefixlen}");
 
         init_readline() if $INTERACTIVE;
@@ -469,18 +469,18 @@ sub expand_ip_chunk {
                 qq{$name: "$ip_s" is not a valid IP range});
         return;
     }
-    if (!$M6::ReadLine::IP_NETWORK->contains($cidr)) {
+    if (!$M6::ArpSponge::ReadLine::IP_NETWORK->contains($cidr)) {
         $silent or print_error(
                 qq{$name: $ip_s is out of range }
-                . $M6::ReadLine::IP_NETWORK->cidr
+                . $M6::ArpSponge::ReadLine::IP_NETWORK->cidr
         );
         return;
     }
 
     my ($cidr_first, $cidr_last, $net_first, $net_last) = (
         $cidr->first->addr, $cidr->last->addr,
-        $M6::ReadLine::IP_NETWORK->first->addr,
-        $M6::ReadLine::IP_NETWORK->last->addr,
+        $M6::ArpSponge::ReadLine::IP_NETWORK->first->addr,
+        $M6::ArpSponge::ReadLine::IP_NETWORK->last->addr,
     );
     $lo_s = $cidr_first eq $net_first
         ? $cidr_first
@@ -810,7 +810,7 @@ sub complete_arp_update_flags {
     DEBUG "\ncomplete_arp_update_flags partial:<$partial>; prefix:<$prefix>";
 
     my @names;
-    for my $name (keys %M6::ARP::Const::STR_TO_UPDATE_FLAG) {
+    for my $name (keys %M6::ArpSponge::Const::STR_TO_UPDATE_FLAG) {
         if (substr($name, 0, length($partial)) eq $partial) {
             push @names, $name;
         }
@@ -2502,27 +2502,27 @@ sub initialise {
 
     }
 
-    $M6::ReadLine::TYPES{'ip-range'} = {
+    $M6::ArpSponge::ReadLine::TYPES{'ip-range'} = {
             'verify'   => \&check_ip_range_arg,
             'complete' => \&complete_ip_range,
         };
-    $M6::ReadLine::TYPES{'ip-filter'} = {
+    $M6::ArpSponge::ReadLine::TYPES{'ip-filter'} = {
             'verify'   => \&check_ip_filter_arg,
             'complete' => \&complete_ip_filter,
         };
-    $M6::ReadLine::TYPES{'ip-any'} = {
+    $M6::ArpSponge::ReadLine::TYPES{'ip-any'} = {
             'verify'   => \&check_ip_any_arg,
             'complete' => \&complete_ip_any,
         };
-    $M6::ReadLine::TYPES{'arp-update-flags'} = {
+    $M6::ArpSponge::ReadLine::TYPES{'arp-update-flags'} = {
             'verify'   => \&check_arp_update_flags,
             'complete' => \&complete_arp_update_flags,
         };
-    $M6::ReadLine::TYPES{'log-level'} = {
+    $M6::ArpSponge::ReadLine::TYPES{'log-level'} = {
             'verify'   => \&check_log_level,
             'complete' => \&complete_log_level,
         };
-    $M6::ReadLine::TYPES{'log-mask'} = {
+    $M6::ArpSponge::ReadLine::TYPES{'log-mask'} = {
             'verify'   => \&check_log_mask,
             'complete' => \&complete_log_mask,
         };

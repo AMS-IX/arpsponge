@@ -20,22 +20,22 @@
 # IMPORTANT:
 #
 #   * IP and MAC addresses are stored as HEX strings, use
-#     M6::ARP::Util::hex2{ip,mac} to convert to human-readable
+#     M6::ArpSponge::Util::hex2{ip,mac} to convert to human-readable
 #     form.
 #
 ###############################################################################
-package M6::ARP::Sponge;
+package M6::ArpSponge::Sponge;
 
 use strict;
 
-use base qw( M6::ARP::Base );
+use base qw( M6::ArpSponge::Base );
 
-use M6::ARP::Queue;
-use M6::ARP::Event;
-use M6::ARP::Log;
-use M6::ARP::Const      qw( :all );
-use M6::ARP::Util       qw( :all );
-use M6::ARP::NetPacket  qw( :all );
+use M6::ArpSponge::Queue;
+use M6::ArpSponge::Event;
+use M6::ArpSponge::Log;
+use M6::ArpSponge::Const      qw( :all );
+use M6::ArpSponge::Util       qw( :all );
+use M6::ArpSponge::NetPacket  qw( :all );
 
 use POSIX               qw( strftime );
 use Net::ARP;
@@ -146,7 +146,7 @@ sub set_state    {
 }
 
 ###############################################################################
-# $sponge = new M6::ARP::Sponge(ARG => VAL ...)
+# $sponge = new M6::ArpSponge::Sponge(ARG => VAL ...)
 #
 #    Create a new Sponge object.
 #
@@ -156,7 +156,7 @@ sub new {
 
     my $self = {
             'arp_update_flags'  => ARP_UPDATE_ALL,
-            'queuedepth'        => $M6::ARP::Queue::DFL_DEPTH,
+            'queuedepth'        => $M6::ArpSponge::Queue::DFL_DEPTH,
         };
 
     while (@args >= 2) {
@@ -175,7 +175,7 @@ sub new {
     $self->my_mac( $self->get_mac );
 
     $self->{user}        = {};
-    $self->{queue}       = new M6::ARP::Queue($self->queuedepth);
+    $self->{queue}       = new M6::ArpSponge::Queue($self->queuedepth);
 
     $self->init_all_state();
 

@@ -18,15 +18,15 @@
 # S.Bakker, 2011
 #
 ###############################################################################
-package M6::ARP::Control::Client;
+package M6::ArpSponge::Control::Client;
 
 use strict;
 
-use base qw( M6::ARP::Control::Base );
+use base qw( M6::ArpSponge::Control::Base );
 
 use IO::Socket;
 
-use M6::ARP::Control;
+use M6::ArpSponge::Control;
 
 # $ref = $handle->_log_buffer;
 # $handle->_log_buffer($ref);
@@ -56,7 +56,7 @@ sub _parse_log_buffer {
     my $maxloglines = 0;
     if (!$log) {
         $log = $self->_log_buffer;
-        $maxloglines = $M6::ARP::Control::MAXLOGLINES;
+        $maxloglines = $M6::ArpSponge::Control::MAXLOGLINES;
     }
 
     while ($data =~ s/^\014LOG\t(.*?\n)//m) {
@@ -197,17 +197,17 @@ __END__
 
 =head1 NAME
 
-M6::ARP::Control::Client - client part of arpsponge control
+M6::ArpSponge::Control::Client - client part of arpsponge control
 
 =head1 SYNOPSIS
 
- use M6::ARP::Control::Client;
+ use M6::ArpSponge::Control::Client;
 
- $client = M6::ARP::Control::Client->create_client($socket_file);
+ $client = M6::ArpSponge::Control::Client->create_client($socket_file);
 
  # Alternative method (equivalent to above):
  use IO::Socket;
- $client = M6::ARP::Control::Client->new(
+ $client = M6::ArpSponge::Control::Client->new(
                         Peer      => $socket_file,
                         Type      => SOCK_STREAM,
                     );
@@ -261,10 +261,10 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ARP::Sponge>(3),
-L<M6::ARP::Control>(3),
-L<M6::ARP::Control::Base>(3),
-L<M6::ARP::Control::Server>(3),
+L<M6::ArpSponge::Sponge>(3),
+L<M6::ArpSponge::Control>(3),
+L<M6::ArpSponge::Control::Base>(3),
+L<M6::ArpSponge::Control::Server>(3),
 L<IO::Socket|IO::Socket>(3),
 L<arpsponge|arpsponge>(8), L<asctl>(1).
 

@@ -17,7 +17,7 @@
 # S.Bakker.
 #
 ###############################################################################
-package M6::ARP::Util;
+package M6::ArpSponge::Util;
 
 use strict;
 use POSIX qw( strftime strtod strtol );
@@ -47,11 +47,11 @@ BEGIN {
 
 =head1 NAME
 
-M6::ARP::Util - IP, MAC, misc. utility routines
+M6::ArpSponge::Util - IP, MAC, misc. utility routines
 
 =head1 SYNOPSIS
 
- use M6::ARP::Util qw( :all );
+ use M6::ArpSponge::Util qw( :all );
 
  $ip  = int2ip( $num );
  $num = ip2int( $ip  );
@@ -592,7 +592,7 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>, L<M6::ARP::Sponge(3)|M6::ARP::Sponge>.
+L<perl(1)|perl>, L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>.
 
 =head1 AUTHORS
 

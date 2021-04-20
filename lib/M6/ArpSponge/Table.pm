@@ -17,7 +17,7 @@
 # S.Bakker, 2005
 #
 ###############################################################################
-package M6::ARP::Table;
+package M6::ArpSponge::Table;
 
 use strict;
 
@@ -31,13 +31,13 @@ BEGIN {
 
 =head1 NAME
 
-M6::ARP::Table - keep a table of ARP entries
+M6::ArpSponge::Table - keep a table of ARP entries
 
 =head1 SYNOPSIS
 
- use M6::ARP::Table;
+ use M6::ArpSponge::Table;
 
- $table = new M6::ARP::Table;
+ $table = new M6::ArpSponge::Table;
 
  $table->clear($some_ip);
  $table->add($some_ip, $some_mac);
@@ -154,7 +154,7 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>, L<M6::ARP::Sponge(3)|M6::ARP::Sponge>.
+L<perl(1)|perl>, L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>.
 
 =head1 AUTHORS
 

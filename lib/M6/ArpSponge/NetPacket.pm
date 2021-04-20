@@ -20,7 +20,7 @@
 # S.Bakker.
 #
 ###############################################################################
-package M6::ARP::NetPacket;
+package M6::ArpSponge::NetPacket;
 
 use strict;
 use Readonly;
@@ -82,12 +82,12 @@ Readonly our $IPv4_ADDR_NONE      => '00' x $ARP_PLEN_IPv4;
 
 =head1 NAME
 
-M6::ARP::NetPacket - (partially) decode ethernet, IP and ARP packets
+M6::ArpSponge::NetPacket - (partially) decode ethernet, IP and ARP packets
 
 =head1 SYNOPSIS
 
- use M6::ARP::NetPacket qw( :all );
- use M6::ARP::Util qw( :all );
+ use M6::ArpSponge::NetPacket qw( :all );
+ use M6::ArpSponge::Util qw( :all );
 
  $packet = ...;
 
@@ -143,8 +143,8 @@ L<arpsponge>(1)'s purposes.
 
 The variables below can be imported individually, by using the C<:vars> or C<:all> tags:
 
-  use M6::ARP::NetPacket qw( :vars );
-  use M6::ARP::NetPacket qw( :all );
+  use M6::ArpSponge::NetPacket qw( :vars );
+  use M6::ArpSponge::NetPacket qw( :all );
 
 Note that these variables are all read-only.
 
@@ -208,8 +208,8 @@ IP protocol address length in bytes (4).
 
 The functions below can be imported individually, by using the C<:func> or C<:all> tags:
 
-  use M6::ARP::NetPacket qw( :all );
-  use M6::ARP::NetPacket qw( :func );
+  use M6::ArpSponge::NetPacket qw( :all );
+  use M6::ArpSponge::NetPacket qw( :func );
 
 All functions return a hash ref (not an object!) with a minimal set of fields
 set. They do not set C<_parent> or C<_frame>.
@@ -579,8 +579,8 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ARP::Sponge(3)|M6::ARP::Sponge>,
-L<M6::ARP::Util(3)|M6::ARP::Util>,
+L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>,
+L<M6::ArpSponge::Util(3)|M6::ArpSponge::Util>,
 L<NetPacket(3)|NetPacket>.
 
 =head1 AUTHORS

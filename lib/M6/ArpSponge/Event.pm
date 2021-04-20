@@ -18,13 +18,13 @@
 # S.Bakker, 2014;
 #
 ###############################################################################
-package M6::ARP::Event;
+package M6::ArpSponge::Event;
 
 use strict;
 
 use parent qw( Exporter );
 
-use M6::ARP::Log        qw( :standard :macros );
+use M6::ArpSponge::Log        qw( :standard :macros );
 
 BEGIN {
     our $VERSION   = 1.00;
@@ -132,7 +132,7 @@ Log an I<EVENT> at level I<LOGLEVEL>, with the message specified by
 the I<FMT> format string and any additional arguments.
 
 If I<EVENT> matches the current event mask and I<LOGLEVEL> passes
-the current log level threshold, the message is logged (L<M6::ARP::Log>),
+the current log level threshold, the message is logged (L<M6::ArpSponge::Log>),
 otherwise it is discarded.
 
 =cut

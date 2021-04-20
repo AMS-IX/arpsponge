@@ -1,9 +1,9 @@
 #===============================================================================
 #
-#       Module:  M6::ARP::Base
+#       Module:  M6::ArpSponge::Base
 #         File:  M6/ARP/Base.pm
 #
-#  Description:  Base class for all M6::ARP objects.
+#  Description:  Base class for all M6::ArpSponge objects.
 #
 #       Author:  Steven Bakker (SB), <steven.bakker@ams-ix.net>
 #      Created:  2010-10-07
@@ -22,7 +22,7 @@
 #
 #===============================================================================
 
-package M6::ARP::Base;
+package M6::ArpSponge::Base;
 
 use strict;
 #use warnings;
@@ -192,13 +192,13 @@ __END__
 
 =head1 NAME
 
-M6::ARP::Base - base class for all M6::ARP objects
+M6::ArpSponge::Base - base class for all M6::ArpSponge objects
 
 =head1 SYNOPSIS
 
- package M6::ARP::SomeObj;
+ package M6::ArpSponge::SomeObj;
 
- use base qw( M6::ARP::Base );
+ use base qw( M6::ArpSponge::Base );
 
  our %attr_names = __PACKAGE__->parent_attr_names('banana');
                                           # (banana=>1, monkey=>1)
@@ -209,7 +209,7 @@ M6::ARP::Base - base class for all M6::ARP objects
 
  package main;
 
- $obj = new M6::ARP::SomeObj;
+ $obj = new M6::ArpSponge::SomeObj;
  %attr_names = $obj->attr_names(); # ('monkey'=>1, 'banana'=>1)
 
  my $monkey = $obj->monkey();
@@ -218,7 +218,7 @@ M6::ARP::Base - base class for all M6::ARP objects
 
 =head1 DESCRIPTION
 
-C<M6::ARP::Base> provides a base class for all M6::ARP
+C<M6::ArpSponge::Base> provides a base class for all M6::ArpSponge
 objects. It only defines common class methods and does not
 look directly at an object's instance data.
 
@@ -260,7 +260,7 @@ class's C<@ISA>.
 This is typically only used in a package's set-up code:
 
     package Bar;
-    use base qw( M6::ARP::Base );
+    use base qw( M6::ArpSponge::Base );
     our %attr_names = ('bar' => 1, Bar->parent_attr_names); # bar=>1
 
     package Foo;
@@ -271,7 +271,7 @@ To shorten the above, it is possible to provide the additional
 attribute names in the I<ATTRLIST> argument:
 
     package Bar;
-    use base qw( M6::ARP::Base );
+    use base qw( M6::ArpSponge::Base );
     our %attr_names = Bar->parent_attr_names('bar'); # bar=>1
 
     package Foo;
@@ -308,7 +308,7 @@ The function returns a reference to the new (normalised) hash.
 Example:
 
     package Something;
-    use base qw( M6::ARP::Base );
+    use base qw( M6::ArpSponge::Base );
 
     sub do_something {
         my $self = shift;
@@ -334,8 +334,8 @@ Prints:
 
 =head1 SEE ALSO
 
-L<M6::ARP::Sponge(3)|M6::ARP::Sponge>,
-L<M6::ARP::Queue(3)|M6::ARP::Queue>.
+L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>,
+L<M6::ArpSponge::Queue(3)|M6::ArpSponge::Queue>.
 
 =head1 AUTHOR
 

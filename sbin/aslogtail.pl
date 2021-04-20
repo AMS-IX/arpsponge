@@ -28,8 +28,8 @@ use strict;
 use warnings;
 use Getopt::Long qw( GetOptions );
 use Pod::Usage;
-use M6::ARP::Control::Client;
-use M6::ARP::Util qw( :all );
+use M6::ArpSponge::Control::Client;
+use M6::ArpSponge::Util qw( :all );
 
 my $SPONGE_VAR    = '@SPONGE_VAR@';
 my $CONN          = undef;
@@ -49,8 +49,8 @@ sub Main {
     my ($sockname, $raw, $follow, $lines) = initialise();
 
     verbose "connecting to arpsponge on $sockname\n";
-    my $conn = M6::ARP::Control::Client->create_client($sockname)
-                or die M6::ARP::Control::Client->error."\n";
+    my $conn = M6::ArpSponge::Control::Client->create_client($sockname)
+                or die M6::ArpSponge::Control::Client->error."\n";
 
     if ($lines) {
         my $reply = $conn->send_command("get_log $lines");

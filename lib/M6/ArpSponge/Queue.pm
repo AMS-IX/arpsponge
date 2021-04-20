@@ -18,7 +18,7 @@
 # S.Bakker, 2004-2010;
 #
 ###############################################################################
-package M6::ARP::Queue;
+package M6::ArpSponge::Queue;
 
 use strict;
 
@@ -28,19 +28,19 @@ BEGIN {
 
 our $DFL_DEPTH = 1000;
 
-use M6::ARP::Log;
+use M6::ArpSponge::Log;
 
 =pod
 
 =head1 NAME
 
-M6::ARP::Queue - ARP query queue.
+M6::ArpSponge::Queue - ARP query queue.
 
 =head1 SYNOPSIS
 
- use M6::ARP::Queue;
+ use M6::ArpSponge::Queue;
 
- $q = new M6::ARP::Queue($max_depth);
+ $q = new M6::ArpSponge::Queue($max_depth);
 
  $q->clear($dst_ip);
  $q->add($dst_ip, $src_ip, $timestamp);
@@ -64,7 +64,7 @@ M6::ARP::Queue - ARP query queue.
 
 =head1 DESCRIPTION
 
-This object class is used by the L<M6::ARP::Sponge|M6::ARP::Sponge>
+This object class is used by the L<M6::ArpSponge::Sponge|M6::ArpSponge::Sponge>
 module to store [source, timestamp] tuples for ARP queries.
 
 The object holds a collection of circular buffers that are accessed by
@@ -85,7 +85,7 @@ I<mac-address> could stand for I<arbitrary-value>.
 
 =over
 
-=item X<$M6::ARP::Queue::DFL_DEPTH>I<$M6::ARP::Queue::DFL_DEPTH>
+=item X<$M6::ArpSponge::Queue::DFL_DEPTH>I<$M6::ArpSponge::Queue::DFL_DEPTH>
 
 Default maximum depth for queue objects (1000).
 
@@ -98,7 +98,7 @@ Default maximum depth for queue objects (1000).
 =item X<new>B<new> ( [ I<MAXDEPTH> ] )
 
 Create a new object instance. Each queue will have a maximum depth
-of I<MAXDEPTH> (or I<$M6::ARP::Queue::DFL_DEPTH> if not given).
+of I<MAXDEPTH> (or I<$M6::ArpSponge::Queue::DFL_DEPTH> if not given).
 Returns a reference to the newly created object.
 
 =cut
@@ -361,8 +361,8 @@ __END__
 
 =head1 EXAMPLE
 
-    use M6::ARP::Queue;
-    use M6::ARP::Util qw( :all );
+    use M6::ArpSponge::Queue;
+    use M6::ArpSponge::Util qw( :all );
     use Time::HiRes qw( usleep time );
     use POSIX qw( strftime );
 
@@ -371,7 +371,7 @@ __END__
     my @src_ip    = map { ip2hex($_) } qw(10.1.1.2 10.1.1.3 10.1.1.4);
     my $max_rate  = 10;
 
-    $q = new M6::ARP::Queue(100);
+    $q = new M6::ArpSponge::Queue(100);
 
     printf("Filling queue for $some_ip_s (max %d)\n", $q->max_depth);
 
@@ -429,8 +429,8 @@ Output:
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>, L<M6::ARP::Sponge(3)|M6::ARP::Sponge>,
-L<M6::ARP::Util(3)|M6::ARP::Util>.
+L<perl(1)|perl>, L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>,
+L<M6::ArpSponge::Util(3)|M6::ArpSponge::Util>.
 
 =head1 AUTHORS
 

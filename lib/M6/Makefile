@@ -11,19 +11,14 @@ TOPDIR	=	../..
 
 include $(TOPDIR)/config.mk
 
-INSTALLDIR	=	$(INSTLIB)/M6
-
-INSTALLFILES		=	\
-				$(INSTALLDIR)/ReadLine.pm
-
 include $(TOPDIR)/rules.mk
 
-all			:	ARP-all
+all			:	ArpSponge-all
 
-install		:	ARP-install
+install		:	ArpSponge-install
 
-clean		:	ARP-clean
+clean		:	ArpSponge-clean
 
-veryclean	:	ARP-veryclean
+veryclean	:	ArpSponge-veryclean
 
 # E.O.F. Makefile
