@@ -2068,6 +2068,8 @@ interface name.
 For boolean variables, "true", "yes", "on" and positive integers evaluate
 to "true", other values are "false".
 
+=head3 Global variables
+
 =over 4
 
 =item I<AGE> (integer)
@@ -2152,7 +2154,10 @@ Use C<--sweep-skip-alive>
 
 =back
 
-The I<ethX> files can override each of the above and can also specify:
+=head3 Per-interface variables
+
+The per-interface configuration files can override each of the above and
+can also specify:
 
 =over 4
 
@@ -2160,11 +2165,19 @@ The I<ethX> files can override each of the above and can also specify:
 
 This specifies the network for which to sponge.
 
+Note that this variable must be set in the interface-specific configuration
+file (setting it in the global defaults file will have no effect, other than
+a warning).
+
 =item I<DEVICE> (optional)
 
 By default, the init script will use the configuration file's name
 as the device name, but this can be overridden with the I<DEVICE>
 variable.
+
+Note that this variable must be set in the interface-specific configuration
+file (setting it in the global defaults file will have no effect, other than
+a warning).
 
 =item I<STATIC_STATE_FILE> (string)
 
@@ -2173,6 +2186,10 @@ a file with a status dump to load on (re)start of the ARP sponge.
 
 See L<asctl's "load status" command|"asctl/load status"> for more
 information.
+
+Note that this variable must be set in the interface-specific configuration
+file (setting it in the global defaults file will have no effect, other than
+a warning).
 
 =back
 
@@ -2284,7 +2301,7 @@ maintaining this since 2004.
 
 =head1 COPYRIGHT
 
-Copyright 2003-2019, AMS-IX B.V.
+Copyright 2003-2021, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
 
 =cut
