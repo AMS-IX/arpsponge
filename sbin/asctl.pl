@@ -521,7 +521,7 @@ sub expand_ip_range {
 }
 
 #############################################################################
-sub check_output_format_2 {
+sub check_output_format {
     my ($opts) = @_;
 
     my $fmt = $opts->{format};
@@ -540,26 +540,9 @@ sub check_output_format_2 {
     }
 
     for my $k (sort keys %VALID_OUTPUT_FORMAT) {
-        return $VALID_OUTPUT_FORMAT{$k};
+        return $VALID_OUTPUT_FORMAT{$k} if $opts->{$k};
     }
     return 'native';
-}
-
-sub check_output_format {
-    my ($fmt) = @_;
-    $fmt = lc $fmt;
-    if (my $val = $VALID_OUTPUT_FORMAT{$fmt}) {
-        return $val;
-    }
-
-    my @formats = sort keys %VALID_OUTPUT_FORMAT;
-    my $last_fmt = pop @formats;
-
-    my $fmt_list = join('', map { "'$_', " } @formats);
-    $fmt_list .= "or " if length($fmt_list);
-    $fmt_list .= $last_fmt;
-
-    return print_error("invalid format '$fmt'; need $fmt_list");
 }
 
 sub mk_output_format_options {
@@ -1334,7 +1317,7 @@ sub shared_show_arp_ip {
 
     my $opts = $args->{-options};
 
-    $opts->{format} = check_output_format_2($opts) or return;
+    $opts->{format} = check_output_format($opts) or return;
 
     my $reply = '';
     if ($args->{'ip'}) {
@@ -1844,7 +1827,7 @@ sub do_show_status {
     my ($conn, $args) = @_;
 
     my $opts = $args->{-options};
-    $opts->{format} = check_output_format_2($opts) or return;
+    $opts->{format} = check_output_format($opts) or return;
 
     my ($info, $reply, $tag) = get_status($conn, $opts);
     return if ! defined $info;
@@ -1912,7 +1895,7 @@ sub do_show_parameters {
     my $format = 1;
 
     my $opts = $args->{-options};
-    $opts->{format} = check_output_format_2($opts) or return;
+    $opts->{format} = check_output_format($opts) or return;
 
     ($opts, my $reply, my $info, my $tag) = get_param($conn, $opts);
 
@@ -2030,7 +2013,7 @@ sub cmd_dump_status {
     }
 
     # Dump to a file.
-    $args->{-options}{format} = check_output_format_2($args->{-options}) or return;
+    $args->{-options}{format} = check_output_format($args->{-options}) or return;
 
     my $output_str = prepare_dump_status_output($conn, $args);
     return if !defined $output_str;
