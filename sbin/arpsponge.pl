@@ -485,8 +485,8 @@ sub handle_input {
         if ($Select_Error_Count > 1 && $now > $Last_Select_Error_Time + 15) {
             # We've seen multiple select errors in the last 15 seconds.
             # Only the first was logged. Log the number of repetitions.
-            event_err(EVENT_IO, "previous select error repeated %d time(s)",
-                $Select_Error_Count-1);
+            event_err(EVENT_IO, "previous select error repeated %d time(s): %s",
+                $Select_Error_Count-1, $Last_Select_Error);
             $Select_Error_Count = 0;
         }
 
@@ -501,8 +501,8 @@ sub handle_input {
             if ($Last_Select_Error != $err) {
                 if ($Select_Error_Count > 1) {
                     event_err(EVENT_IO,
-                        "previous select error repeated %d time(s)",
-                        $Select_Error_Count-1);
+                        "previous select error repeated %d time(s): %s",
+                        $Select_Error_Count-1, $Last_Select_Error);
                     $Select_Error_Count = 0;
                 }
             }
@@ -923,14 +923,49 @@ sub do_sweep {
 sub update_state {
     my ($sponge, $src_ip, $src_mac) = @_;
 
-    my $state = $sponge->get_state($src_ip);
-    $state = STATIC if $state != ALIVE && $sponge->user('static');
+    # Suppress STATIC warnings a bit.
+    state $Last_Static_Error_Time  = 0;
+    state $Last_Static_Error       = '';
+    state $Static_Error_Count      = 0;
+
+    my $now = time;
+
+    if ($Static_Error_Count > 1 && $now > $Last_Static_Error_Time + 15) {
+        # We've seen a bunch of warnings in the last 15 seconds.
+        # Only the first was logged. Log the number of repetitions.
+        event_warning(EVENT_STATIC,
+            "previous STATIC warning repeated %d time(s): %s",
+            $Static_Error_Count-1, $Last_Static_Error);
+        $Static_Error_Count = 0;
+        $Last_Static_Error_Time = $now;
+    }
+
+    my $state = $sponge->get_state($src_ip) // ALIVE;
+
+    $state = STATIC if $state < ALIVE && $sponge->user('static');
 
     if ($state == STATIC) {
-        event_warning(EVENT_STATIC,
+        my $err = sprintf(
             "traffic from STATIC sponged IP: src.mac=%s src.ip=%s",
             hex2mac($src_mac), hex2ip($src_ip),
         );
+
+        if ($err ne $Last_Static_Error) {
+            if ($Static_Error_Count > 1) {
+                event_warning(EVENT_STATIC,
+                    "previous STATIC warning repeated %d time(s): %s",
+                    $Static_Error_Count-1, $Last_Static_Error);
+            }
+            event_warning(EVENT_STATIC, "%s", $err);
+            $Static_Error_Count = 0;
+            $Last_Static_Error = $err;
+            $Last_Static_Error_Time = $now;
+        }
+
+        $Static_Error_Count++;
+
+        $sponge->arp_table($src_ip, $src_mac, $now);
+        return;
     }
 
     $sponge->set_alive($src_ip, $src_mac);
