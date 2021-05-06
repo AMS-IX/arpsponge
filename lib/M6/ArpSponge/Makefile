@@ -10,7 +10,7 @@ TOPDIR		=	../../..
 include $(TOPDIR)/config.mk
 
 
-INSTALLDIR	=	$(INSTLIB)/M6/ARP
+INSTALLDIR	=	$(INSTLIB)/M6/ArpSponge
 
 INSTALLFILES		=	\
 		$(INSTALLDIR)/Base.pm \
