@@ -32,7 +32,7 @@
 ifeq (${DISTRO},)
   $(info --------------------------)
   $(info Detecting DISTRO and OS...)
-  OS := $(shell uname -s | tr [:upper:] [:lower:])
+  OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
   DISTRO := ?
   ifeq (${OS}, linux)
     DISTRO := $(shell grep -E "^ID=" /etc/os-release | cut -f2 -d=)
