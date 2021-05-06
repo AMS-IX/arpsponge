@@ -1,3 +1,15 @@
+arpsponge (3.23.1~1.gbp6e0580) UNRELEASED; urgency=medium
+
+  ** SNAPSHOT build @6e05800452c68671c45c9fd172132d0648d1def9 **
+
+  * Add quotes around `tr` arguments.
+  * Refactor init script.
+     * Use a `Main` function so we can order stuff top-down.
+     * Add warnings for interface-specific variables that are set globally.
+  * Fix doc regarding interface-specific variables.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 06 May 2021 14:54:22 +0200
+
 arpsponge (3.23) unstable; urgency=medium
 
   * Packaging:
