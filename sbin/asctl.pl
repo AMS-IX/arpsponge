@@ -1201,7 +1201,7 @@ sub do_show_arp {
     }
 
     my @output;
-    if ($$opts{header} && !$$opts{H}) {
+    if ($$opts{header} // 1 && !$$opts{H}) {
         push @output, [
             "%-17s %-17s %-11s %s\n", "# MAC", "IP", "Epoch", "Time"
         ];
@@ -1275,7 +1275,7 @@ sub do_show_ip {
     }
 
     my @output;
-    if ($$opts{header} && !$$opts{H}) {
+    if ($$opts{header} // 1 && !$$opts{H}) {
         push @output, [
             "%-17s %-12s %7s %12s %7s\n",
             "# IP", "State", "Queue", "Rate (q/min)", "Updated"
