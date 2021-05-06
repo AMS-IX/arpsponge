@@ -1,3 +1,48 @@
+arpsponge (3.23) unstable; urgency=medium
+
+  * Packaging:
+    * Fix dependencies.
+    * Use @DFL_SOCK_PERMS@ in defaults sample.
+    * Try to autodiscover the OS; annotate README accordingly.
+    
+  * Generic:
+    * Clean up library namespace.
+        * Rename M6::ARP -> M6::ArpSponge
+        * Move M6::ReadLine to M6::ArpSponge::ReadLine.
+    * Clean commented code blocks.
+    * Whitespace/tab fixes.
+
+  * asctl fixes:
+    * Save various integer attributes after conversion to string
+      (log_mask, etc.).
+    * Rename various `do_` routines to `cmd_` so it's clear which
+      subs handle commands.
+    * Remove use of `$parsed` where not necessary.
+    * Simplify format options.
+    * Fix `delete %` statements to be "delete @" for older perls.
+    * Let M6::ArpSponge::ReadLine handle the options parsing.
+    * Fix default output format.
+      A bug set `json` as the default format and prevented `--yaml`,
+      `--native` from working.
+    * Print header by default in native format.
+      Logic error made `--no-header` the default.
+
+  * M6::ArpSponge::ReadLine:
+    * Fix `clr_to_eol()`
+        * Try both `tput el` and `tput ce`, with a default of `ESC-[K`.
+        * Use a `state` variable instead of a package global to cache the
+          value.
+    * Handle the options parsing; this makes the "help" text show
+      the options as well.
+
+  * arpsponge:
+    * Fix handling of state update for STATIC addresses.
+        * Add a timely `return`, so STATIC addresses are not revived
+          automatically, but do update the ARP table entry.
+        * Suppress duplicate warnings.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 06 May 2021 11:30:07 +0200
+
 arpsponge (3.22) unstable; urgency=medium
 
   * Major features:
