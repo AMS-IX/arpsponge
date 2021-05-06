@@ -466,10 +466,11 @@ sub is_valid_bool {
 
 ###############################################################################
 
-=item X<is_valid_ip>B<is_valid_ip> ( I<ARG>
+=item B<is_valid_ip> ( I<ARG>
 [, B<-network> =E<gt> I<CIDR>]
 [, B<-err> =E<gt> I<REF>]
 )
+X<is_valid_ip>
 
 Check whether I<ARG> is defined and represents a valid IPv4 address.
 If I<CIDR> is given, it also checks whether the address is part
@@ -491,7 +492,7 @@ sub is_valid_ip {
         return;
     }
 
-    my $ip = NetAddr::IP->new($arg);
+    my $ip = $arg =~ /^\d/ ? NetAddr::IP->new($arg) : undef;
     if (!$ip) {
         ${$opts{-err}} = qq/"$arg" is not a valid IPv4 address/;
         return;
