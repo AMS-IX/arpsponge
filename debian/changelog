@@ -1,14 +1,22 @@
-arpsponge (3.23.1~1.gbp6e0580) UNRELEASED; urgency=medium
+arpsponge (3.24) unstable; urgency=medium
 
-  ** SNAPSHOT build @6e05800452c68671c45c9fd172132d0648d1def9 **
-
-  * Add quotes around `tr` arguments.
   * Refactor init script.
-     * Use a `Main` function so we can order stuff top-down.
-     * Add warnings for interface-specific variables that are set globally.
+    * Add quotes around `tr` arguments.
+    * Use a `Main` function so we can order stuff top-down.
+    * Add warnings for interface-specific variables that are set globally.
+
   * Fix doc regarding interface-specific variables.
 
- -- Steven Bakker <steven.bakker@ams-ix.net>  Thu, 06 May 2021 14:54:22 +0200
+  * M6::ArpSponge::Util:
+    * Fix `is_valid_ip()` to only accept literal IPv4 addresses.
+
+      `NetAddr::IP` will call `gethostbyname` if the argument is not
+      a literal IP address, and hence try to do DNS resolving on it.
+      Cute, but not relevant here, and not fully functional anyway,
+      since a hostname with a `-` in it would have been split as a
+      range in `asctl`.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed, 19 May 2021 15:15:59 +0200
 
 arpsponge (3.23) unstable; urgency=medium
 
