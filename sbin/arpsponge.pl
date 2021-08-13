@@ -302,8 +302,8 @@ sub Main {
                 $sponge->device, $sponge->my_ip_s
             );
             $sponge->user('passive', 1);
-            # Signal to other parts of the program that the "passive" mode was
-            # forced, so they can issue appropriate warnings.
+            # Signal to other parts of the program that the "passive" mode
+            # was forced, so they can issue appropriate warnings.
             $sponge->user('forced_passive', 1);
         }
     }
@@ -773,19 +773,18 @@ sub do_probe_pending($) {
     my $pending  = $sponge->pending;
     my $sleep    = $sponge->user('probesleep');
 
-    if (keys %$sponge > 0 && $sponge->user('forced_passive')) {
-        # Log reminders that the sponge was started without an IP address, and
-        # no --passive flag.
+    if (keys %$pending > 0 && $sponge->user('forced_passive')) {
+        # Log reminders that the sponge was started without an IP address,
+        # and no --passive flag.
         event_warning(EVENT_STATE,
-            "%s has no IP address; forced --passive; not querying pending IPs",
+            "%s has no IP address; forced --passive;"
+            ." pending addresses not queried",
             $sponge->device,
         );
-        return;
     }
 
-    return if $sponge->user('passive');
 
-    log_verbose(2, "Querying pending addresses...\n");
+    log_verbose(2, "Processing pending addresses...\n");
     my $n = 0;
     for my $ip (sort keys %$pending) {
         $n++;
@@ -793,15 +792,17 @@ sub do_probe_pending($) {
             $sponge->set_dead($ip);
             next;
         }
-        $sponge->send_query($ip);
         $sponge->incr_pending($ip);
-        log_verbose(2, "probed $ip, state=",
+        if (! $sponge->user('passive')) {
+            $sponge->send_query($ip);
+            log_verbose(2, "probed $ip, state=",
                                 $sponge->get_state($ip), "\n");
+        }
         handle_input($sponge, time+$sleep);
     }
 
     if ($n > 1 || log_is_verbose() > 1) {
-        event_notice(EVENT_STATE, "%d pending IPs queried", $n);
+        event_notice(EVENT_STATE, "%d pending address(es) processed", $n);
     }
 }
 ###############################################################################
@@ -854,8 +855,8 @@ sub do_sweep {
                       // $sponge->user('sweep_skip_alive');
 
     if ($sponge->user('forced_passive')) {
-        # Log reminders that the sponge was started without an IP address, and
-        # no --passive flag.
+        # Log reminders that the sponge was started without an IP address,
+        # and no --passive flag.
         event_warning(EVENT_STATE,
             "%s has no IP address; forced --passive; IP sweeping disabled!",
             $sponge->device,
@@ -1074,7 +1075,7 @@ sub process_pkt {
     }
 
     if ($sponge->is_my_ip($dst_ip)) {
-        # ARPs for our IPs require no action (handled by the kernel),
+        # ARPs for our addresses require no action (handled by the kernel),
         # except for maybe updating our internal ARP table.
         if (log_is_verbose()) {
             log_sverbose(1, "ARP WHO HAS %s TELL %s (for our IP)\n",
