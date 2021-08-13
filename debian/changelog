@@ -1,3 +1,10 @@
+arpsponge (3.24.1) unstable; urgency=medium
+
+  * Fix MANIFEST for new library structure.
+  * Fix for --passive mode not incrementing pending state
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Fri, 13 Aug 2021 15:24:44 +0200
+
 arpsponge (3.24) unstable; urgency=medium
 
   * Refactor init script.
