@@ -21,11 +21,9 @@
 #
 # ============================================================================
 
-$0 =~ s|.*/||g;
-
-use 5.010;
-use strict;
+use 5.014;
 use warnings;
+use FindBin;
 use Getopt::Long    qw( GetOptions GetOptionsFromArray );
 use POSIX           qw( strftime floor );
 use Pod::Usage;
@@ -170,9 +168,12 @@ my $rundir        = $SPONGE_VAR;
 my $INTERACTIVE   = 1;
 
 my $VERSION    = '@RELEASE@';
-my $app_header = "\nThis is $0, v$VERSION\n\n"
-               . "See \"perldoc $0\" for more information.\n"
-               ;
+my $app_header = <<EO_USAGE;
+
+This is $FindBin::Script, v$VERSION
+
+See "perldoc $FindBin::Script" for more information.
+EO_USAGE
 
 END {
     $CONN && $CONN->close;
@@ -2472,7 +2473,8 @@ sub initialise {
 
     if ($sockname) {
         if ($interface) {
-            die "$0: --socket and --interface are mutually exclusive\n";
+            die "$FindBin::Script: ",
+                "--socket and --interface are mutually exclusive\n";
         }
     }
     elsif ($interface) {
@@ -2486,7 +2488,8 @@ sub initialise {
             }
         }
         if (!$sockname) {
-            my $err = "$0: cannot find sponge instance in $rundir\n";
+            my $err = "$FindBin::Script: "
+                    . "cannot find sponge instance in $rundir\n";
             if ($opt_test) {
                 warn "** WARN: $err";
             }
