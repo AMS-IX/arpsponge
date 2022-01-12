@@ -11,7 +11,7 @@ This is released as free software, see the "Copying" file that came with this so
 ## Requirements
 
   * GNU make
-  * Perl (>= 5.10)
+  * Perl (>= 5.14)
   * Perl modules:
     * Carp
     * Config
