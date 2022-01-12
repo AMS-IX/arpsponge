@@ -1,3 +1,13 @@
+arpsponge (3.24.2) unstable; urgency=medium
+
+  * asctl:
+    * Use YAML::PP and JSON::PP for boolean consistency.
+    * Set minimum perl version to 5.014, use FindBin.
+  * packaging:
+    * Update dependencies.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Wed, 12 Jan 2022 12:01:47 +0100
+
 arpsponge (3.24.1) unstable; urgency=medium
 
   * Fix MANIFEST for new library structure.
