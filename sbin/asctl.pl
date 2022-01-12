@@ -35,18 +35,30 @@ use NetAddr::IP;
 use Term::ReadLine;
 use IO::File;
 use Scalar::Util    qw( reftype );
-use YAML::XS qw();
-use JSON qw();
-
-$YAML::XS::Boolean = 'JSON::PP';
+use YAML::PP qw();
+use JSON::PP qw();
 
 use M6::ArpSponge::Control::Client;
 use M6::ArpSponge::Event     qw( :standard );
 use M6::ArpSponge::Log       qw( :standard :macros );
 use M6::ArpSponge::Util      qw( :all );
-use M6::ArpSponge::ReadLine       qw( :all );
+use M6::ArpSponge::ReadLine  qw( :all );
 use M6::ArpSponge::Const     qw( :all );
 use M6::ArpSponge::NetPacket qw( :vars );
+
+my $JSON_OBJ        = JSON::PP->new->pretty(1);
+my $YAML_OBJ        = YAML::PP->new(
+    yaml_version      => [qw( 1.2 1.1 )],
+    schema            => ['+'],
+    boolean           => 'JSON::PP',
+    cyclic_refs       => 'fatal',
+    duplicate_keys    => 0,
+    indent            => 2,
+    width             => 78,
+    header            => 1,
+    footer            => 0,
+    version_directive => 1,
+);
 
 my $SPONGE_VAR      = '@SPONGE_VAR@';
 my $CONN            = undef;
@@ -186,11 +198,11 @@ my %Syntax = (
         '?'       => 'Clear ARP table for given IP(s).',
         '$ip'     => { type=>'ip-range'  } },
     'load status $- $file' => {
-        '?'        => 'Load IP/ARP state from dump file.',
+        '?'       => 'Load IP/ARP state from dump file.',
         '$file'   => { type=>'filename' },
         'opts'    => [ 'force|f' ], },
     'dump status $- $file?' => {
-        '?'        => 'Either dump daemon status to <file>,'
+        '?'       => 'Either dump daemon status to <file>,'
                      .' or signal the daemon to dump to its'
                      .' "standard" location (user needs'
                      .' privileges to send signals to the'
@@ -566,7 +578,7 @@ sub mk_output_format_options_2 {
 #############################################################################
 sub int2bool {
     my ($val) = @_;
-    return $_[0] ? JSON::true : JSON::false;
+    return $_[0] ? JSON::PP::true : JSON::PP::false;
 }
 
 sub bool2str {
@@ -1190,10 +1202,10 @@ sub do_show_arp {
         my $data = { 'arpsponge.arp-table' => $arp_table };
 
         if ($opts->{format} eq 'json') {
-            print_output(JSON->new->pretty->encode($data));
+            print_output($JSON_OBJ->encode($data));
         }
         elsif ($opts->{format} eq 'yaml') {
-            print_output(YAML::XS::Dump($data));
+            print_output($YAML_OBJ->dump_string($data));
         }
 
         my $count = () = $reply =~ /^ip=/gm;
@@ -1266,10 +1278,10 @@ sub do_show_ip {
         my $data = { 'arpsponge.state-table' => $ip_table };
 
         if ($opts->{format} eq 'json') {
-            print_output(JSON->new->pretty->encode($data));
+            print_output($JSON_OBJ->encode($data));
         }
         else {
-            print_output(YAML::XS::Dump($data));
+            print_output($YAML_OBJ->dump_string($data));
         }
         return \%count;
     }
@@ -1843,8 +1855,8 @@ sub do_show_status {
         my $data = { 'arpsponge.status' => $info };
         return print_output(
             $opts->{format} eq 'json'
-                ? JSON->new->pretty->encode($data)
-                : YAML::XS::Dump($data)
+                ? $JSON_OBJ->encode($data)
+                : $YAML_OBJ->dump_string($data)
         );
     }
 
@@ -1910,8 +1922,8 @@ sub do_show_parameters {
         my $data = { 'arpsponge.parameters' => $info };
         return print_output(
             $opts->{format} eq 'json'
-                ? JSON->new->pretty->encode($data)
-                : YAML::XS::Dump($data)
+                ? $JSON_OBJ->encode($data)
+                : $YAML_OBJ->dump_string($data)
         );
     }
 
@@ -2081,10 +2093,10 @@ sub prepare_dump_status_output {
     };
 
     if ($opts->{format} eq 'json') {
-        return JSON->new->pretty->encode($data);
+        return $JSON_OBJ->encode($data);
     }
 
-    return YAML::XS::Dump($data);
+    return $YAML_OBJ->dump_string($data);
 }
 
 sub convert_ip_output_for_export {
@@ -2299,7 +2311,7 @@ sub read_state_table_from_file {
 sub parse_json_status {
     my ($input, $fname) = @_;
 
-    my $data = eval { JSON::decode_json($input) };
+    my $data = eval { $JSON_OBJ->decode($input) };
 
     if (my $err = $@) {
         chomp($err);
@@ -2329,7 +2341,7 @@ sub parse_json_status {
 sub parse_yaml_status {
     my ($input, $fname) = @_;
 
-    my $data = eval { YAML::XS::Load($input) };
+    my $data = eval { $YAML_OBJ->load_string($input) };
 
     if (my $err = $@) {
         $err =~ s/at \S+ line \d+\.$//;
