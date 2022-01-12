@@ -1874,7 +1874,7 @@ sub do_show_status {
         [ "$tag%s", 'next sweep:', $$info{next_sweep} ],
         ($$info{tm_next_sweep} ?
             sprintf(" (in %d secs) [%d]",
-                $$info{tm_next_sweep}-$$info{date},
+                $$info{tm_next_sweep}-$$info{tm_date},
                 $$info{tm_next_sweep})
             : ''
         ),
