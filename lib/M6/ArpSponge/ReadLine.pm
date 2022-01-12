@@ -75,6 +75,7 @@ our $PAGER        = join(' ', qw(
                         less --no-lessopen --no-init
                              --dumb  --quit-at-eof
                              --quit-if-one-screen
+                             --RAW-CONTROL-CHARS
                     ));
 
 my $ERROR         = undef;
