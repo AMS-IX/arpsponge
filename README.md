@@ -14,26 +14,33 @@ This is released as free software, see the "Copying" file that came with this so
   * Perl (>= 5.10)
   * Perl modules:
     * Carp
+    * Config
     * Data::Dumper
+    * Exporter
     * File::Path
+    * FindBin
     * Getopt::Long
     * IO::File
     * IO::Select
     * IO::Socket
+    * IO::Socket::UNIX
     * IO::String
     * IPC::Run
+    * JSON::PP
     * NetAddr::IP
     * Net::ARP
-    * Net::IPv4Addr
-    * NetPacket (::ARP, ::Ethernet, ::IP)
     * Net::Pcap
+    * Pod::Text::Termcap
     * Pod::Usage
     * POSIX
     * Readonly
+    * Scalar::Util
     * Sys::Syslog
     * Term::ReadKey
     * Term::ReadLine
+    * Term::ReadLine::Gnu
     * Time::HiRes
+    * YAML::PP
 
 Depending on your O/S distribution and version of Perl, some or all of these may already be included in a base install of Perl.
 
@@ -82,5 +89,5 @@ pkg install gmake \
     perl5 \
     p5-Net-Pcap p5-Readonly p5-NetAddr-IP p5-IO-String \
     p5-Net-Arp p5-Term-ReadKey p5-Term-ReadLine-Gnu p5-IPC-Run \
-    p5-YAML p5-YAML-LibYAML p5-JSON
+    p5-YAML-PP p5-JSON-PP
 ```
