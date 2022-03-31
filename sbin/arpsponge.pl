@@ -88,7 +88,7 @@ Usage: $PROG [options] IPADDR/PREFIXLEN dev IFNAME
 Options:
   --age=secs              - time in seconds until we consider an ARP entry
                             "stale" ($DFL_ARP_AGE)
-  --arp-update-methods=.. - how to update neighbor ARP caches
+  --arp-update-method=... - how to update neighbor ARP caches
   --control=socket        - location of the control socket (<rundir>/control)
   --[no]daemon            - put process in background
   --dummy                 - simulate sponging; turns off syslog
@@ -327,7 +327,7 @@ sub Main {
     if ($arp_update_methods) {
         my $flags = parse_update_flags($arp_update_methods, -err => \(my $err));
         if (defined $err) {
-            log_fatal(qq{bad --arp-update-methods argument "%s": %s},
+            log_fatal(qq{bad --arp-update-method argument "%s": %s},
                       $arp_update_methods, $err);
         }
         $sponge->arp_update_flags($flags);
@@ -1341,7 +1341,7 @@ B<@NAME@> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
 I<Options>:
 
     --age=secs
-    --arp-update-methods={all,none,request,reply,gratuitous}*
+    --arp-update-method={all,none,request,reply,gratuitous}*
     --control=socket
     --[no]daemon
     --dummy
@@ -1498,8 +1498,8 @@ Time until we consider an ARP entry "stale" (default @DFL_ARP_AGE@).
 This really controls how often we refresh the entries in our internal
 ARP cache.
 
-=item B<--arp-update-methods>=[B<!>]I<method>,...
-X<--arp-update-methods>
+=item B<--arp-update-method>=[B<!>]I<method>,...
+X<--arp-update-method>
 
 Some routers do not update their ARP cache when an IP gets unsponged.
 We detect this by looking for traffic destined for our MAC, with a
