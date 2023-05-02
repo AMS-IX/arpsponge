@@ -1183,14 +1183,21 @@ sub process_pkt {
     my $r1 = $sponge->queue->rate($dst_ip);
     my $d2 = $sponge->queue->reduce($dst_ip, $fp_rate);
     my $r2 = $sponge->queue->rate($dst_ip);
-    event_notice(EVENT_SPONGE,
-            "%s queue reduced: [depth,rate] = "
-            ."[%d,%0.1f] -> [%d,%0.1f]",
+
+    if ($d1 != $d2) {
+        event_notice(EVENT_SPONGE,
+            "%s queue reduced: [depth,rate] = [%d,%0.1f] -> [%d,%0.1f]",
             hex2ip($dst_ip), $d1, $r1, $d2, $r2
         );
-    if ($sponge->queue->is_full($dst_ip) &&
-        $r2 > $sponge->max_rate)
-    {
+    }
+    else {
+        event_notice(EVENT_SPONGE,
+            "%s queue not reduced: [depth,rate] = [%d,%0.1f]",
+            hex2ip($dst_ip), $d1, $r1
+        );
+    }
+
+    if ($sponge->queue->is_full($dst_ip) && $r2 > $sponge->max_rate) {
         $state = $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
     }
 
