@@ -1192,7 +1192,7 @@ sub process_pkt {
     }
     else {
         event_notice(EVENT_SPONGE,
-            "%s queue not reduced: [depth,rate] = [%d,%0.1f]",
+            "%s queue reduction had no effect: [depth,rate] = [%d,%0.1f]",
             hex2ip($dst_ip), $d1, $r1
         );
     }
