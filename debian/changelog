@@ -1,3 +1,12 @@
+arpsponge (3.24.4) unstable; urgency=medium
+
+  * Fix "next sweep" output (subtract a real integer).
+  * Fix docs for --arp-update-method (closes #11)
+    It's --arp-update-method, not --arp-update-methods.
+  * Fix version of libscalar-list-utils-perl dependency.
+
+ -- Steven Bakker <steven.bakker@ams-ix.net>  Mon, 05 Dec 2022 14:32:54 +0100
+
 arpsponge (3.24.3) unstable; urgency=medium
 
   * Add "-R" flag to "less".
