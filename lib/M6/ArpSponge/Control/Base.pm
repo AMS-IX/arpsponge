@@ -233,7 +233,7 @@ See the L</SYNOPSIS> section.
 L<M6::ArpSponge::Control>(3),
 L<M6::ArpSponge::Control::Server>(3),
 L<M6::ArpSponge::Control::Client>(3),
-L<IO::Socket|IO::Socket>(3).
+L<IO::Socket|IO::Socket>(3),
 L<arpsponge|arpsponge>(8).
 
 =head1 AUTHORS
