@@ -19,7 +19,9 @@
 ###############################################################################
 package M6::ArpSponge::Util;
 
-use strict;
+use 5.014;
+use warnings;
+
 use POSIX qw( strftime strtod strtol );
 use NetAddr::IP;
 
