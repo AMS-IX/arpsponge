@@ -27,12 +27,12 @@ INSTALLFILES		=	\
 
 include $(TOPDIR)/rules.mk
 
-all			:	Control-all
+all			:	Control-all Asctl-all
 
-install		:	Control-install
+install		:	Control-install Asctl-install
 
-clean		:	Control-clean
+clean		:	Control-clean Asctl-clean
 
-veryclean	:	Control-veryclean
+veryclean	:	Control-veryclean Asctl-veryclean
 
 # E.O.F. Makefile

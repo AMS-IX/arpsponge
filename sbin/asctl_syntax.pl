@@ -1,35 +1,51 @@
 #!/usr/bin/perl
-#
-use Modern::Perl;
+
+use 5.014;
+use warnings;
 use Term::CLI;
 use Term::CLI::L10N;
+use NetAddr::IP;
+use Data::Dumper;
 
-package Arg::IP::Filter {
-    use Moo;
-    use Term::CLI::Util qw( is_prefix_str find_text_matches );
+use M6::ArpSponge::Util qw( ip2int );
+use M6::ArpSponge::Asctl::Arg_IP_Range;
+use M6::ArpSponge::Asctl::Arg_IP_Filter;
 
-    extends 'Term::CLI::Argument';
+my $IP_NETWORK = NetAddr::IP->new( '127.0.0.0/24' );
+my $TERM;
 
-    my @States = sort qw( all dead alive pending );
+my $opt_verbose = 0;
+my $opt_debug   = 1;
 
-    sub complete {
-        my ($self, $text, $state) = @_;
+sub verbose(@) { print @_ if $opt_verbose; }
+sub DEBUG(@)   { print_error(@_) if $opt_debug; }
 
-        if (!length $text) {
-            return ('IP-ADDRESS', 'IP-RANGE', @States);
-        }
-
-        return find_text_matches( $text, \@States );
+sub print_error_cond {
+    my ($cond, @args) = @_;
+    my $out = join('', @args);
+    chomp($out);
+    if ($cond) {
+        say STDERR $out;
+        $TERM && $TERM->term->on_new_line();
     }
+    return;
 }
 
-my $term = Term::CLI->new(
+sub print_error {
+    return print_error_cond(1, @_);
+}
+
+#############################################################################
+
+#############################################################################
+
+$TERM = Term::CLI->new(
     name => 'asctl',
     prompt => 'asctl> ',
     skip => qr/^\s*(?:#.*)$/,
 );
 
-$term->term->Attribs->{sort_completion_matches} = 0;
+$TERM->term->Attribs->{sort_completion_matches} = 0;
 
 #
 # Callback: noop
@@ -53,20 +69,8 @@ push @commands, Term::CLI::Command->new(
     name => 'quit',
     summary => 'disconnect and quit',
     description => 'Disconnect and quit.',
-    callback  => \&command_exit,
+    callback  => \&command_quit,
 );
-
-sub command_exit {
-    my ($cmd, %args) = @_;
-    return %args if $args{status} < 0;
-    execute_exit(0);
-}
-
-sub execute_exit {
-    say "-- exit";
-    exit @_;
-}
-
 
 #
 # Command: ping
@@ -90,16 +94,6 @@ push @commands, Term::CLI::Command->new(
     ],
 );
 
-sub command_ping {
-    my ($cmd, %args) = @_;
-    return %args if $args{status} < 0;
-    my ($count, $delay) = @{$args{arguments}};
-    $count //= 1;
-    $delay //= 1;
-    say "ping count=$count delay=$delay";
-    return %args;
-}
-
 
 #
 # Command: clear
@@ -114,10 +108,10 @@ push @commands, Term::CLI::Command->new(
             description => 'Clear state table for given IP address(es).',
             callback => \&command_clear_ip,
             arguments => [
-                #Term::CLI::Argument::String->new(
-                Arg::IP::Filter->new(
+                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
                     name => 'IP',
                     max_occur => 0,
+                    network_prefix => $IP_NETWORK,
                 ),
             ],
         ),
@@ -126,22 +120,15 @@ push @commands, Term::CLI::Command->new(
             description => 'Clear ARP table for given IP address(es).',
             callback => \&command_clear_arp,
             arguments => [
-                Term::CLI::Argument::String->new(
+                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
                     name => 'IP',
                     max_occur => 0,
+                    network_prefix => $IP_NETWORK,
                 ),
             ],
         ),
     ],
 );
-
-sub command_clear_ip {
-    return command_noop(@_);
-}
-
-sub command_clear_arp {
-    return command_noop(@_);
-}
 
 
 #
@@ -165,10 +152,6 @@ push @commands, Term::CLI::Command->new(
         ),
     ],
 );
-
-sub command_load_status {
-    return command_noop(@_);
-}
 
 #
 # command: dump status
@@ -201,10 +184,6 @@ sub command_load_status {
     );
 }
 
-sub command_dump_status {
-    return command_noop(@_);
-}
-
 #
 # command: probe
 #
@@ -221,45 +200,22 @@ sub command_dump_status {
         summary => $summary,
         description => $description,
         callback => \&command_probe,
+        options => [ 'rate|r=f', 'count|c=i' ],
         arguments => [
-            Term::CLI::Argument::String->new(
+            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
                 name => 'IP',
                 max_occur => 0,
+                network_prefix => $IP_NETWORK,
             ),
         ],
     );
 }
-
-sub command_probe {
-    return command_noop(@_);
-}
-
 
 #
 # command: show
 #
 {
     my @show_sub_commands;
-
-    {
-        my $summary = 'show state table for given IP address(es)';
-        my $description =
-            qq{Show state table for the given IP address(es).\n};
-            ;
-
-        push @show_sub_commands, Term::CLI::Command->new(
-            name => 'ip',
-            summary => $summary,
-            description => $description,
-            callback => \&command_show_ip,
-            arguments => [
-                Term::CLI::Argument::String->new(
-                    name => 'IP',
-                    occur => 0,
-                ),
-            ],
-        );
-    }
 
     {
         my $summary = 'show ARP table for given IP address(es)';
@@ -273,9 +229,31 @@ sub command_probe {
             description => $description,
             callback => \&command_show_arp,
             arguments => [
-                Term::CLI::Argument::String->new(
+                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
                     name => 'IP',
                     occur => 0,
+                    network_prefix => $IP_NETWORK,
+                ),
+            ],
+        );
+    }
+
+    {
+        my $summary = 'show state table for given IP address(es)';
+        my $description =
+            qq{Show state table for the given IP address(es).\n};
+            ;
+
+        push @show_sub_commands, Term::CLI::Command->new(
+            name => 'ip',
+            summary => $summary,
+            description => $description,
+            callback => \&command_show_ip,
+            arguments => [
+                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                    name => 'IP',
+                    occur => 0,
+                    network_prefix => $IP_NETWORK,
                 ),
             ],
         );
@@ -296,6 +274,20 @@ sub command_probe {
     }
 
     {
+        my $summary = 'show version information';
+        my $description =
+            qq{Show B<asctl> version information.\n};
+            ;
+
+        push @show_sub_commands, Term::CLI::Command->new(
+            name => 'version',
+            summary => $summary,
+            description => $description,
+            callback => \&command_show_version,
+        );
+    }
+
+    {
         my $summary = 'show arpsponge status summary';
         my $description =
             qq{Show a summary of the status of the running arpsponge daemon.\n};
@@ -309,6 +301,20 @@ sub command_probe {
         );
     }
 
+    {
+        my $summary = 'show uptime';
+        my $description =
+            qq{Show B<arpsponge> uptime.\n};
+            ;
+
+        push @show_sub_commands, Term::CLI::Command->new(
+            name => 'uptime',
+            summary => $summary,
+            description => $description,
+            callback => \&command_show_version,
+        );
+    }
+
     push @commands, Term::CLI::Command->new(
         name => 'show',
         summary => 'show various information',
@@ -317,11 +323,135 @@ sub command_probe {
     );
 }
 
-sub command_show_ip {
+#
+# command: sponge
+#
+{
+    my $summary = 'sponge given IP address(es)';
+    my $description =
+        qq{Sponge the given IP address(es); see also C<set ip dead>.}
+        ;
+
+    push @commands, Term::CLI::Command->new(
+        name        => 'sponge',
+        summary     => $summary,
+        description => $description,
+        callback    => \&command_sponge,
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                name => 'IP',
+                max_occur => 0,
+                network_prefix => $IP_NETWORK,
+            ),
+        ],
+    );
+}
+
+#
+# command: unsponge
+#
+{
+    my $summary = 'unsponge given IP address(es)';
+    my $description =
+        qq{Unsponge the given IP address(es); see also C<set ip alive>.}
+        ;
+
+    push @commands, Term::CLI::Command->new(
+        name        => 'unsponge',
+        summary     => $summary,
+        description => $description,
+        callback    => \&command_unsponge,
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                name => 'IP',
+                max_occur => 0,
+                network_prefix => $IP_NETWORK,
+            ),
+        ],
+    );
+}
+
+#
+# Command: help
+#
+push @commands, Term::CLI::Command::Help->new();
+
+#
+# REPL
+#
+$TERM->add_command(@commands);
+
+while (defined (my $line = $TERM->readline)) {
+    $TERM->execute($line);
+}
+
+print "\n";
+execute_exit(0);
+
+##############################################################################
+# Command execution routines.
+##############################################################################
+
+sub command_quit {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+    execute_exit(0);
+}
+
+sub execute_exit {
+    exit @_;
+}
+
+
+sub command_ping {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+    my ($count, $delay) = @{$args{arguments}};
+    $count //= 1;
+    $delay //= 1;
+    say "ping count=$count delay=$delay";
+    return %args;
+}
+
+sub command_clear_ip {
+    my ($cmd, %args) = @_;
+
+    return %args if $args{status} < 0;
+
+    my @cmd_path = @{$args{command_path}};
+
+    my $app = (shift @cmd_path)->name;
+
+    my $cmd_name = join(' ', map { $_->name } @cmd_path);
+
+    say "($app) $cmd_name";
+
+    print Dumper($args{arguments});
+
+    return %args;
+}
+
+sub command_clear_arp {
+    return command_noop(@_);
+}
+
+sub command_load_status {
+    return command_noop(@_);
+}
+
+sub command_dump_status {
+    return command_noop(@_);
+}
+
+sub command_probe {
     return command_noop(@_);
 }
 
 sub command_show_arp {
+    return command_noop(@_);
+}
+
+sub command_show_ip {
     return command_noop(@_);
 }
 
@@ -333,26 +463,25 @@ sub command_show_status {
     return command_noop(@_);
 }
 
-
-#
-# Command: help
-#
-push @commands, Term::CLI::Command::Help->new();
-
-#
-# REPL
-#
-$term->add_command(@commands);
-
-while (defined (my $line = $term->readline)) {
-    $term->execute($line);
+sub command_show_uptime {
+    return command_noop(@_);
 }
 
-print "\n";
-execute_exit(0);
+sub command_show_version {
+    return command_noop(@_);
+}
+
+sub command_sponge {
+    return command_noop(@_);
+}
+
+sub command_unsponge {
+    return command_noop(@_);
+}
 
 __END__
 
+DONE:
     'show ip $ip?'   => {
         '?'       => 'Show state table for given IP(s).',
         '$ip'     => { type=>'ip-filter' } },
@@ -362,15 +491,20 @@ __END__
     'show parameters' => { '?' => 'Show daemon parameters.'   },
 
     'show status'  => { '?' => 'Show daemon status.'   },
-    ###
+
     'show version' => { '?' => 'Show daemon version.'  },
+
     'show uptime'  => { '?' => 'Show daemon uptime.'   },
+
     'show log $nlines?' => {
         '?'       => 'Show daemon log (most recent <nlines>).',
         '$nlines' => { type=>'int', min=>1 }, },
+
     'sponge $ip' => {
         '?'       => 'Sponge given IP(s); see also "set ip dead".',
         '$ip'     => { type=>'ip-range' } },
+TO DO:
+
     'unsponge $ip' => {
         '?'       => 'Unsponge given IP(s); see also "set ip alive".',
         '$ip'     => { type=>'ip-range' } },
