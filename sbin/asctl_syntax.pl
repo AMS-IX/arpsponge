@@ -72,6 +72,13 @@ push @commands, Term::CLI::Command->new(
     callback  => \&command_quit,
 );
 
+push @commands, Term::CLI::Command->new(
+    name => 'exit',
+    summary => 'alias for C<quit>',
+    description => 'Disconnect and quit.',
+    callback  => \&command_quit,
+);
+
 #
 # Command: ping
 #
@@ -191,8 +198,8 @@ push @commands, Term::CLI::Command->new(
     my $summary = 'send ARP requests for given IP address(es)';
     my $description =
         qq{Send ARP broadcast requests for the given IP address(es).\n}
-        .qq{This only sends the requests, it doesn't wait for any replies;\n}
-        .qq{any replies will be caught by the regular sponge operation.}
+        .qq{This only sends the requests, it doesn't wait for any replies:\n}
+        .qq{these will be caught by the regular sponge operation.}
         ;
 
     push @commands, Term::CLI::Command->new(
@@ -200,7 +207,7 @@ push @commands, Term::CLI::Command->new(
         summary => $summary,
         description => $description,
         callback => \&command_probe,
-        options => [ 'rate|r=f', 'count|c=i' ],
+        options => [ 'delay|d=f', 'count|c=i' ],
         arguments => [
             M6::ArpSponge::Asctl::Arg_IP_Filter->new(
                 name => 'IP',
@@ -317,6 +324,7 @@ push @commands, Term::CLI::Command->new(
 
     push @commands, Term::CLI::Command->new(
         name => 'show',
+        usage => 'B<show> I<item>',
         summary => 'show various information',
         description => 'Show IP/ARP state, log, and operational parameters.',
         commands => \@show_sub_commands,
@@ -368,6 +376,73 @@ push @commands, Term::CLI::Command->new(
                 network_prefix => $IP_NETWORK,
             ),
         ],
+    );
+}
+
+#
+# command: inform X about Y
+#
+{
+    my $summary = 'update ARP entry for I<src_list> at I<dst_list>';
+    my $description = q{}
+        .qq{Tell the devices at I<dst_list> to update their ARP cache\n}
+        .qq{entries for I<src_list> with the MAC addresses that are in\n}
+        .qq{the arpsponge's own table.\n}
+        .qq{\n}
+        .qq{The method by which the I<dst_list> entities are informed is\n}
+        .qq{determined by the value of the C<arp_update_flags> configuration\n}
+        .qq{setting.\n}
+        .qq{\n}
+        .qq{The B<asctl> program will expand the I<src_list> and I<dst_list>\n}
+        .qq{arguments and send update packets for each I<src> and I<dst>\n}
+        .qq{pair. This implies a quadratic complexity; that is, if you have\n}
+        .qq{200 "alive" IP addresses in your table then B<asctl> will\n}
+        .qq{the arpsponge to send S<200 x 199 = 39,800 updates.>\n}
+        .qq{If C<arp_update_flags> is also set to C<all> (i.e.\n}
+        .qq{C<reply,request,gratuitous>, then the arpsponge will end up\n}
+        .qq{sending S<39,800 x 3 = 119,400 packets.>\n}
+        .qq{\n}
+        .qq{B<Options:>\n\n}
+        .qq{=over\n\n}
+        .qq{=item B<--delay>=I<secs>\n\n}
+        .qq{Delay I<secs> seconds between subsequent "inform" steps. I<secs>\n}
+        .qq{can be a fractional number (e.g. C<0.1>.\n}
+        .qq{\n}
+        .qq{Especially on large ranges of IP addresses, the delay can be\n}
+        .qq{useful to avoid locking the arpsponge with many "inform" requests\n}
+        .qq{as well as to avoid flooding connected stations with lots of\n}
+        .qq{ARP traffic.\n}
+        .qq{\n}
+        .qq{=back\n\n}
+        ;
+
+    push @commands, Term::CLI::Command->new(
+        name        => 'inform',
+        summary     => $summary,
+        description => $description,
+        options     => [ 'delay|d=f' ],
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                name => 'dst_ip',
+                occur => 1,
+                network_prefix => $IP_NETWORK,
+            ),
+        ],
+        commands    => [
+            Term::CLI::Command->new(
+                name        => 'about',
+                summary     => $summary,
+                description => $description,
+                callback    => \&command_inform,
+                arguments   => [
+                    M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                        name => 'src_ip',
+                        occur => 1,
+                        network_prefix => $IP_NETWORK,
+                    ),
+                ],
+            )
+        ]
     );
 }
 
@@ -479,35 +554,12 @@ sub command_unsponge {
     return command_noop(@_);
 }
 
+sub command_inform {
+    return command_noop(@_);
+}
+
 __END__
 
-DONE:
-    'show ip $ip?'   => {
-        '?'       => 'Show state table for given IP(s).',
-        '$ip'     => { type=>'ip-filter' } },
-    'show arp $ip?'  => {
-        '?'       => 'Show ARP table for given IP(s).',
-        '$ip'     => { type=>'ip-any'    } },
-    'show parameters' => { '?' => 'Show daemon parameters.'   },
-
-    'show status'  => { '?' => 'Show daemon status.'   },
-
-    'show version' => { '?' => 'Show daemon version.'  },
-
-    'show uptime'  => { '?' => 'Show daemon uptime.'   },
-
-    'show log $nlines?' => {
-        '?'       => 'Show daemon log (most recent <nlines>).',
-        '$nlines' => { type=>'int', min=>1 }, },
-
-    'sponge $ip' => {
-        '?'       => 'Sponge given IP(s); see also "set ip dead".',
-        '$ip'     => { type=>'ip-range' } },
-TO DO:
-
-    'unsponge $ip' => {
-        '?'       => 'Unsponge given IP(s); see also "set ip alive".',
-        '$ip'     => { type=>'ip-range' } },
     'inform $dst_ip about $src_ip' => {
         '?'       => 'Force <dst_ip> to update its ARP entry for <src_ip>.',
         '$dst_ip' => { type=>'ip-filter' },
