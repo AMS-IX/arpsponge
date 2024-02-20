@@ -1,4 +1,4 @@
-###############################################################################
+##############################################################################
 #
 # ARP Sponge Flags
 #
@@ -19,9 +19,10 @@
 ###############################################################################
 package M6::ArpSponge::Const;
 
-use strict;
+use 5.014;
+use warnings;
 
-use base qw( Exporter );
+use parent qw( Exporter );
 
 BEGIN {
     our $VERSION = 1.02;
@@ -56,6 +57,8 @@ use constant ARP_UPDATE_GRATUITOUS => 0x04;
 use constant ARP_UPDATE_NONE       => 0x00;
 use constant ARP_UPDATE_ALL        => 0x07;
 
+our $DEBUG = 0;
+
 our %UPDATE_FLAG_TO_STR = (
     ARP_UPDATE_REPLY()      => 'reply',
     ARP_UPDATE_REQUEST()    => 'request',
@@ -74,6 +77,9 @@ use constant DEAD    => -2;
 use constant ALIVE   => -1;
 
 sub PENDING { 0 + $_[$#_] };
+
+sub saydebug(@)   { say @_ if $DEBUG }
+sub printdebug(@) { print @_ if $DEBUG }
 
 our %STATE_TO_STR = (
         STATIC() => 'STATIC',
@@ -140,8 +146,24 @@ sub parse_update_flags {
     my %opts = (-err => \$err_s, @opts);
 
     my $flags = ARP_UPDATE_NONE;
-    return $flags if ! defined $arg;
+
+    printdebug "[parse_update_flags] #BEGIN ",
+        "[flags=$flags] ";
+
+    if (! defined $arg) {
+        saydebug "arg=UNDEF";
+        saydebug "[parse_update_flags] #END flags=$flags";
+        return $flags;
+    }
+
+    saydebug qq{arg="$arg"};
+
+    my $iter = 0;
     for my $method (split(/\s*,\s*/, lc $arg)) {
+        $iter++;
+        printdebug "[parse_update_flags] #$iter [flags=$flags] ",
+            "method=$method";
+
         my $negate = 0;
         if ($method =~ s/^\!//) {
             $negate = 1;
@@ -151,17 +173,32 @@ sub parse_update_flags {
             $negate = !$negate;
         }
 
-        if (! exists $STR_TO_UPDATE_FLAG{$method}) {
+        saydebug " => [method=$method; negate=$negate]";
+
+        my $int_method = int($STR_TO_UPDATE_FLAG{$method});
+        if (! defined $int_method ) {
             ${$opts{-err}} = qq/"$method" is not a valid ARP update flag/;
             return;
         }
 
+        saydebug "[parse_update_flags] #$iter [flags=$flags] ",
+            "$method => $int_method";
+
         if ($negate) {
-            $flags &= ~ $STR_TO_UPDATE_FLAG{$method};
+            my $mask = ~$int_method & ARP_UPDATE_ALL;
+            $flags &= $mask;
+
+            saydebug "[parse_update_flags] #$iter [flags=$flags] ",
+                "flags = flags & ~($int_method) = ",
+                "flags & $mask = ",
+                $flags;
             next;
         }
-        $flags |= $STR_TO_UPDATE_FLAG{$method};
+        $flags |= $int_method;
+        saydebug "[parse_update_flags] #$iter [flags=$flags] ",
+            "flags = flags | $int_method = $flags";
     }
+    saydebug "[parse_update_flags] #END [flags=$flags]";
     return $flags;
 }
 
