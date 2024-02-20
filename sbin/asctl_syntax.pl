@@ -10,6 +10,7 @@ use Data::Dumper;
 use M6::ArpSponge::Util qw( ip2int );
 use M6::ArpSponge::Asctl::Arg_IP_Range;
 use M6::ArpSponge::Asctl::Arg_IP_Filter;
+use M6::ArpSponge::Asctl::Arg_Arp_Update_Flags;
 
 my $IP_NETWORK = NetAddr::IP->new( '127.0.0.0/24' );
 my $TERM;
@@ -49,7 +50,6 @@ my %DATA_SECTION;
             (?= \@\@)
         }gmsx)
     {
-        say "=== section $1:\n---$2---";
         $DATA_SECTION{$1} = $2;
     }
 }
@@ -162,7 +162,7 @@ push @commands, make_command(
             callback    => \&command_load_status,
             arguments   => [
                 Term::CLI::Argument::Filename->new(
-                    name => 'file',
+                    name  => 'file',
                     occur => 1,
                 ),
             ],
@@ -177,13 +177,13 @@ push @commands, Term::CLI::Command->new(
     name        => 'dump',
     data_key    => 'dump_status',
     commands    => [
-        Term::CLI::Command->new(
+        make_command(
             name        => 'status',
             data_key    => 'dump_status',
             callback    => \&command_dump_status,
             arguments   => [
                 Term::CLI::Argument::Filename->new(
-                    name => 'file',
+                    name      => 'file',
                     min_occur => 0,
                 ),
             ],
@@ -195,13 +195,13 @@ push @commands, Term::CLI::Command->new(
 # command: probe
 #
 push @commands, make_command(
-    name => 'probe',
-    callback => \&command_probe,
-    options => [ 'delay|d=f', 'count|c=i' ],
+    name      => 'probe',
+    callback  => \&command_probe,
+    options   => [ 'delay|d=f', 'count|c=i' ],
     arguments => [
         M6::ArpSponge::Asctl::Arg_IP_Filter->new(
-            name => 'IP',
-            max_occur => 0,
+            name           => 'IP',
+            max_occur      => 0,
             network_prefix => $IP_NETWORK,
         ),
     ],
@@ -213,110 +213,73 @@ push @commands, make_command(
 {
     my @show_sub_commands;
 
-    {
-        my $summary = 'show ARP table for given IP address(es)';
-        my $description =
-            qq{Show ARP table entries for the given IP address(es).\n};
-            ;
+    push @show_sub_commands, make_command(
+        name        => 'arp',
+        data_key    => 'show_arp',
+        callback    => \&command_show_arp,
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                name           => 'IP',
+                occur          => 0,
+                network_prefix => $IP_NETWORK,
+            ),
+        ],
+    );
 
-        push @show_sub_commands, Term::CLI::Command->new(
-            name => 'arp',
-            summary => $summary,
-            description => $description,
-            callback => \&command_show_arp,
-            arguments => [
-                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
-                    name => 'IP',
-                    occur => 0,
-                    network_prefix => $IP_NETWORK,
-                ),
-            ],
-        );
-    }
+    push @show_sub_commands, make_command(
+        name      => 'ip',
+        data_key  => 'show_ip',
+        callback  => \&command_show_ip,
+        arguments => [
+            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                name           => 'IP',
+                occur          => 0,
+                network_prefix => $IP_NETWORK,
+            ),
+        ],
+    );
 
-    {
-        my $summary = 'show state table for given IP address(es)';
-        my $description =
-            qq{Show state table for the given IP address(es).\n};
-            ;
+    push @show_sub_commands, make_command(
+        name      => 'log',
+        data_key  => 'show_log',
+        callback  => \&command_show_log,
+        arguments => [
+            Term::CLI::Argument::Number::Int->new(
+                name      => 'nlines',
+                min_occur => 0,
+                min       => 1,
+            ),
+        ],
+    );
 
-        push @show_sub_commands, Term::CLI::Command->new(
-            name => 'ip',
-            summary => $summary,
-            description => $description,
-            callback => \&command_show_ip,
-            arguments => [
-                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
-                    name => 'IP',
-                    occur => 0,
-                    network_prefix => $IP_NETWORK,
-                ),
-            ],
-        );
-    }
+    push @show_sub_commands, make_command(
+        name        => 'parameters',
+        data_key    => 'show_parameters',
+        callback    => \&command_show_parameters,
+    );
 
-    {
-        my $summary = 'show arpsponge daemon parameters';
-        my $description =
-            qq{Show configuration parameters of the running arpsponge daemon.\n};
-            ;
+    push @show_sub_commands, make_command(
+        name        => 'version',
+        data_key    => 'show_version',
+        callback    => \&command_show_version,
+    );
 
-        push @show_sub_commands, Term::CLI::Command->new(
-            name => 'parameters',
-            summary => $summary,
-            description => $description,
-            callback => \&command_show_parameters,
-        );
-    }
+    push @show_sub_commands, make_command(
+        name => 'status',
+        data_key => 'show_status',
+        callback => \&command_show_status,
+    );
 
-    {
-        my $summary = 'show version information';
-        my $description =
-            qq{Show B<asctl> version information.\n};
-            ;
+    push @show_sub_commands, make_command(
+        name => 'uptime',
+        data_key => 'show_uptime',
+        callback => \&command_show_version,
+    );
 
-        push @show_sub_commands, Term::CLI::Command->new(
-            name => 'version',
-            summary => $summary,
-            description => $description,
-            callback => \&command_show_version,
-        );
-    }
-
-    {
-        my $summary = 'show arpsponge status summary';
-        my $description =
-            qq{Show a summary of the status of the running arpsponge daemon.\n};
-            ;
-
-        push @show_sub_commands, Term::CLI::Command->new(
-            name => 'status',
-            summary => $summary,
-            description => $description,
-            callback => \&command_show_status,
-        );
-    }
-
-    {
-        my $summary = 'show uptime';
-        my $description =
-            qq{Show B<arpsponge> uptime.\n};
-            ;
-
-        push @show_sub_commands, Term::CLI::Command->new(
-            name => 'uptime',
-            summary => $summary,
-            description => $description,
-            callback => \&command_show_version,
-        );
-    }
-
-    push @commands, Term::CLI::Command->new(
-        name => 'show',
-        usage => 'B<show> I<item>',
-        summary => 'show various information',
-        description => 'Show IP/ARP state, log, and operational parameters.',
-        commands => \@show_sub_commands,
+    push @commands, make_command(
+        name        => 'show',
+        data_key    => 'show',
+        commands    => \@show_sub_commands,
     );
 }
 
@@ -360,8 +323,8 @@ push @commands, make_command(
         callback    => \&command_unsponge,
         arguments   => [
             M6::ArpSponge::Asctl::Arg_IP_Filter->new(
-                name => 'IP',
-                max_occur => 0,
+                name           => 'IP',
+                max_occur      => 0,
                 network_prefix => $IP_NETWORK,
             ),
         ],
@@ -376,19 +339,19 @@ push @commands, make_command(
     options     => [ 'delay|d=f' ],
     arguments   => [
         M6::ArpSponge::Asctl::Arg_IP_Filter->new(
-            name => 'dst_ip',
-            occur => 1,
+            name           => 'dst_list',
+            occur          => 1,
             network_prefix => $IP_NETWORK,
         ),
     ],
     commands    => [
-        Term::CLI::Command->new(
+        make_command(
             name        => 'about',
             data_key    => 'inform',
             callback    => \&command_inform,
             arguments   => [
                 M6::ArpSponge::Asctl::Arg_IP_Filter->new(
-                    name => 'src_ip',
+                    name => 'src_list',
                     occur => 1,
                     network_prefix => $IP_NETWORK,
                 ),
@@ -397,6 +360,57 @@ push @commands, make_command(
     ]
 );
 
+#'set arp_update_flags $flags' => {
+#        '?'       => q{Set the methods (comma-separated list) by which the}
+#                    .q{ sponge is to update its neighbors' ARP caches},
+#        '$flags'  => { type=>'arp-update-flags' },
+#        },
+ 
+#
+# command: set
+#
+{
+    my @set_ip_sub_commands;
+
+    push @set_ip_sub_commands, make_command(
+        name => 'dead',
+        data_key => 'set_ip_dead',
+        callback => \&command_noop,
+    );
+
+    my $set_ip_command = make_command(
+        name     => 'ip',
+        data_key => 'set_ip',
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                name => 'IP',
+                occur => 1,
+                network_prefix => $IP_NETWORK,
+            ),
+        ],
+        commands => \@set_ip_sub_commands,
+    );
+
+    my @set_sub_commands = ( $set_ip_command );
+
+    push @set_sub_commands, make_command(
+        name        => 'arp_update_flags',
+        data_key    => 'set_arp_update_flags',
+        callback    => \&command_set_arp_update_flags,
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg_Arp_Update_Flags->new(
+                name           => 'flags',
+                max_occur      => -1,
+            ),
+        ],
+    );
+
+    push @commands, make_command(
+        name        => 'set',
+        data_key    => 'set',
+        commands    => \@set_sub_commands,
+    );
+}
 #
 # Command: help
 #
@@ -407,16 +421,20 @@ push @commands, Term::CLI::Command::Help->new();
 #
 
 $TERM = Term::CLI->new(
-    name => 'asctl',
-    prompt => 'asctl> ',
-    skip => qr{^ \s* (?:\#.*)? $}x,
-    commands => \@commands
+    name     => 'asctl',
+    prompt   => 'asctl> ',
+    skip     => qr{^ \s* (?:\#.*)? $}x,
+    commands => \@commands,
+    callback => sub {
+        my ($cmd, %args) = @_;
+        say "ERROR: $args{error}." if $args{status} < 0;
+    }
 );
 
 $TERM->term->Attribs->{sort_completion_matches} = 0;
 
 while (defined (my $line = $TERM->readline)) {
-    $TERM->execute($line);
+    $TERM->execute_line($line);
 }
 
 print "\n";
@@ -436,13 +454,64 @@ sub execute_exit {
     exit @_;
 }
 
+sub validate_num {
+    my ($value, %args) = @_;
+
+    my ($name, $type, $min, $max, $inclusive)
+        = @args{qw( name type min max inclusive )};
+
+    my $err = delete $args{error};
+
+    my $class = qq{Term::CLI::Argument::Number::$type};
+
+    my $obj = $class->new(
+        name => $name,
+        (defined $min ? (min => $min) : ()),
+        (defined $max ? (max => $max) : ()),
+        (defined $inclusive ? (inclusive => $inclusive) : ()),
+    );
+
+    my $validated = $obj->validate($value);
+    return $validated if defined $validated;
+
+    if (ref $err) {
+        $$err = qq{Value "$value" invalid for $name (}.$obj->error().')';
+    }
+    return;
+}
+
+sub validate_int {
+    my ($value, %args) = @_;
+    return validate_num($value, %args, type => 'Int');
+}
+
+sub validate_float {
+    my ($value, %args) = @_;
+    return validate_num($value, %args, type => 'Float');
+}
 
 sub command_ping {
     my ($cmd, %args) = @_;
     return %args if $args{status} < 0;
-    my ($count, $delay) = @{$args{arguments}};
-    $count //= 1;
-    $delay //= 1;
+
+    my $opt = $args{options};
+
+    my $count = validate_int(
+        $opt->{count} // 1,
+        name  => 'option count',
+        error => \$args{error},
+        min   => 1
+    );
+    defined $count or return (%args, status => -1);
+
+    my $delay = validate_float(
+        $opt->{delay} // 1,
+        name  => 'option delay',
+        error => \$args{error},
+        min   => 0.01
+    );
+    defined $delay or return (%args, status => -1);
+
     say "ping count=$count delay=$delay";
     return %args;
 }
@@ -478,7 +547,31 @@ sub command_dump_status {
 }
 
 sub command_probe {
-    return command_noop(@_);
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+
+    my $opt = $args{options};
+
+    my $count = validate_int(
+        $opt->{count} // 1,
+        name  => 'option count',
+        error => \$args{error},
+        min   => 1
+    );
+    defined $count or return (%args, status => -1);
+
+    my $delay = validate_float(
+        $opt->{delay} // 1,
+        name  => 'option delay',
+        error => \$args{error},
+        min   => 0.01
+    );
+    defined $delay or return (%args, status => -1);
+
+    say "probe count=$count delay=$delay";
+
+    print Dumper($args{arguments});
+    return %args;
 }
 
 sub command_show_arp {
@@ -486,6 +579,10 @@ sub command_show_arp {
 }
 
 sub command_show_ip {
+    return command_noop(@_);
+}
+
+sub command_show_log {
     return command_noop(@_);
 }
 
@@ -515,6 +612,25 @@ sub command_unsponge {
 
 sub command_inform {
     return command_noop(@_);
+}
+
+sub command_set_arp_update_flags {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+    my @cmd_path = @{$args{command_path}};
+    my $app = (shift @cmd_path)->name;
+    my $cmd_name = join(' ', map { $_->name } @cmd_path);
+    my @txt_args = @{$args{arguments}};
+    say "($app) $cmd_name", map { " <$_>" } @txt_args;
+
+    my $flags_arg =
+            M6::ArpSponge::Asctl::Arg_Arp_Update_Flags->new(
+                name           => 'flags',
+                max_occur      => -1,
+            );
+    my $flags = $flags_arg->translate(join(',', @txt_args), \%args);
+    say "($app) $cmd_name -> $flags";
+    return %args;
 }
 
 __DATA__
@@ -607,7 +723,7 @@ highly recommended to insert a delay with L<--delay|/inform_delay>
 Suppose the arpsponge has 200 "alive" IP addresses in its table and
 the following command is issued:
 
-    inform alive alive
+    inform alive about alive
 
 This will result in the arpsponge being instructed to send
 S<200 x 199 = 39,800 updates.>
@@ -664,7 +780,8 @@ zero (0). Default is one (1).
 =item B<--delay>=I<secs>
 
 Delay I<secs> between subsequent ping requests to the daemon; I<secs> is
-a decimal number greater than or equal to 0.01. The default is 0.01.
+a decimal number greater than or equal to 0.01. The default is one (1)
+second.
 
 =back
 
@@ -694,11 +811,133 @@ an integer greater than zero (0). The default is one (1).
 =item B<--delay>=I<secs>, B<-d> I<secs>
 
 Wait for I<secs> between subsequent probe messages. The I<secs> argument
-is a decimal number greater than 0.01. The default is 0.01.
+is a decimal number greater than 0.01. The default is one (1) second.
 
 =back
 
 =back
+
+@@ ######################################################################
+@@ set:summary
+set arpsponge state and parameters
+@@ set:description
+Modify arpsponge IP/ARP state, log, and operational parameters.
+
+@@ set_arp_update_flags:summary
+how to force ARP cache updates
+@@ set_arp_update_flags:description
+
+Some routers do not update their ARP cache when an IP gets unsponged.
+We detect this by looking for traffic destined for our MAC, with a
+destination IP that is I<not> ours. If the destination IP is in our local
+LAN, we should attempt to update the packet source's ARP cache.
+       
+This can be done in three ways:
+       
+=over  
+       
+=item C<reply>
+       
+Send an unsollicited unicast reply to I<IP-B>:
+       
+  ARP <IP-A> IS AT <MAC-A>
+       
+Where I<IP-A> and I<MAC-A> are of the router targeted by the stray packet,
+and I<IP-B> is the IP address of the neighbour whose cache needs to be
+updated.
+       
+=item C<request>
+       
+Send an unicast request by proxy (i.e. fake the requestor):
+       
+  ARP WHO HAS <IP-B> TELL <IP-A>@<MAC-A>
+       
+Where I<IP-B> is the IP address of the neighbour whose cache needs to be
+updated.
+       
+=item C<gratuitous>
+       
+Send a unicast gratuitous ARP request on behalf of I<IP-A> to I<IP-B>:
+       
+  ARP WHO HAS <IP-A> TELL <IP-A>@<MAC-A>
+       
+Where I<IP-B> is the IP address of the neighbour whose cache needs to be
+updated.
+       
+=item C<all>, C<none>
+       
+All or none of the above, resp.
+       
+=back  
+       
+The methods can be specified as a comma-separated list, e.g.:
+       
+   request,reply
+       
+Each element can be prefixed by C<!> to negate it, so the following are
+equivalent:
+       
+   request,reply
+       
+   all,!gratuitous
+       
+Default value is C<all>.
+       
+This value is also used by the L<inform|/inform> command.
+
+@@ set_ip:summary
+set arpsponge IP/ARP state
+@@ set_ip:description
+Modify arpsponge IP/ARP state.
+
+@@ set_ip_dead:summary
+sponge given IP address(es)
+@@ set_ip_dead:description
+Sponge the given IP address(es), i.e. answer ARP requests for them.
+
+@@ ######################################################################
+@@ # @@ show:usage
+@@ # B<show>
+@@ show:summary
+show arpsponge information
+@@ show:description
+Show arpsponge IP/ARP state, log, and operational parameters.
+
+@@ show_arp:summary
+show ARP table for given IP address(es)
+@@ show_arp:description
+Show ARP table entries for the given IP address(es).
+
+@@ show_log:summary
+show daemon log
+@@ show_log:description
+Show daemon log. If I<nlines> is given, show the I<nlines> most recent
+log lines.
+
+@@ show_ip:summary
+show state table for given IP address(es)
+@@ show_ip:description
+Show state table for the given IP address(es).
+
+@@ show_parameters:summary
+show arpsponge daemon parameters
+@@ show_parameters:description
+Show configuration parameters of the running arpsponge daemon.
+
+@@ show_status:summary
+show arpsponge status summary
+@@ show_status:description
+Show a summary of the status of the running arpsponge daemon.
+
+@@ show_uptime:summary
+show arpsponge uptime
+@@ show_uptime:description
+Show B<arpsponge> uptime.
+
+@@ show_version:summary
+show version information
+@@ show_version:description
+Show B<asctl> version information.
 
 @@ ######################################################################
 @@ quit:summary
@@ -713,15 +952,6 @@ Disconnect from the arpsponge daemon and exit from B<asctl>.
 
 __END__
 
-    'inform $dst_ip about $src_ip' => {
-        '?'       => 'Force <dst_ip> to update its ARP entry for <src_ip>.',
-        '$dst_ip' => { type=>'ip-filter' },
-        '$src_ip' => { type=>'ip-filter' } },
-    'set arp_update_flags $flags' => {
-        '?'       => q{Set the methods (comma-separated list) by which the}
-                    .q{ sponge is to update its neighbors' ARP caches},
-        '$flags'  => { type=>'arp-update-flags' },
-        },
     'set ip $ip dead'   => {
         '?'       => 'Sponge given IP(s).',
         '$ip'      => { type=>'ip-range'  } },
@@ -738,6 +968,7 @@ __END__
         '?'        => 'Unsponge given IP(s) (associate them with <mac>).',
         '$ip'      => { type=>'ip-range'    },
         '$mac'     => { type=>'mac-address' }, },
+
     'set max_pending $num' => {
         '?'        => 'Set max. number of "pending" probes before'
                       .' sponging an IP',
