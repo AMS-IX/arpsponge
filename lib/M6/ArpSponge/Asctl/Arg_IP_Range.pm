@@ -71,6 +71,13 @@ sub expand_ip_chunk {
                 qq{'$ip_s' is not a valid IP range});
     }
 
+    if ($cidr->first->addr ne $cidr->addr) {
+        my $prefixlen = $cidr->masklen;
+        my $addr = $cidr->addr;
+        return $self->set_error(
+                qq{'$addr' is not on a /$prefixlen boundary});
+    }
+
     if (!$net_prefix->contains($cidr)) {
         return $self->set_error(
             qq{$ip_s is out of range } . $net_prefix->cidr
@@ -117,8 +124,6 @@ sub expand_ip_range {
 
     my @args = split(' ', $arg_str);
 
-    #::DEBUG "range: <$arg_str>:", map {" <$_>"} @args;
-
     my @list;
     for my $ip_s (@args) {
         my $chunk = $self->expand_ip_chunk($ip_s) or return;
@@ -136,23 +141,12 @@ sub complete {
     return;
 }
 
-# Steal this bit from asctl...
 sub validate {
     my ($self, $text, $state) = @_;
 
     #::DEBUG "validate: ", join(" ", map { "<$_>" } @_), "\n";
 
     return $self->expand_ip_range($text);
-
-    my @addr = split(/-/, $text);
-    if (@addr == 1) {
-        my $ip = NetAddr::IP->new($text);
-        return $ip if $ip;
-    }
-    if (@addr > 2) {
-        return $self->set_error('bad IP address range');
-    }
-    $self->set_error('bad IP address or state');
 }
 
 1;
