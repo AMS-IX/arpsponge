@@ -8,9 +8,9 @@ use NetAddr::IP;
 use Data::Dumper;
 
 use M6::ArpSponge::Util qw( ip2int );
-use M6::ArpSponge::Asctl::Arg_IP_Range;
-use M6::ArpSponge::Asctl::Arg_IP_Filter;
-use M6::ArpSponge::Asctl::Arg_Arp_Update_Flags;
+use M6::ArpSponge::Asctl::Arg::IP_Range;
+use M6::ArpSponge::Asctl::Arg::IP_Filter;
+use M6::ArpSponge::Asctl::Arg::Arp_Update_Flags;
 
 my $IP_NETWORK = NetAddr::IP->new( '127.0.0.0/24' );
 my $TERM;
@@ -126,7 +126,7 @@ push @commands, make_command(
             name      => 'ip',
             callback  => \&command_clear_ip,
             arguments => [
-                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                     name => 'IP',
                     max_occur => 0,
                     network_prefix => $IP_NETWORK,
@@ -138,7 +138,7 @@ push @commands, make_command(
             name        => 'arp',
             callback    => \&command_clear_arp,
             arguments   => [
-                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                     name => 'IP',
                     max_occur => 0,
                     network_prefix => $IP_NETWORK,
@@ -199,7 +199,7 @@ push @commands, make_command(
     callback  => \&command_probe,
     options   => [ 'delay|d=f', 'count|c=i' ],
     arguments => [
-        M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+        M6::ArpSponge::Asctl::Arg::IP_Filter->new(
             name           => 'IP',
             max_occur      => 0,
             network_prefix => $IP_NETWORK,
@@ -218,7 +218,7 @@ push @commands, make_command(
         data_key    => 'show_arp',
         callback    => \&command_show_arp,
         arguments   => [
-            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+            M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                 name           => 'IP',
                 occur          => 0,
                 network_prefix => $IP_NETWORK,
@@ -231,7 +231,7 @@ push @commands, make_command(
         data_key  => 'show_ip',
         callback  => \&command_show_ip,
         arguments => [
-            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+            M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                 name           => 'IP',
                 occur          => 0,
                 network_prefix => $IP_NETWORK,
@@ -298,7 +298,7 @@ push @commands, make_command(
         description => $description,
         callback    => \&command_sponge,
         arguments   => [
-            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+            M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                 name => 'IP',
                 max_occur => 0,
                 network_prefix => $IP_NETWORK,
@@ -322,7 +322,7 @@ push @commands, make_command(
         description => $description,
         callback    => \&command_unsponge,
         arguments   => [
-            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+            M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                 name           => 'IP',
                 max_occur      => 0,
                 network_prefix => $IP_NETWORK,
@@ -338,7 +338,7 @@ push @commands, make_command(
     name        => 'inform',
     options     => [ 'delay|d=f' ],
     arguments   => [
-        M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+        M6::ArpSponge::Asctl::Arg::IP_Filter->new(
             name           => 'dst_list',
             occur          => 1,
             network_prefix => $IP_NETWORK,
@@ -350,7 +350,7 @@ push @commands, make_command(
             data_key    => 'inform',
             callback    => \&command_inform,
             arguments   => [
-                M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+                M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                     name => 'src_list',
                     occur => 1,
                     network_prefix => $IP_NETWORK,
@@ -382,7 +382,7 @@ push @commands, make_command(
         name     => 'ip',
         data_key => 'set_ip',
         arguments   => [
-            M6::ArpSponge::Asctl::Arg_IP_Filter->new(
+            M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                 name => 'IP',
                 occur => 1,
                 network_prefix => $IP_NETWORK,
@@ -398,7 +398,7 @@ push @commands, make_command(
         data_key    => 'set_arp_update_flags',
         callback    => \&command_set_arp_update_flags,
         arguments   => [
-            M6::ArpSponge::Asctl::Arg_Arp_Update_Flags->new(
+            M6::ArpSponge::Asctl::Arg::Arp_Update_Flags->new(
                 name           => 'flags',
                 max_occur      => -1,
             ),
@@ -624,7 +624,7 @@ sub command_set_arp_update_flags {
     say "($app) $cmd_name", map { " <$_>" } @txt_args;
 
     my $flags_arg =
-            M6::ArpSponge::Asctl::Arg_Arp_Update_Flags->new(
+            M6::ArpSponge::Asctl::Arg::Arp_Update_Flags->new(
                 name           => 'flags',
                 max_occur      => -1,
             );
