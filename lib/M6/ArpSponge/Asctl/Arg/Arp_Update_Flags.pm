@@ -1,4 +1,4 @@
-package M6::ArpSponge::Asctl::Arg_Arp_Update_Flags;
+package M6::ArpSponge::Asctl::Arg::Arp_Update_Flags;
 
 use Moo;
 

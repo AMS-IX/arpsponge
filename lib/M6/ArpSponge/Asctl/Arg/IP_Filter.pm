@@ -1,8 +1,8 @@
-package M6::ArpSponge::Asctl::Arg_IP_Filter;
+package M6::ArpSponge::Asctl::Arg::IP_Filter;
 
 use Moo;
 
-extends 'M6::ArpSponge::Asctl::Arg_IP_Range';
+extends 'M6::ArpSponge::Asctl::Arg::IP_Range';
 
 use Term::CLI::Util qw( is_prefix_str find_text_matches );
 

@@ -1,4 +1,4 @@
-package M6::ArpSponge::Asctl::Arg_IP_Range;
+package M6::ArpSponge::Asctl::Arg::IP_Range;
 
 use 5.014;
 use warnings;
