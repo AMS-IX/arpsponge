@@ -48,10 +48,19 @@ sub Main {
             'export|e+' => \(my $opt_export),
         },
         min_args => 0,
-        max_args => 0
+        max_args => 1
     );
 
     my %all = M6::ArpSponge::Defaults->all();
+
+    if (@ARGV) {
+        if ($opt_export) {
+            warn "$FindBin::Script: '--export' option ignored.\n";
+        }
+        my $v = $all{$ARGV[0]};
+        say $v // '';;
+        exit defined $v ? 0 : 1;
+    }
 
     my @keys = sort keys %all;
     for my $k (@keys) {
@@ -70,6 +79,10 @@ sub Main {
 
     exit 0 if !$opt_export;
 
+    print "\n";
+
+    # Print export statements for the keys, but
+    # make sure we don't make the lines too long.
     my $col = 0;
     for my $k (@keys) {
         if ($col + 1 + length($k) > 72) {
@@ -162,9 +175,9 @@ arpsponge_defaults - print arpsponge defaults
 
 =head1 SYNOPSIS
 
-B<arpsponge_defaults> [B<--export>]
+B<arpsponge_defaults> [B<--export>|B<-e>]
 
-B<arpsponge_defaults> [B<-e>]
+B<arpsponge_defaults> I<param>
 
 B<arpsponge_defaults> {B<--version>|B<-V>}
 
@@ -174,7 +187,11 @@ B<arpsponge_defaults> B<--manual>
 
 =head1 DESCRIPTION
 
-Print default parameters for the L<arpsponge>(8) as shell variables.
+Print default values of L<arpsponge>(8) parameters.
+
+If given a I<param> argument, print the value of that single
+I<param>. Otherwise, print all parameters, formatted as
+shell variable assignments.
 
 =head1 OPTIONS
 
@@ -185,6 +202,13 @@ X<--export>X<-e>
 
 Print C<export> statements for the shell variables
 as well.
+
+This option only makes sense if no I<param> argument
+was given.
+
+If this option is used in combination with a I<param>
+argument, the option will be ignored and a warning will
+be issued to F<stderr>.
 
 =item B<--help>, B<-h>, B<-?>
 X<--help>X<-h>X<-?>
