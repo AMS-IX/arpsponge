@@ -107,8 +107,6 @@ sub state_to_string {
     return sprintf("PENDING(%d)", $state - PENDING(0));
 }
 
-=over
-
 =item B<is_valid_state> ( I<ARG> [, B<-err =E<gt>> I<REF> )
 X<is_valid_state>
 

@@ -276,6 +276,8 @@ sub log_sverbose($@) {
     }
 }
 
+=over
+
 =item X<is_valid_log_level>B<is_valid_log_level> ( I<ARG>
 [, B<-err> =E<gt> I<REF>]
 )
@@ -317,6 +319,8 @@ sub log_level_to_string {
     }
     return $LOGLEVEL_TO_STR{$level};
 }
+
+=back
 
 =head1 COPYRIGHT
 

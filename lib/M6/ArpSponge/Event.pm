@@ -125,6 +125,8 @@ sub event_notice  { event_log(LOG_NOTICE,   $_[0], @_[1..$#_]) }
 sub event_info    { event_log(LOG_INFO,     $_[0], @_[1..$#_]) }
 sub event_debug   { event_log(LOG_DEBUG,    $_[0], @_[1..$#_]) }
 
+=over
+
 =item B<event_log> ( I<LOGLEVEL>, I<EVENT>, I<FMT> [, I<ARG>, ... ] )
 X<event_log>
 
@@ -255,6 +257,8 @@ sub event_mask_to_str {
 
     return map { $EVENT_MASK_TO_STR{$_} } event_mask_split($mask);
 }
+
+=back
 
 =head1 COPYRIGHT
 
