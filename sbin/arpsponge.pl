@@ -1,5 +1,4 @@
-#!@PERL@ -I../lib
-# [Net::ARP is not clean, so "-w" flag to perl produces spurious warnings]
+#!/usr/bin/env perl -I../lib
 ###############################################################################
 #
 # ARP sponge
@@ -14,8 +13,9 @@
 # Yes, this file is BIG. There's a POD at the end.
 #
 ###############################################################################
-use feature ':5.10';
-use strict;
+use 5.014;
+use warnings;
+
 use Getopt::Long;
 use Pod::Usage;
 use FindBin;
@@ -27,11 +27,10 @@ use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
                   pcap_get_selectable_fd pcap_setnonblock );
 
 use M6::ArpSponge::NetPacket  qw( :all );
-use NetAddr::IP         qw( :lower );
 
+use NetAddr::IP         qw( :lower );
 use Time::HiRes         qw( time sleep );
 use POSIX               qw( strftime :signal_h :errno_h );
-
 use File::Path          qw( mkpath );
 
 use IO::File;
@@ -43,28 +42,28 @@ use M6::ArpSponge::Sponge;
 use M6::ArpSponge::Log        qw( :standard );
 use M6::ArpSponge::Event      qw( :standard );
 use M6::ArpSponge::Const      qw( :all );
+use M6::ArpSponge::Defaults;
 use M6::ArpSponge::Util       qw( :all );
 use M6::ArpSponge::Control::Server;
 
 ###############################################################################
 
-use constant SYSLOG_IDENT => '@NAME@';
+use constant SYSLOG_IDENT => M6::ArpSponge::Defaults->NAME;
 
 my $PROG                 = $FindBin::Script;
-my $VERSION              = '@RELEASE@';
-
-my $SPONGE_VAR           = '@SPONGE_VAR@';
-my $DFL_LOGMASK          = 'all';
-my $DFL_LOGLEVEL         = '@DFL_LOGLEVEL@';
-my $DFL_RATE             = '@DFL_RATE@';
-my $DFL_ARP_AGE          = '@DFL_ARP_AGE@';
-my $DFL_PENDING          = '@DFL_PENDING@';
-my $DFL_LEARN            = '@DFL_LEARN@';
-my $DFL_QUEUEDEPTH       = '@DFL_QUEUEDEPTH@';
-my $DFL_PROBERATE        = '@DFL_PROBERATE@';
-my $DFL_FLOOD_PROTECTION = '@DFL_FLOOD_PROTECTION@';
-my $DFL_INIT             = '@DFL_INIT@';
-my $DFL_SOCK_PERMS       = '@DFL_SOCK_PERMS@';
+my $VERSION              = M6::ArpSponge::Defaults->VERSION;
+my $RUN_DIR              = M6::ArpSponge::Defaults->RUN_DIR;
+my $DFL_LOG_MASK         = M6::ArpSponge::Defaults->LOG_LEVEL;
+my $DFL_LOG_LEVEL        = M6::ArpSponge::Defaults->LOG_LEVEL;
+my $DFL_RATE             = M6::ArpSponge::Defaults->MAX_ARP_RATE;
+my $DFL_ARP_AGE          = M6::ArpSponge::Defaults->MAX_ARP_AGE;
+my $DFL_PENDING          = M6::ArpSponge::Defaults->MAX_PENDING;
+my $DFL_LEARN            = M6::ArpSponge::Defaults->LEARN_TIME;
+my $DFL_QUEUEDEPTH       = M6::ArpSponge::Defaults->QUEUE_DEPTH;
+my $DFL_PROBERATE        = M6::ArpSponge::Defaults->PROBE_RATE;
+my $DFL_FLOOD_PROTECTION = M6::ArpSponge::Defaults->FLOOD_PROTECTION;
+my $DFL_INIT             = M6::ArpSponge::Defaults->INIT_STATE;
+my $DFL_SOCK_PERMS       = M6::ArpSponge::Defaults->SOCK_PERMS;
 
 # Max. number of packets to handle in a pcap_dispatch() cycle.
 # This should be large enough to allow for some efficiency,
@@ -100,8 +99,8 @@ Options:
   --[no]gratuitous        - send gratuitous ARP when sponging
   --init=state            - how to initialize (default: $DFL_INIT)
   --learning=secs         - number of seconds to spend in LEARN state
-  --loglevel=level        - syslog logging level ("$DFL_LOGLEVEL")
-  --logmask=mask          - syslog event filter ("$DFL_LOGMASK")
+  --loglevel=level        - syslog logging level ("$DFL_LOG_LEVEL")
+  --logmask=mask          - syslog event filter ("$DFL_LOG_MASK")
   --pending=n             - number of seconds we send ARP queries before
                             sponging ($DFL_PENDING)
   --permissions=u:g:m     - permissions for the control socket
@@ -112,7 +111,7 @@ Options:
                             ($DFL_QUEUEDEPTH)
   --rate=n                - ARP threshold rate in queries/min ($DFL_RATE)
   --rundir=path           - override base directory for run-time files
-                            ($SPONGE_VAR/<IFNAME>)
+                            ($RUN_DIR/<IFNAME>)
   --sponge-network        - sponge the network and broadcast addresses as well
   --statusfile=file       - where to write status information when receiving
                             HUP or USR1 signal (<rundir>/status)
@@ -176,8 +175,8 @@ sub Main {
         'help|?'              => sub { print $::USAGE; exit 0 },
         'init=s'              => \(my $init_arg         = $DFL_INIT),
         'learning=i'          => \(my $learning         = $DFL_LEARN),
-        'loglevel=s'          => \(my $loglevel         = $DFL_LOGLEVEL),
-        'logmask=s'           => \(my $logmask          = $DFL_LOGMASK),
+        'loglevel=s'          => \(my $loglevel         = $DFL_LOG_LEVEL),
+        'logmask=s'           => \(my $logmask          = $DFL_LOG_MASK),
         'man'                 => \(my $man),
         'pending=i'           => \(my $pending          = $DFL_PENDING),
         'permissions=s'       => \(my $permissions      = $DFL_SOCK_PERMS),
@@ -236,7 +235,7 @@ sub Main {
 
     $device = $ARGV[2];
 
-    $rundir         //= "$SPONGE_VAR/$device";
+    $rundir         //= "$RUN_DIR/$device";
     $statusfile     //= "$rundir/status";
 
     ####################################################################
@@ -260,7 +259,7 @@ sub Main {
     ####################################################################
     $| = ($verbose > 0 ? 1 : 0);
 
-    my $sponge = new M6::ArpSponge::Sponge(
+    my $sponge = M6::ArpSponge::Sponge->new(
             verbose          => $verbose,
             is_dummy         => $dummy,
             queuedepth       => $queuedepth,
@@ -562,8 +561,8 @@ sub packet_capture_loop {
     # Prepare the bit vector for the select() calls.
     $sponge->user(
         select => IO::Select->new(
-                    $sponge->user('pcap_fh'),
-                    $sponge->user('control'),
+            $sponge->user('pcap_fh'),
+            $sponge->user('control'),
         ),
     );
 
@@ -1297,7 +1296,7 @@ sub do_status {
     # and don't buffer anything. This is useful if the destination
     # is a FIFO and there is not always a reader.
 
-    my $fh = new IO::File($fname, O_RDWR|O_CREAT);
+    my $fh = IO::File->new($fname, O_RDWR|O_CREAT);
 
     unless ($fh) {
         event_err(EVENT_IO, "cannot write status to %s: %s", $fname, $!);
@@ -1339,11 +1338,11 @@ __END__
 
 =head1 NAME
 
-@NAME@ - automatically "sponge" ARP requests for dead IP addresses
+arpsponge - automatically "sponge" ARP requests for dead IP addresses
 
 =head1 SYNOPSIS
 
-B<@NAME@> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
+B<arpsponge> [I<options>] I<NETPREFIX/LEN> B<dev> I<DEV>
 
 I<Options>:
 
@@ -1374,18 +1373,18 @@ I<Options>:
     --sweep-skip-alive
     --verbose[=n]
 
-B</etc/init.d/@NAME@> {B<start>|B<stop>|B<restart>|B<status>}
+B</etc/init.d/>rpsponge {B<start>|B<stop>|B<restart>|B<status>}
 
 =head1 DESCRIPTION
 
-The C<@NAME@> program "sponges" ARP queries from an Ethernet interface.
+The C<arpsponge> program "sponges" ARP queries from an Ethernet interface.
 
 =head2 Sponging
 
 The program monitors ARP queries for addresses in the I<NETPREFIX/LEN>
 network and starts spoofing replies for them when the queries reach a
-threshold (default @DFL_QUEUEDEPTH@ unanswered queries with an average
-rate of @DFL_RATE@ or more per minute).
+threshold (default unanswered queries with an average
+rate of 50 or more per minute).
 
 =head2 Unsponging
 
@@ -1624,7 +1623,7 @@ Dummy operation (simulate sponging). Does send ARP queries, but no ARP
 =item B<--flood-protection>=I<r>
 X<--flood-protection>
 
-ARP threshold rate in queries/sec (default @DFL_FLOOD_PROTECTION@) above
+ARP threshold rate in queries/sec (default 3) above
 which we ignore ARP queries from a particular source.
 
 If there is a ARP broadcast storm on the platform (e.g. loops or DoS),
@@ -1775,14 +1774,14 @@ Default value is C<all>.
 X<--pending>
 
 Number of ARP queries the sponge itself sends before sponging an IP address
-(default: @DFL_PENDING@).
+(default: 5).
 
 The L<pending state|/Pending State> (see L<above|/Pending State>)
 serves as an extra check before sponging: if it gets a response from
 the target IP, then that address is obviously not dead yet.
 
 Choosing the I<pending> parameter wisely (larger than one, but not much
-larger than @DFL_PENDING@) will prevent unjustified sponging (e.g. when
+larger than 5) will prevent unjustified sponging (e.g. when
 a Black Hat sends streams of ARP queries in the hopes of getting the
 target sponged).
 
@@ -1795,7 +1794,7 @@ as well.
 X<--permissions>
 
 Set the permissions on the L<control socket|/--control>. Default is
-C<@DFL_SOCK_PERMS@>.
+system-dependent (C<root:adm:0660> on Linux, C<root:wheel:0660> on BSD).
 
 =item B<--pidfile>=I<pidfile>
 X<--pidfile>
@@ -1808,7 +1807,8 @@ X<--proberate>
 
 The rate at which we send our ARP queries. Used when sweeping
 and querying pending addresses.
-Default is @DFL_PROBERATE@, but check the rate your network can
+
+Default is 100, but check the rate your network can
 comfortably handle.
 
 Generally speaking, the following formula gives an upper bound for
@@ -1822,13 +1822,14 @@ the time spent in a probing sweep:
 So a sweep over 100 addresses with a query rate of 50 takes about 2 seconds.
 
 The CPU can usually throw ICMP packets at an interface much faster than
-the actual wire-speed, so many do not make it onto the wire.
-Furthermore, since ARP queries are broadcast and thus typically CPU-bound,
-they may get rate-limited by the L2 infrastructure or at the
+the actual wire speed, so many do not make it onto the wire.
+Furthermore, since ARP queries are broadcast and thus typically CPU-bound at
+the receiver, they may get rate-limited by the L2 infrastructure or at the
 receiving stations.
 
-Having the sponge itself be a source of periodic broadcast storms pretty
-much defeats the purpose of the thing.
+Furthermore, having the sponge itself be a source of periodic broadcast storms
+pretty much defeats the purpose of the thing, so the probe rate should be
+set to something "sensible".
 
 =over 7
 
@@ -1836,8 +1837,7 @@ much defeats the purpose of the thing.
 
 Due to the way the C<proberate> delays are implemented, it's possible
 that you will not be able to go higher than 100 and possibly even get stuck
-at 50 or so.  See also L<Bugs and Limitations|/BUGS AND LIMITATIONS>
-below.
+at 50 or so.  See also L</BUGS AND LIMITATIONS> below.
 
 =back
 
@@ -1845,7 +1845,7 @@ below.
 X<--queuedepth>
 
 Number of ARP queries over which to calculate average rate (default
-@DFL_QUEUEDEPTH@).
+1000).
 Sponging is not triggered until at least this number of ARP queries are seen.
 
 =item B<--rate>=I<r>
@@ -1859,7 +1859,9 @@ L<--flood-protection|/--flood-protection>.
 =item B<--rundir>=I<path>
 X<--rundir>
 
-Base directory for run-time files. Default is "F<@SPONGE_VAR@>/I<interface>".
+Base directory for run-time files. Default is system dependent, but
+typically one of "F</run/arpsponge>/I<interface>" or 
+"F</var/run/arpsponge>/I<interface>".
 
 =item B<--sponge-network>
 X<--sponge-network>
@@ -1954,22 +1956,22 @@ Has no effect when L<--daemon|/--daemon> is specified.
 To start the program on C<eth0> for the C<91.200.17.0/26> network,
 simply use:
 
-   @NAME@ 91.200.17.0/26 dev eth0
+   arpsponge 91.200.17.0/26 dev eth0
 
 =head2 Status Dumping
 
 To use the status dumping functionality, do:
 
-   @NAME@ --daemon --statusfile=/tmp/sponge.out \
+   arpsponge --daemon --statusfile=/tmp/sponge.out \
         91.200.17.0/26 dev eth0
 
 Then send a C<USR1> signal to the process:
 
-   pkill -USR1 @NAME@
+   pkill -USR1 arpsponge
 
 Now F</tmp/sponge.out> should contain something like:
 
-  id:               @NAME@
+  id:               arpsponge
   pid:              27482
   version:          @RELEASE@(146)
   date:             2011-04-22@15:30:26 [1303479026]
@@ -2032,20 +2034,20 @@ Now F</tmp/sponge.out> should contain something like:
 =head1 SYSTEM INIT SCRIPT
 
 The sponge can be started by an L<init(1)|init> script,
-F</etc/init.d/@NAME@>. This script looks for the following files:
+F</etc/init.d/arpsponge>. This script looks for the following files:
 
 =over 4
 
-=item F<@ETC_DEFAULT@/@NAME@/defaults>
+=item F<@ETC_DEFAULT@/arpsponge/defaults>
 
 Contains default options for every sponge instance. The options are
 specified as L<sh(1)|sh> shell variables.
 
-=item F<@ETC_DEFAULT@/@NAME@/interfaces.d/if_name>
+=item F<@ETC_DEFAULT@/arpsponge/interfaces.d/if_name>
 
 Contains a network definition for the sponge on I<if_name>.
 
-=item F<@ETC_DEFAULT@/@NAME@/ethX> (LEGACY)
+=item F<@ETC_DEFAULT@/arpsponge/ethX> (LEGACY)
 
 Contains a network definition for the sponge on I<ethX>. This is a
 legacy option, because it forces a name format on interfaces. If
@@ -2067,8 +2069,8 @@ be seen as an interface configuration file.
 
 For every interface configuration file the script finds, it starts a sponge
 daemon on the corresponding interface. The sponge daemon will write its
-status file to F<$SPONGE_VAR/if_name/status> and create a control socket in
-F<$SPONGE_VAR/if_name/control>, where I<if_name> corresponds to the
+status file to F<$RUN_DIR/if_name/status> and create a control socket in
+F<$RUN_DIR/if_name/control>, where I<if_name> corresponds to the
 interface name.
 
 =head2 Init Variables
@@ -2137,7 +2139,7 @@ The argument to C<--rate>.
 
 Use C<--sponge-network>
 
-=item I<SPONGE_VAR> (default: F<@SPONGE_VAR@>)
+=item I<SPONGE_VAR> (default: F</run/arpsponge>)
 
 Directory root that holds state information for the various sponge
 instances. The script will create the directory if it doesn't exist yet.
@@ -2205,15 +2207,15 @@ a warning).
 
 =over 4
 
-=item F</etc/init.d/@NAME@>
+=item F</etc/init.d/arpsponge>
 
-Init script for the @NAME@.
+Init script for the arpsponge.
 
-=item F<@ETC_DEFAULT@/@NAME@/defaults>
+=item F</etc/defaults/arpsponge/defaults>
 
 Contains default options for the sponge's L<init(1)|init> script.
 
-=item F<@ETC_DEFAULT@/@NAME@/interfaces.d/if_name>
+=item F</etc/defaults/arpsponge/interfaces.d/if_name>
 
 Contains interface specific options for the sponge on I<ethX>.
 This I<must> define the C<NETWORK> variable.
@@ -2221,7 +2223,7 @@ This I<must> define the C<NETWORK> variable.
 This is used by the sponge's L<init(1)|init> script, see
 also L<SYSTEM INIT SCRIPT|/SYSTEM INIT SCRIPT>.
 
-=item F<@ETC_DEFAULT@/@NAME@/ethX> (LEGACY)
+=item F</etc/defaults/arpsponge/ethX> (LEGACY)
 
 Contains (I<LEGACY>) interface specific options for the sponge on I<ethX>.
 This I<must> define the C<NETWORK> variable.
@@ -2229,17 +2231,17 @@ This I<must> define the C<NETWORK> variable.
 This is used by the sponge's L<init(1)|init> script, see
 also L<SYSTEM INIT SCRIPT|/SYSTEM INIT SCRIPT>.
 
-=item F<@SPONGE_VAR@/if_name/status>
+=item F</run/arpsponge/if_name/status>
 
 Status file for the sponge daemon that runs on interface I<if_name>.
 This is set up by the sponge's L<init(1)|init> script.
 
-=item F<@SPONGE_VAR@/if_name/control>
+=item F</run/arpsponge/if_name/control>
 
 Control socket for L<asctl>(8).
 This is set up by the sponge's L<init(1)|init> script.
 
-=item F<@SPONGE_VAR@/if_name/pid>
+=item F</run/arpsponge/if_name/pid>
 
 PID file for the sponge daemon that runs on interface I<if_name>.
 This is set up by the sponge's L<init(1)|init> script.
