@@ -1,0 +1,242 @@
+#!/usr/bin/perl
+# ============================================================================
+#
+#         File:  arpsponge_defaults
+#
+#        Usage:  See POD at end.
+#
+#  Description:  Print default configuration values for arpsponge.
+#
+#       Author:  Steven Bakker (SB), <Steven.Bakker@ams-ix.net>
+#      Created:  2024-04-20
+#
+#   Copyright (c) 2024 AMS-IX B.V.; All rights reserved.
+#
+#   This program is free software; you can redistribute it and/or modify
+#   it under the same terms as Perl itself. See "perldoc perlartistic".
+#
+#   This software is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# ============================================================================
+
+use 5.014;
+use warnings;
+use FindBin;
+use Getopt::Long qw( :config bundling );
+use Pod::Usage;
+
+use M6::ArpSponge::Defaults;
+#
+# Values set on the Command Line.
+my $opt_verbose   = 0;
+my $opt_debug     = 0;
+my $opt_dryrun    = 0;
+
+our $VERSION   = '1.000';
+my $app_header = "\nThis is $FindBin::Script, v$VERSION\n\n"
+			   . "See \"perldoc $FindBin::Script\" for more information.\n"
+               ;
+
+sub verbose(@) { print @_ if $opt_verbose }
+sub debug(@)   { print STDERR @_ if $opt_debug }
+
+sub Main {
+    my $opts = init_options(
+        opts => {
+            'export|e+' => \(my $opt_export),
+        },
+        min_args => 0,
+        max_args => 0
+    );
+
+    my %all = M6::ArpSponge::Defaults->all();
+
+    my @keys = sort keys %all;
+    for my $k (@keys) {
+        my $v = $all{$k};
+        if ($v =~ /\W/) {
+            if ($v !~ /'/) {
+                $v = qq{'$v'};
+            }
+            else {
+                $v =~ s{([\"\$\\])}{\\$1}g;
+                $v = qq{"$v"};
+            }
+        }
+        printf "%s=%s\n", $k, $v;
+    }
+
+    exit 0 if !$opt_export;
+
+    my $col = 0;
+    for my $k (@keys) {
+        if ($col + 1 + length($k) > 72) {
+            print "\n";
+            $col = 0;
+        }
+        if ($col == 0) {
+            my $str = 'export ';
+            print $str;
+            $col = length($str);
+        }
+        else {
+            print ' ';
+            $col++;
+        }
+        print $k;
+        $col += length($k);
+    }
+    print "\n";
+}
+
+sub init_options {
+    my %args = (
+        min_args => -1,
+        max_args => -1,
+        opts     => {},
+        @_
+    );
+    my $opts = $args{opts};
+    my $min_args = $args{min_args};
+    my $max_args = $args{max_args};
+
+    GetOptions(
+        # Boiler-plate options.
+        'debug|d+'          => \$opt_debug,
+        'dryrun|dry-run|n!' => \$opt_dryrun,
+        'help|?|h'          => sub {
+            pod2usage(-msg => $app_header, -exitval=>0, -verbose=>0)
+        },
+        'manual'            => sub { pod2usage(-exitval=>0, -verbose=>2) },
+        'quiet|q'           => sub { $opt_verbose = 0 },
+        'verbose|v+'        => \$opt_verbose,
+        'version|V'         => sub { print $app_header; exit(0) },
+        # Custom options.
+        %$opts,
+    ) or pod2usage(-exitval=>2);
+
+    my $args_required = $min_args > 0 ? $min_args : 0;
+
+    if ($min_args > 0) {
+        if ($max_args > $min_args) {
+            $args_required = "between $min_args and $max_args";
+        }
+        elsif ($max_args == $min_args) {
+            $args_required = $min_args;
+        }
+        else {
+            $args_required = "at least $min_args";
+        }
+    }
+    elsif ($max_args > 0) {
+        $args_required = "no more than $max_args";
+    }
+    else {
+        $args_required = "none";
+    }
+
+    if ($min_args > 0 && @ARGV < $min_args) {
+        pod2usage(
+            -message => "\nNot enough arguments ($args_required expected)\n",
+            -exitval => 2);
+    }
+    elsif ($max_args >= 0 && @ARGV > $max_args) {
+        pod2usage(
+            -message => "\nToo many arguments ($args_required expected)\n",
+            -exitval => 2);
+    }
+
+    $opt_verbose++ if $opt_debug;
+}
+
+
+Main();
+
+__END__
+
+=head1 NAME
+
+arpsponge_defaults - print arpsponge defaults
+
+=head1 SYNOPSIS
+
+B<arpsponge_defaults> [B<--export>]
+
+B<arpsponge_defaults> [B<-e>]
+
+B<arpsponge_defaults> {B<--version>|B<-V>}
+
+B<arpsponge_defaults> {B<--help>|B<-h>|B<-?>}
+
+B<arpsponge_defaults> B<--manual>
+
+=head1 DESCRIPTION
+
+Print default parameters for the L<arpsponge>(8) as shell variables.
+
+=head1 OPTIONS
+
+=over
+
+=item B<--export>, B<-e>
+X<--export>X<-e>
+
+Print C<export> statements for the shell variables
+as well.
+
+=item B<--help>, B<-h>, B<-?>
+X<--help>X<-h>X<-?>
+
+Print a brief help message to F<STDOUT> and exit.
+
+=item B<--manual>
+X<--manual>
+
+Display the program's L<man>(1) manual page and exit.
+
+=item B<--version>, B<-V>
+X<--version>X<-V>
+
+Print program version to F<STDOUT> and exit.
+
+=back
+
+=head1 EXAMPLES
+
+=head1 EXIT CODE
+
+=over
+
+=item I<zero>
+
+Success.
+
+=item I<non-zero>
+
+One or more errors occurred.
+
+=back
+
+=head1 SEE ALSO
+
+L<perl(1)|perl>.
+
+=head1 AUTHOR
+
+Steven Bakker E<lt>Steven.Bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2024.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2024 AMS-IX B.V.; All rights reserved.
+
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. See "perldoc perlartistic".
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+=cut
+
