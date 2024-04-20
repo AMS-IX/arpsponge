@@ -36,7 +36,7 @@ my $opt_dryrun    = 0;
 
 our $VERSION   = '1.000';
 my $app_header = "\nThis is $FindBin::Script, v$VERSION\n\n"
-			   . "See \"perldoc $FindBin::Script\" for more information.\n"
+               . "See \"perldoc $FindBin::Script\" for more information.\n"
                ;
 
 sub verbose(@) { print @_ if $opt_verbose }
@@ -85,7 +85,7 @@ sub Main {
     # make sure we don't make the lines too long.
     my $col = 0;
     for my $k (@keys) {
-        if ($col + 1 + length($k) > 72) {
+        if ($col + 1 + length($k) > 64) {
             print "\n";
             $col = 0;
         }
@@ -229,6 +229,32 @@ Print program version to F<STDOUT> and exit.
 
 =head1 EXAMPLES
 
+Print the value of a single parameter:
+
+    $ arpsponge_defaults NAME
+    arpsponge
+
+Print all values as shell variables:
+
+    $ arpsponge_defaults
+    FLOOD_PROTECTION=3
+    IFCONFIG='/sbin/ifconfig'
+    ...
+    VERSION='3.17.6'
+
+Print all values as shell variables with C<export> statements:
+
+    $ arpsponge_defaults -e
+    FLOOD_PROTECTION=3
+    IFCONFIG='/sbin/ifconfig'
+    ...
+    VERSION='3.17.6'
+
+    export FLOOD_PROTECTION IFCONFIG INIT_STATE LEARN_TIME
+    export LOG_EVENT_MASK LOG_LEVEL MAX_ARP_AGE MAX_ARP_RATE
+    export MAX_PENDING NAME PROBE_RATE QUEUE_DEPTH RUN_DIR
+    export SOCK_PERMS VERSION
+
 =head1 EXIT CODE
 
 =over
@@ -245,7 +271,7 @@ One or more errors occurred.
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>.
+L<arpsponge>(8).
 
 =head1 AUTHOR
 
