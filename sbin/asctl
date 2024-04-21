@@ -168,7 +168,7 @@ my $rundir        = $RUN_DIR;
 
 my $INTERACTIVE   = 1;
 
-my $VERSION    = '@RELEASE@';
+my $VERSION    = M6::ArpSponge::Defaults->VERSION;
 my $app_header = <<EO_USAGE;
 
 This is $FindBin::Script, v$VERSION
