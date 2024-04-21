@@ -33,6 +33,7 @@ WriteMakefile(
     PREREQ_FATAL => 0, # Change to 1 if you really need our prereqs.
     
     'MIN_PERL_VERSION'  => '5.014',
+
     'PREREQ_PM'         => {
         'Carp'                                          => '1.54',
         'Config'                                        => '5.038002',
@@ -49,7 +50,6 @@ WriteMakefile(
         'IPC::Run'                                      => '20220807.0',
         'JSON::PP'                                      => '4.16',
         'List::Util'                                    => '1.63',
-        'Modern::Perl'                                  => '1.20240115',
         'Moo'                                           => '2.005005',
         'Net::ARP'                                      => 'v1.0.12',
         'Net::Pcap'                                     => '0.21',
@@ -61,6 +61,9 @@ WriteMakefile(
         'Scalar::Util'                                  => '1.63',
         'Sys::Syslog'                                   => '0.36',
         'Term::CLI'                                     => '0.059000',
+        'Term::CLI::Argument'                           => '0.059000',
+        'Term::CLI::L10N'                               => '0.059000',
+        'Term::CLI::Util'                               => '0.059000',
         'Term::ReadKey'                                 => '2.38',
         'Term::ReadLine'                                => '1.17',
         'Time::HiRes'                                   => '1.9775',
@@ -74,8 +77,12 @@ WriteMakefile(
         'version'                                       => '0.9930',
         'warnings'                                      => '1.65',
     },
+
     BUILD_REQUIRES      => {
-        # Include output from "perldepend --cpan t/*"
+        'Test::Compile' => 'v3.3.1',
+        'Test::More'    => '1.302195',
+        'strict'        => '1.12',
+        'warnings'      => '1.65',
     },
 
     dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz' },
