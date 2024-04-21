@@ -20,6 +20,7 @@ old_t/dosponge2
 old_t/testpcap
 init.d/arpsponge.sh
 init.d/Makefile
+lib/M6/ArpSponge.pm
 lib/M6/ArpSponge/Base.pm
 lib/M6/ArpSponge/Const.pm
 lib/M6/ArpSponge/Control/Base.pm
