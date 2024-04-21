@@ -30,15 +30,16 @@ use Getopt::Long qw( GetOptions );
 use Pod::Usage;
 use M6::ArpSponge::Control::Client;
 use M6::ArpSponge::Util qw( :all );
+use M6::ArpSponge::Defaults;
 
-my $SPONGE_VAR    = '@SPONGE_VAR@';
-my $CONN          = undef;
+my $RUN_DIR = M6::ArpSponge::Defaults->RUN_DIR;
+my $CONN    = undef;
 
 # Values set on the Command Line.
 my $opt_verbose   = undef;
-my $rundir        = $SPONGE_VAR;
+my $rundir        = $RUN_DIR;
 
-my $VERSION    = '@RELEASE@';
+my $VERSION    = M6::ArpSponge::Defaults->VERSION;
 my $app_header = "\nThis is $0, v$VERSION\n\n"
                . "See \"perldoc $0\" for more information.\n"
                ;
@@ -157,7 +158,7 @@ on a file, it connects to a running L<arpsponge(8)|arpsponge>'s control
 socket, reads log events from the daemon and prints them to F<stdout>.
 
 By default, the program connects to the first control socket it finds in
-F<@SPONGE_VAR@> (see L<FILES|/FILES>), but see L<OPTIONS|/OPTIONS> below
+F</run/arpsponge> (see L<FILES|/FILES>), but see L<OPTIONS|/OPTIONS> below
 for ways to override this.
 
 Like L<tail(1)|tail>, it prints 10 lines of log by default and supports
@@ -217,20 +218,19 @@ The C<--verbose> flag causes the program to be a little more talkative.
 
 =over
 
-=item F<@SPONGE_VAR@>
+=item F</run/arpsponge>
 
 Default top-level directory location for per-interface control sockets:
 the L<arpsponge> on interface I<ifname> will have its control socket at
-F<@SPONGE_VAR@/>I<ifname>F</control>.
+F</run/arpsponge/>I<ifname>F</control>.
 
 =back
 
 =head1 SEE ALSO
 
-L<arpsponge(8)|arpsponge>,
-L<asctl(8)|asctl>,
-L<tail(1)|tail>,
-L<perl(1)|perl>.
+L<arpsponge|arpsponge>(8),
+L<asctl|asctl>(8),
+L<tail|tail>(1).
 
 =head1 AUTHOR
 
