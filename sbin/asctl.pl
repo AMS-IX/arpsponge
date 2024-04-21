@@ -37,6 +37,7 @@ use YAML::PP qw();
 use JSON::PP qw();
 
 use M6::ArpSponge::Control::Client;
+use M6::ArpSponge::Defaults;
 use M6::ArpSponge::Event     qw( :standard );
 use M6::ArpSponge::Log       qw( :standard :macros );
 use M6::ArpSponge::Util      qw( :all );
@@ -58,7 +59,7 @@ my $YAML_OBJ        = YAML::PP->new(
     version_directive => 1,
 );
 
-my $SPONGE_VAR      = '@SPONGE_VAR@';
+my $RUN_DIR         = M6::ArpSponge::Defaults->RUN_DIR;
 my $CONN            = undef;
 my $ERR             = 0;
 my $STATUS          = {};
@@ -163,7 +164,7 @@ my $opt_quiet     = 0;
 my $opt_verbose   = 0;
 my $opt_debug     = 0;
 my $opt_test      = 0;
-my $rundir        = $SPONGE_VAR;
+my $rundir        = $RUN_DIR;
 
 my $INTERACTIVE   = 1;
 
@@ -2569,7 +2570,7 @@ socket, and executes commands that either come from standard input, or from
 the command line.
 
 By default, the program connects to the first control socket it finds in
-F<@SPONGE_VAR@> (see L<FILES|/FILES>), but see L<OPTIONS|/OPTIONS> below
+F</run/arpsponge> (see L<FILES|/FILES>), but see L<OPTIONS|/OPTIONS> below
 for ways to override this.
 
 =head1 OPTIONS
@@ -3222,20 +3223,19 @@ Shortcuts for C<--format=X>.
 
 =over
 
-=item F<@SPONGE_VAR@>
+=item F</run/arpsponge>
 
 Default top-level directory location for per-interface control sockets:
 the L<arpsponge> on interface I<ifname> will have its control socket at
-F<@SPONGE_VAR@/>I<ifname>F</control>.
+F</run/arpsponge/>I<ifname>F</control>.
 
 =back
 
 =head1 SEE ALSO
 
-L<arpsponge(8)|arpsponge>,
-L<asctl(8)|asctl>,
-L<tail(1)|tail>,
-L<perl(1)|perl>.
+L<arpsponge|arpsponge>(8),
+L<M6::ArpSponge::Defaults>(3),
+L<tail|tail>(1).
 
 =head1 AUTHOR
 
