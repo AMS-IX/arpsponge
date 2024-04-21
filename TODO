@@ -1,5 +1,3 @@
-@(#) $Id$
-
 --------------------------------------------------
 Tue Mar 29 23:13:42 CEST 2011
 
@@ -141,3 +139,12 @@ Thu Oct  7 09:16:50 CEST 2010
       Advantage:    less state to keep, less processing when queue is full
       Disadvantage: multiple flooding sources can still cause sponging,
                     extra overhead for adding _each_ entry to the queue.
+
+
+Decide what to do with ARPs to/from the network and/or broadcast address.
+
+Right now, these addresses are recognised as being within the network, but
+don't get any state initialisation (because we use "first" and "last" in the
+init loop), so they are treated as state PENDING.
+
+
