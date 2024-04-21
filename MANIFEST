@@ -35,9 +35,9 @@ lib/M6/ArpSponge/Queue.pm
 lib/M6/ArpSponge/Sponge.pm
 lib/M6/ArpSponge/Table.pm
 lib/M6/ArpSponge/Util.pm
-sbin/arpsponge.pl
-sbin/aslogtail.pl
-sbin/asctl.pl
+sbin/arpsponge
+sbin/aslogtail
+sbin/asctl
 debian/arpsponge.init
 debian/arpsponge.links
 debian/changelog
