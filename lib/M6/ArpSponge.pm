@@ -56,6 +56,8 @@ name space, L<arpsponge>(8), and L<asctl>(8).
 
 The package's version.
 
+=back
+
 =head1 SEE ALSO
 
 L<arpsponge>(8), L<asctl>(8).
