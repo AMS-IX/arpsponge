@@ -2,7 +2,7 @@ Source: arpsponge
 Section: perl
 Priority: optional
 Maintainer: Steven Bakker <steven.bakker@ams-ix.net>
-Build-Depends: debhelper (>= 9),
+Build-Depends: debhelper-compat (= 13),
  perl (>= 5.014),
  libio-string-perl (>= 1.08-3),
  libipc-run-perl (>= 0.92-1+deb8u1),
@@ -22,7 +22,7 @@ Vcs-Browser: https://github.com/AMS-IX/arpsponge
 Package: arpsponge
 Architecture: all
 Depends: ${misc:Depends},
- net-tools,
+ iproute2,
  perl (>= 5.014),
  libio-string-perl (>= 1.08-3),
  libipc-run-perl (>= 0.92-1+deb8u1),
