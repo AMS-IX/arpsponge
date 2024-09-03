@@ -5,7 +5,7 @@ Changelog
 Makefile.PL
 config.mk
 rules.mk
-defaults.sample.src
+defaults.sample
 MANIFEST
 MANIFEST.SKIP
 doc/arpsponge_architecture.txt
@@ -18,7 +18,7 @@ old_t/dosponge
 old_t/testqueue.pl
 old_t/dosponge2
 old_t/testpcap
-init.d/arpsponge.sh
+init.d/arpsponge
 init.d/Makefile
 lib/M6/ArpSponge.pm
 lib/M6/ArpSponge/Base.pm
