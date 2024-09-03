@@ -38,6 +38,7 @@ lib/M6/ArpSponge/Util.pm
 sbin/arpsponge
 sbin/aslogtail
 sbin/asctl
+sbin/arpsponge_defaults
 debian/arpsponge.init
 debian/arpsponge.links
 debian/changelog
