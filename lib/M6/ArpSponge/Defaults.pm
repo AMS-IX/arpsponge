@@ -57,6 +57,7 @@ my %Defaults = (
     NAME             => $NAME,
     VERSION          => $RELEASE,
     IFCONFIG         => _get_ifconfig(),
+    IP_CMD           => _get_ip_cmd(),
     SOCK_PERMS       => _get_sock_perms(),
     RUN_DIR          => _get_run_dir(),
     BIN_DIR          => _get_bin_dir(),
@@ -79,6 +80,15 @@ sub _get_ifconfig {
             map { "$_/ifconfig" } @SYS_DIRS;
 
     return $ifconfig;
+}
+
+
+sub _get_ip_cmd {
+    state $ip_cmd =
+        first { -f $_ && -x $_ }
+            map { "$_/ip" } @SYS_DIRS;
+
+    return $ip_cmd;
 }
 
 
@@ -187,17 +197,28 @@ Valid method names correspond to the keys in the hash returned by L</all>:
 
 =over
 
-=item B<MAX_ARP_AGE>
+=item B<BIN_DIR>
 
-Default maximum age for ARP entries.
+System-dependent.
+Directory where the C<arpsponge> executable is installed.
 
 =item B<FLOOD_PROTECTION>
 
 Default flood protection parameter.
 
+=item B<IFCONFIG>
+
+System-dependent.
+Path to the L<ifconfig>(8) executable.
+
 =item B<INIT_STATE>
 
 Initialisation state for IP addresses at startup.
+
+=item B<IP_CMD>
+
+System-dependent.
+Path to the L<ip>(8) executable (typically only on Linux systems).
 
 =item B<LEARN_TIME>
 
@@ -211,10 +232,23 @@ Which even types to log.
 
 At which level log events are sent to L<syslog>(2).
 
+=item B<MAX_ARP_AGE>
+
+Default maximum age for ARP entries.
+
+=item B<MAX_ARP_RATE>
+
+Threshold of ARP queries/sec above which we will consider sponging an IP
+address.
+
 =item B<MAX_PENDING>
 
 How many unanswered ARP requests we can have for a particular IP before
 sponging.
+
+=item B<NAME>
+
+Package name.
 
 =item B<PROBE_RATE>
 
@@ -225,34 +259,20 @@ send probe packets (ARP requests) during sweeps.
 
 Size of "ARP queue" for each IP address.
 
-=item B<MAX_ARP_RATE>
-
-Threshold of ARP queries/sec above which we will consider sponging an IP
-address.
-
-=item B<NAME>
-
-Package name.
-
-=item B<VERSION>
-
-Package version.
-
-=item B<IFCONFIG>
+=item B<RUN_DIR>
 
 System-dependent.
-Path to the L<ifconfig>(8) executable.
+Volatile "run" directory for the arpsponge, typically 
+F</run/arpsponge> or F</var/run/arpsponge>.
 
 =item B<SOCK_PERMS>
 
 System-dependent.
 Control socket permissions (I<user>B<:>I<group>B<:>I<mode>).
 
-=item B<RUN_DIR>
+=item B<VERSION>
 
-System-dependent.
-Volatile "run" directory for the arpsponge, typically 
-F</run/arpsponge> or F</var/run/arpsponge>.
+Package version.
 
 =back
 
@@ -263,12 +283,11 @@ F</run/arpsponge> or F</var/run/arpsponge>.
   my %h = M6::ArpSponge::Defaults->all();
   say join(" ", sort keys %h);
 
-Will print:
+Will print (output broken to multiple lines for readability):
 
-  FLOOD_PROTECTION IFCONFIG INIT_STATE LEARN_TIME
-  LOG_LEVEL LOG_MASK MAX_ARP_AGE MAX_ARP_RATE MAX_PENDING
-  NAME PROBE_RATE QUEUE_DEPTH RUN_DIR SOCK_PERMS
-  VERSION
+  BIN_DIR FLOOD_PROTECTION IFCONFIG INIT_STATE IP_CMD LEARN_TIME
+  LOG_EVENT_MASK LOG_LEVEL MAX_ARP_AGE MAX_ARP_RATE MAX_PENDING NAME
+  PROBE_RATE QUEUE_DEPTH RUN_DIR SOCK_PERMS VERSION
 
 =head2 Access parameter by name
 
