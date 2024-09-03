@@ -34,7 +34,7 @@ my $opt_verbose   = 0;
 my $opt_debug     = 0;
 my $opt_dryrun    = 0;
 
-our $VERSION   = '1.000';
+our $VERSION   = '1.001';
 my $app_header = "\nThis is $FindBin::Script, v$VERSION\n\n"
                . "See \"perldoc $FindBin::Script\" for more information.\n"
                ;
@@ -45,15 +45,20 @@ sub debug(@)   { print STDERR @_ if $opt_debug }
 sub Main {
     my $opts = init_options(
         opts => {
-            'export|e+' => \(my $opt_export),
+            'export|e+'  => \(my $opt_export),
+            'prefix|p=s' => \(my $opt_prefix = ''),
         },
         min_args => 0,
-        max_args => 1
+        max_args => -1
     );
+
+    if (length $opt_prefix && $opt_prefix !~ /^[a-z_]\w*$/) {
+        die "$FindBin::Script: invalid variable prefix '$opt_prefix'.\n";
+    }
 
     my %all = M6::ArpSponge::Defaults->all();
 
-    if (@ARGV) {
+    if (@ARGV == 1) {
         if ($opt_export) {
             warn "$FindBin::Script: '--export' option ignored.\n";
         }
@@ -62,9 +67,9 @@ sub Main {
         exit defined $v ? 0 : 1;
     }
 
-    my @keys = sort keys %all;
+    my @keys = @ARGV ? sort @ARGV : sort keys %all;
     for my $k (@keys) {
-        my $v = $all{$k};
+        my $v = $all{$k} // '';
         if ($v =~ /\W/) {
             if ($v !~ /'/) {
                 $v = qq{'$v'};
@@ -74,7 +79,7 @@ sub Main {
                 $v = qq{"$v"};
             }
         }
-        printf "%s=%s\n", $k, $v;
+        printf "%s%s=%s\n", $opt_prefix, $k, $v;
     }
 
     exit 0 if !$opt_export;
@@ -85,7 +90,8 @@ sub Main {
     # make sure we don't make the lines too long.
     my $col = 0;
     for my $k (@keys) {
-        if ($col + 1 + length($k) > 64) {
+        my $pk = $opt_prefix.$k;
+        if ($col + 1 + length($pk) > 64) {
             print "\n";
             $col = 0;
         }
@@ -98,8 +104,8 @@ sub Main {
             print ' ';
             $col++;
         }
-        print $k;
-        $col += length($k);
+        print $pk;
+        $col += length($pk);
     }
     print "\n";
 }
@@ -175,7 +181,11 @@ arpsponge_defaults - print arpsponge defaults
 
 =head1 SYNOPSIS
 
-B<arpsponge_defaults> [B<--export>|B<-e>]
+B<arpsponge_defaults> [B<--export>]
+[B<--prefix>=I<var_prefix>]
+
+B<arpsponge_defaults> [B<-e>]
+[B<-p> I<var_prefix>]
 
 B<arpsponge_defaults> I<param>
 
@@ -191,7 +201,8 @@ Print default values of L<arpsponge>(8) parameters.
 
 If given a I<param> argument, print the value of that single
 I<param>. Otherwise, print all parameters, formatted as
-shell variable assignments.
+shell variable assignments (see also the L<--prefix/--prefix>
+option).
 
 =head1 OPTIONS
 
@@ -220,6 +231,12 @@ X<--manual>
 
 Display the program's L<man>(1) manual page and exit.
 
+=item B<--prefix>=I<var_prefix>, B<-p> I<var_prefix>
+X<--prefix>X<--p>
+
+Prefix to use for variable names in the output, see
+also L<EXAMPLES|/EXAMPLES> below.
+
 =item B<--version>, B<-V>
 X<--version>X<-V>
 
@@ -234,7 +251,7 @@ Print the value of a single parameter:
     $ arpsponge_defaults NAME
     arpsponge
 
-Print all values as shell variables:
+Print all parameters as shell variables:
 
     $ arpsponge_defaults
     FLOOD_PROTECTION=3
@@ -242,7 +259,7 @@ Print all values as shell variables:
     ...
     VERSION='3.17.6'
 
-Print all values as shell variables with C<export> statements:
+Print all parameters as shell variables with C<export> statements:
 
     $ arpsponge_defaults -e
     FLOOD_PROTECTION=3
@@ -254,6 +271,21 @@ Print all values as shell variables with C<export> statements:
     export LOG_EVENT_MASK LOG_LEVEL MAX_ARP_AGE MAX_ARP_RATE
     export MAX_PENDING NAME PROBE_RATE QUEUE_DEPTH RUN_DIR
     export SOCK_PERMS VERSION
+
+Print all parameters as shell variables with C<export> statements and
+a name prefix:
+
+    $ arpsponge_defaults --export --prefix=_as_
+    _as_FLOOD_PROTECTION=3
+    _as_IFCONFIG='/sbin/ifconfig'
+    ...
+    _as_VERSION='3.17.6'
+
+    export _as_FLOOD_PROTECTION _as_IFCONFIG _as_INIT_STATE
+    export _as_LEARN_TIME _as_LOG_EVENT_MASK _as_LOG_LEVEL
+    export _as_MAX_ARP_AGE _as_MAX_ARP_RATE _as_MAX_PENDING _as_NAME
+    export _as_PROBE_RATE _as_QUEUE_DEPTH _as_RUN_DIR _as_SOCK_PERMS
+    export _as_VERSION
 
 =head1 EXIT CODE
 
@@ -289,4 +321,3 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 =cut
-
