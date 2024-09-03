@@ -325,7 +325,7 @@ sub is_valid_int {
     if (defined(my $max = $opts{-max})) {
         my $max_ok = $opts{-inclusive} ? $num <= $max : $num < $max;
         if (!$max_ok) {
-            ${$opts{-err}} = 'number too larg';
+            ${$opts{-err}} = 'number too large';
             return;
         }
     }
@@ -409,7 +409,7 @@ sub is_valid_float {
     if (defined(my $max = $opts{-max})) {
         my $max_ok = $opts{-inclusive} ? $num <= $max : $num < $max;
         if (!$max_ok) {
-            ${$opts{-err}} = 'number too larg';
+            ${$opts{-err}} = 'number too large';
             return;
         }
     }
