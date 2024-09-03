@@ -254,6 +254,7 @@ Print the value of a single parameter:
 Print all parameters as shell variables:
 
     $ arpsponge_defaults
+    BIN_DIR='/usr/sbin'
     FLOOD_PROTECTION=3
     IFCONFIG='/sbin/ifconfig'
     ...
@@ -262,30 +263,32 @@ Print all parameters as shell variables:
 Print all parameters as shell variables with C<export> statements:
 
     $ arpsponge_defaults -e
+    BIN_DIR='/usr/sbin'
     FLOOD_PROTECTION=3
     IFCONFIG='/sbin/ifconfig'
     ...
     VERSION='3.17.6'
 
-    export FLOOD_PROTECTION IFCONFIG INIT_STATE LEARN_TIME
-    export LOG_EVENT_MASK LOG_LEVEL MAX_ARP_AGE MAX_ARP_RATE
-    export MAX_PENDING NAME PROBE_RATE QUEUE_DEPTH RUN_DIR
-    export SOCK_PERMS VERSION
+    export BIN_DIR FLOOD_PROTECTION IFCONFIG INIT_STATE IP_CMD
+    export LEARN_TIME LOG_EVENT_MASK LOG_LEVEL MAX_ARP_AGE
+    export MAX_ARP_RATE MAX_PENDING NAME PROBE_RATE QUEUE_DEPTH
+    export RUN_DIR SOCK_PERMS VERSION
 
 Print all parameters as shell variables with C<export> statements and
 a name prefix:
 
     $ arpsponge_defaults --export --prefix=_as_
+    _as_BIN_DIR='/home/sbak319/Devel/git/arpsponge/sbin'
     _as_FLOOD_PROTECTION=3
     _as_IFCONFIG='/sbin/ifconfig'
     ...
     _as_VERSION='3.17.6'
 
-    export _as_FLOOD_PROTECTION _as_IFCONFIG _as_INIT_STATE
-    export _as_LEARN_TIME _as_LOG_EVENT_MASK _as_LOG_LEVEL
-    export _as_MAX_ARP_AGE _as_MAX_ARP_RATE _as_MAX_PENDING _as_NAME
-    export _as_PROBE_RATE _as_QUEUE_DEPTH _as_RUN_DIR _as_SOCK_PERMS
-    export _as_VERSION
+    export _as_BIN_DIR _as_FLOOD_PROTECTION _as_IFCONFIG
+    export _as_INIT_STATE _as_IP_CMD _as_LEARN_TIME
+    export _as_LOG_EVENT_MASK _as_LOG_LEVEL _as_MAX_ARP_AGE
+    export _as_MAX_ARP_RATE _as_MAX_PENDING _as_NAME _as_PROBE_RATE
+    export _as_QUEUE_DEPTH _as_RUN_DIR _as_SOCK_PERMS _as_VERSION
 
 =head1 EXIT CODE
 
