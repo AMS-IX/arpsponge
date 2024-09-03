@@ -10,8 +10,6 @@ debian/*.*.log
 debian/*.substvars
 debian/*.*.debhelper
 debian/files
-defaults.sample
-init.d/arpsponge
 MYMETA.json
 MYMETA.yml
 _build/
