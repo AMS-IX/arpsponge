@@ -25,6 +25,7 @@ use 5.014;
 use warnings;
 use version;
 
+use FindBin;
 use List::Util qw( first );
 use Carp qw( croak );
 
@@ -58,6 +59,7 @@ my %Defaults = (
     IFCONFIG         => _get_ifconfig(),
     SOCK_PERMS       => _get_sock_perms(),
     RUN_DIR          => _get_run_dir(),
+    BIN_DIR          => _get_bin_dir(),
 );
 
 sub all { return %Defaults }
@@ -77,6 +79,17 @@ sub _get_ifconfig {
             map { "$_/ifconfig" } @SYS_DIRS;
 
     return $ifconfig;
+}
+
+
+sub _get_bin_dir {
+    state $bin_dir =
+        first { -f $_ && -x $_ }
+            map { "$_/$NAME" } ($FindBin::Bin, @SYS_DIRS);
+
+    $bin_dir //= $FindBin::Bin;
+
+    return $bin_dir;
 }
 
 
