@@ -71,17 +71,17 @@ sub expand_ip_chunk {
                 qq{'$ip_s' is not a valid IP range});
     }
 
-    if ($cidr->first->addr ne $cidr->addr) {
-        my $prefixlen = $cidr->masklen;
-        my $addr = $cidr->addr;
-        return $self->set_error(
-                qq{'$addr' is not on a /$prefixlen boundary});
+    if ($cidr->network->addr ne $cidr->addr) {
+        return $self->set_error(sprintf(
+            q{%s is not on a /%d boundary},
+            $cidr->addr, $cidr->masklen
+        ));
     }
 
     if (!$net_prefix->contains($cidr)) {
-        return $self->set_error(
-            qq{$ip_s is out of range } . $net_prefix->cidr
-        );
+        return $self->set_error(sprintf(
+            q{%s is out of range %s}, $ip_s, $net_prefix->cidr
+        ));
         return;
     }
 
