@@ -490,13 +490,13 @@ sub is_valid_ip {
     my %opts = (-err => \$err_s, -network => undef, @opt);
 
     if (!defined $arg || length($arg) == 0) {
-        ${$opts{-err}} = q/"" is not a valid IPv4 address/;
+        ${$opts{-err}} = q{not a valid IPv4 address};
         return;
     }
 
     my $ip = $arg =~ /^\d/ ? NetAddr::IP->new($arg) : undef;
     if (!$ip) {
-        ${$opts{-err}} = qq/"$arg" is not a valid IPv4 address/;
+        ${$opts{-err}} = q{not a valid IPv4 address};
         return;
     }
 
@@ -504,7 +504,7 @@ sub is_valid_ip {
 
     if (my $net = NetAddr::IP->new($opts{-network})) {
         return $ip->addr() if $net->contains($ip);
-        ${$opts{-err}} = qq/$arg is out of range /.$net->cidr();
+        ${$opts{-err}} = q{out of range }.$net->cidr();
         return;
     }
     ${$opts{-err}} = qq/** INTERNAL ** is_valid_ip(): -network /

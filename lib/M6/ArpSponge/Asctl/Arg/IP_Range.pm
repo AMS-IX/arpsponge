@@ -55,7 +55,7 @@ sub expand_ip_chunk {
         }
         if ($hi < $lo) {
             return $self->set_error(
-                qq{'$lo_s-$hi_s' is not a valid IP range} );
+                qq{not a valid IP range} );
         }
         return {
             ip_int_lo => $lo,
@@ -67,8 +67,7 @@ sub expand_ip_chunk {
 
     my $cidr = NetAddr::IP->new($ip_s);
     if (!$cidr) {
-        return $self->set_error(
-                qq{'$ip_s' is not a valid IP range});
+        return $self->set_error(qq{not a valid IP range});
     }
 
     if ($cidr->network->addr ne $cidr->addr) {
@@ -80,7 +79,7 @@ sub expand_ip_chunk {
 
     if (!$net_prefix->contains($cidr)) {
         return $self->set_error(sprintf(
-            q{%s is out of range %s}, $ip_s, $net_prefix->cidr
+            q{out of range %s}, $net_prefix->cidr
         ));
         return;
     }

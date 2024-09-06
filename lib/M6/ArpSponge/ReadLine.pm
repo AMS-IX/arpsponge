@@ -185,7 +185,7 @@ sub check_ip_address_arg {
     if (defined $arg) {
         return clear_error($arg);
     }
-    return print_error_cond(!$silent, qq{$argname: $err});
+    return print_error_cond(!$silent, qq{$argname: "$arg": $err});
 }
 
 sub check_mac_address_arg {
@@ -198,7 +198,7 @@ sub check_mac_address_arg {
         || $arg =~ /^[\da-f]{1,12}$/i) {
         return clear_error($arg);
     }
-    print_error_cond($silent, qq{$argname: "$arg" is not a valid MAC address});
+    print_error_cond($silent, qq{$argname: "$arg": not a valid MAC address});
     return;
 }
 
