@@ -305,13 +305,13 @@ sub is_valid_int {
     );
 
     if (!defined $arg || length($arg) == 0) {
-        ${$opts{-err}} = 'not a valid number';
+        ${$opts{-err}} = 'not a valid integer';
         return;
     }
 
     my ($num, $unparsed) = strtol($arg);
     if ($unparsed) {
-        ${$opts{-err}} = 'not a valid number';
+        ${$opts{-err}} = 'not a valid integer';
         return;
     }
 
