@@ -72,7 +72,7 @@ sub make_command {
     );
 };
 
-    
+
 #############################################################################
 
 #
@@ -365,7 +365,7 @@ push @commands, make_command(
 #                    .q{ sponge is to update its neighbors' ARP caches},
 #        '$flags'  => { type=>'arp-update-flags' },
 #        },
- 
+
 #
 # command: set
 #
@@ -376,6 +376,20 @@ push @commands, make_command(
         name => 'dead',
         data_key => 'set_ip_dead',
         callback => \&command_noop,
+    );
+
+    push @set_ip_sub_commands, make_command(
+        name => 'pending',
+        data_key => 'set_ip_pending',
+        callback => \&command_noop,
+        arguments => [
+            Term::CLI::Argument::Number::Int->new(
+                name      => 'state',
+                min_occur => 0,
+                max_occur => 1,
+                min       => 0,
+            ),
+        ],
     );
 
     my $set_ip_command = make_command(
@@ -831,58 +845,58 @@ Some routers do not update their ARP cache when an IP gets unsponged.
 We detect this by looking for traffic destined for our MAC, with a
 destination IP that is I<not> ours. If the destination IP is in our local
 LAN, we should attempt to update the packet source's ARP cache.
-       
+
 This can be done in three ways:
-       
-=over  
-       
+
+=over
+
 =item C<reply>
-       
+
 Send an unsollicited unicast reply to I<IP-B>:
-       
+
   ARP <IP-A> IS AT <MAC-A>
-       
+
 Where I<IP-A> and I<MAC-A> are of the router targeted by the stray packet,
 and I<IP-B> is the IP address of the neighbour whose cache needs to be
 updated.
-       
+
 =item C<request>
-       
+
 Send an unicast request by proxy (i.e. fake the requestor):
-       
+
   ARP WHO HAS <IP-B> TELL <IP-A>@<MAC-A>
-       
+
 Where I<IP-B> is the IP address of the neighbour whose cache needs to be
 updated.
-       
+
 =item C<gratuitous>
-       
+
 Send a unicast gratuitous ARP request on behalf of I<IP-A> to I<IP-B>:
-       
+
   ARP WHO HAS <IP-A> TELL <IP-A>@<MAC-A>
-       
+
 Where I<IP-B> is the IP address of the neighbour whose cache needs to be
 updated.
-       
+
 =item C<all>, C<none>
-       
+
 All or none of the above, resp.
-       
-=back  
-       
+
+=back
+
 The methods can be specified as a comma-separated list, e.g.:
-       
+
    request,reply
-       
+
 Each element can be prefixed by C<!> to negate it, so the following are
 equivalent:
-       
+
    request,reply
-       
+
    all,!gratuitous
-       
+
 Default value is C<all>.
-       
+
 This value is also used by the L<inform|/inform> command.
 
 @@ set_ip:summary
@@ -894,6 +908,12 @@ Modify arpsponge IP/ARP state.
 sponge given IP address(es)
 @@ set_ip_dead:description
 Sponge the given IP address(es), i.e. answer ARP requests for them.
+
+@@ set_ip_pending:summary
+set given IP address(es) in a pending state
+@@ set_ip_pending:description
+Set the given IP address(es) in a pending state, given by the optional
+I<state> argument. Default I<state> is 0.
 
 @@ ######################################################################
 @@ # @@ show:usage
@@ -952,9 +972,6 @@ Disconnect from the arpsponge daemon and exit from B<asctl>.
 
 __END__
 
-    'set ip $ip dead'   => {
-        '?'       => 'Sponge given IP(s).',
-        '$ip'      => { type=>'ip-range'  } },
     'set ip $ip pending $pending?' => {
         '?'        => 'Set given IP(s) to pending state'
                     . ' <pending> (default 0).',
