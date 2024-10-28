@@ -47,7 +47,7 @@ our $VERSION = 1.07;
 # Accessors; use the factory :-)
 __PACKAGE__->mk_accessors(qw(
                 is_dummy
-                queuedepth      my_ip               my_mac
+                my_ip           my_mac
                 network         prefixlen
                 arp_age         gratuitous          flood_protection
                 max_rate        max_pending         sponge_net
@@ -143,6 +143,15 @@ sub set_state    {
     delete $self->{'pending'}->{$ip};
     $self->queue->clear($ip);
     return;
+}
+
+sub queuedepth {
+    return $_[0]->{queuedepth} if @_ < 2;
+
+    my ($self, $depth) = @_;
+    $self->{'queuedepth'} = $depth;
+    $self->queue->max_depth($self->{'queuedepth'});
+    return $self;
 }
 
 ###############################################################################
