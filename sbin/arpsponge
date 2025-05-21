@@ -1827,9 +1827,10 @@ Furthermore, since ARP queries are broadcast and thus typically CPU-bound at
 the receiver, they may get rate-limited by the L2 infrastructure or at the
 receiving stations.
 
-Furthermore, having the sponge itself be a source of periodic broadcast storms
-pretty much defeats the purpose of the thing, so the probe rate should be
-set to something "sensible".
+Furthermore,
+having the sponge itself be a source of periodic broadcast storms
+defeats its own purpose,
+so the probe rate should be set to something "sensible".
 
 =over 7
 
@@ -1973,7 +1974,7 @@ Now F</tmp/sponge.out> should contain something like:
 
   id:               arpsponge
   pid:              27482
-  version:          @RELEASE@(146)
+  version:          3.25.0
   date:             2011-04-22@15:30:26 [1303479026]
   started:          2011-04-22@11:25:53 [1303464353]
   network:          91.200.17.0/26
