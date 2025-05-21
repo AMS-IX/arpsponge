@@ -200,15 +200,23 @@ sub rate {
     return ($n / $time) * 60;
 }
 
-=item X<max_depth>B<max_depth>
+=item B<max_depth>( [ I<depth> ] )
+X<max_depth>
 
-Return the maximum depth of the queues.
+Return or set the maximum depth of the queues.
 
 =cut
 
-sub max_depth { $_[0]->{'max_depth'} }
+sub max_depth {
+    my ($self, @args) = @_;
+    if (@args) {
+        $self->{'max_depth'} = shift @args;
+    }
+    return $self->{'max_depth'}
+}
 
-=item X<is_full>B<is_full> ( I<IP> )
+=item B<is_full> ( I<IP> )
+X<is_full>
 
 Return whether or not the queue for I<IP> is full, i.e. is wrapping.
 
