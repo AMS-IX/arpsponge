@@ -55,7 +55,7 @@ my %Defaults = (
     QUEUE_DEPTH      => 1000,
     MAX_ARP_RATE     => 50,
     NAME             => $NAME,
-    VERSION          => join('.', $VERSION->tuple),
+    VERSION          => $VERSION->normal =~ s/^v//r,
     IFCONFIG         => _get_ifconfig(),
     IP_CMD           => _get_ip_cmd(),
     SOCK_PERMS       => _get_sock_perms(),
