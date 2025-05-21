@@ -35,7 +35,7 @@ use NetAddr::IP;
 use M6::ArpSponge::Util qw( :all );
 use Data::Dumper;
 use Getopt::Long    qw( GetOptionsFromArray );
-use M6::ArpSponge::Sponge qw( :flags );
+use M6::ArpSponge::Const qw( :flags );
 use Scalar::Util qw( reftype );
 
 BEGIN {
