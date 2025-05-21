@@ -2,10 +2,12 @@
 
 use 5.014;
 use warnings;
+use open qw( :std :encoding(UTF-8) );
+
 use Term::CLI;
 use Term::CLI::L10N;
 use NetAddr::IP;
-use Data::Dumper;
+use Data::Dump qw( dump );
 
 use M6::ArpSponge::Util qw( ip2int );
 use M6::ArpSponge::Asctl::Arg::IP_Range;
@@ -13,14 +15,38 @@ use M6::ArpSponge::Asctl::Arg::IP_Filter;
 use M6::ArpSponge::Asctl::Arg::Arp_Update_Flags;
 use M6::ArpSponge::Asctl::Arg::MAC_Address;
 
-my $IP_NETWORK = NetAddr::IP->new( '127.0.0.0/24' );
-my $TERM;
-
 my $opt_verbose = 0;
 my $opt_debug   = 1;
 
-sub verbose(@) { print @_ if $opt_verbose; }
-sub DEBUG(@)   { print_error(@_) if $opt_debug; }
+
+my $IP_NETWORK = NetAddr::IP->new( '127.0.0.0/24' );
+my %DATA_SECTION;
+my $TERM;
+
+sub Main {
+    init_data_section(\%DATA_SECTION);
+    $TERM = setup_term_cli();
+
+    while (defined (my $line = $TERM->readline)) {
+        $TERM->execute_line($line);
+    }
+    print "\n";
+    execute_exit(0);
+}
+
+sub verbose :prototype(@) {
+    return if !$opt_verbose;
+
+    my $line = join('', @_);
+    print STDOUT $line;
+    if ($TERM && $line =~ /\n$/ && -t STDOUT) {
+        $TERM->term->on_new_line();
+    }
+}
+
+sub DEBUG :prototype(@) {
+    print_error(@_) if $opt_debug;
+}
 
 sub print_error_cond {
     my ($cond, @args) = @_;
@@ -28,7 +54,7 @@ sub print_error_cond {
     chomp($out);
     if ($cond) {
         say STDERR $out;
-        $TERM && $TERM->term->on_new_line();
+        $TERM->term->on_new_line() if $TERM;
     }
     return;
 }
@@ -38,23 +64,59 @@ sub print_error {
 }
 
 #############################################################################
-my %DATA_SECTION;
-
-# Get documentation information from the __DATA__ section.
-{
+# $success = init_data_section( \%data_section );
+#
+#   Get documentation information from the __DATA__ section.
+#   The __DATA__ section is divided in sections using '@@' markers:
+#
+#       __DATA__
+#       @@ clear:summary
+#       clear IP state and ARP entries
+#       @@ clear:description
+#       Clear IP state and ARP entries from their respective tables.
+#       ...
+#
+#   Parse these sections and store them by name in %{$data_section}.
+#
+sub init_data_section {
+    my ($data_section) = @_;
     my $data_text = do { local($/) = undef; <DATA> };
     close DATA;
     $data_text =~ s{ ^ \@\@ \h+ \# .* $ }{}gmx; # remove comment lines.
+
+    # Every section starts with line '@@ name\n' end continues until
+    # the next '@@ ...' line.
     while ($data_text =~
         m{
-            ^ \@\@ \h+ (\S+) \h* \n (.*?) \n
+            ^ \@\@ \h+ (?<section_name> \S+) \h* \n
+            (?<section_text> .*?) \n
             (?= \@\@)
-        }gmsx)
-    {
-        $DATA_SECTION{$1} = $2;
+        }gmsx
+    ) {
+        $data_section->{$+{section_name}} = $+{section_text};
     }
+    return 1;
 }
 
+# $cmd = make_command( name => NAME, ... );
+# $cmd = make_command( data_key => KEY, name => NAME, ... );
+#
+#   Convenience wrapper to make a Term::CLI::Command reference
+#   with the given parameters.
+#
+#   It tries to auto-determine usage, summary, description,
+#   and callback arguments for the constructor.
+#
+#   The "data_key" (which defaults to the value of "name" if
+#   not given) is used to look up documentation sections
+#   in %DATA_SECTION. The "$data_key:usage", "$data_key:summary",
+#   and "$data_key:description" are used for the usage, summary,
+#   and description arguments to the object constructor.
+#
+#   If no explicit "callback" argument is given, we try to see
+#   if "callback_${data_key}" exists as a function and, if so,
+#   use that as the "callback" argument.
+#
 sub make_command {
     my %arg = @_;
 
@@ -67,13 +129,14 @@ sub make_command {
 
     my $callback = $arg{callback};
     if (!exists $arg{callback}) {
-        my $func_name = "command_${data_key}";
+        my $func_name = "callback_${data_key}";
         no strict 'refs';
         if (defined &{$func_name}) {
             $callback = \&{$func_name};
         }
         else {
             warn "$arg{name}/$data_key => $func_name = undef\n";
+
         }
     }
 
@@ -89,258 +152,273 @@ sub make_command {
 
 #############################################################################
 
-# Initialise top-level TERM.
-$TERM = Term::CLI->new(
-    name     => 'asctl',
-    prompt   => 'asctl> ',
-    skip     => qr{^ \s* (?:\#.*)? $}x,
-    callback => sub {
-        my ($cmd, %args) = @_;
-        say "ERROR: $args{error}." if $args{status} < 0;
-    }
-);
+# $term = setup_term_cli();
+#
+#   Initialiase a Term::CLI object and add all the CLI
+#   command definitions to it.
+#
+#   Return a reference to the created TERM.
+#
+sub setup_term_cli {
+    # Initialise top-level TERM.
+    my $term = Term::CLI->new(
+        name     => 'asctl',
+        prompt   => 'asctl> ',
+        skip     => qr{^ \s* (?:\#.*)? $}x,
+        callback => sub {
+            my ($cmd, %args) = @_;
+            say "ERROR: $args{error}." if $args{status} < 0;
+        }
+    );
 
-#
-# Callback: noop
-#
-sub command_noop {
-    my ($cmd, %args) = @_;
-    return %args if $args{status} < 0;
-    my @cmd_path = @{$args{command_path}};
-    my $app = (shift @cmd_path)->name;
-    my $cmd_name = join(' ', map { $_->name } @cmd_path);
-    say "NOOP($app) $cmd_name", map { " <$_>" } @{$args{arguments}};
-    return %args;
-}
-
-#
-#
-$TERM->add_command(
-    make_command( name => 'exit' ),
-    make_command( name => 'quit', data_key => 'exit' ),
-    make_command(
-        name    => 'ping',
-        options => [ 'count|c=i', 'delay|d=f' ],
-    ),
-);
-
-#
-# Command: clear
-#
-$TERM->add_command(make_command(
-    name => 'clear',
-    commands => [
+    # command: exit
+    # command: quit (alias for exit)
+    # command: ping
+    $term->add_command(
+        make_command( name => 'exit' ),
+        make_command( name => 'quit', data_key => 'exit' ),
         make_command(
-            data_key  => 'clear_ip',
-            name      => 'ip',
-            arguments => [
-                M6::ArpSponge::Asctl::Arg::IP_Filter->new(
-                    name => 'IP',
-                    max_occur => 0,
-                    network_prefix => $IP_NETWORK,
-                ),
-            ],
+            name    => 'ping',
+            options => [ 'count|c=i', 'delay|d=f' ],
         ),
-        make_command(
-            data_key    => 'clear_arp',
-            name        => 'arp',
-            arguments   => [
-                M6::ArpSponge::Asctl::Arg::IP_Filter->new(
-                    name => 'IP',
-                    max_occur => 0,
-                    network_prefix => $IP_NETWORK,
-                ),
-            ],
-        ),
-    ],
-));
+    );
 
-#
-# command: load status
-#
-$TERM->add_command(make_command(
-    name     => 'load',
-    data_key => 'load_status',
-    commands => [
-        make_command(
-            name        => 'status',
-            data_key    => 'load_status',
-            arguments   => [
-                Term::CLI::Argument::Filename->new(
-                    name  => 'file',
-                    occur => 1,
-                ),
-            ],
-        ),
-    ],
-));
-
-#
-# command: dump status
-#
-$TERM->add_command(make_command(
-    name        => 'dump',
-    data_key    => 'dump_status',
-    commands    => [
-        make_command(
-            name        => 'status',
-            data_key    => 'dump_status',
-            arguments   => [
-                Term::CLI::Argument::Filename->new(
-                    name      => 'file',
-                    min_occur => 0,
-                ),
-            ],
-        ),
-    ],
-));
-
-#
-# command: probe
-#
-$TERM->add_command(make_command(
-    name      => 'probe',
-    options   => [ 'delay|d=f', 'count|c=i' ],
-    arguments => [
-        M6::ArpSponge::Asctl::Arg::IP_Filter->new(
-            name           => 'IP',
-            max_occur      => 0,
-            network_prefix => $IP_NETWORK,
-        ),
-    ],
-));
-
-#
-# command: show
-#
-$TERM->add_command(make_command(
-    name        => 'show',
-    commands    => [
-        make_command(
-            name        => 'arp',
-            data_key    => 'show_arp',
-            arguments   => [
-                M6::ArpSponge::Asctl::Arg::IP_Filter->new(
-                    name           => 'IP',
-                    occur          => 0,
-                    network_prefix => $IP_NETWORK,
-                ),
-            ],
-        ),
-
-        make_command(
-            name      => 'ip',
-            data_key  => 'show_ip',
-            arguments => [
-                M6::ArpSponge::Asctl::Arg::IP_Filter->new(
-                    name           => 'IP',
-                    occur          => 0,
-                    network_prefix => $IP_NETWORK,
-                ),
-            ],
-        ),
-
-        make_command(
-            name      => 'log',
-            data_key  => 'show_log',
-            arguments => [
-                Term::CLI::Argument::Number::Int->new(
-                    name      => 'nlines',
-                    min_occur => 0,
-                    min       => 1,
-                ),
-            ],
-        ),
-
-        make_command(
-            name        => 'parameters',
-            data_key    => 'show_parameters',
-        ),
-
-        make_command(
-            name        => 'version',
-            data_key    => 'show_version',
-        ),
-
-        make_command(
-            name => 'status',
-            data_key => 'show_status',
-        ),
-
-        make_command(
-            name => 'uptime',
-            data_key => 'show_uptime',
-        ),
-    ]
-));
-
-#
-# command: sponge & unsponge
-#
-$TERM->add_command(
-    make_command(
-        name        => 'sponge',
-        arguments   => [
-            M6::ArpSponge::Asctl::Arg::IP_Filter->new(
-                name => 'IP',
-                max_occur => 0,
-                network_prefix => $IP_NETWORK,
+    #
+    # command: clear
+    #
+    $term->add_command(make_command(
+        name => 'clear',
+        commands => [
+            make_command(
+                data_key  => 'clear_ip',
+                name      => 'ip',
+                arguments => [
+                    M6::ArpSponge::Asctl::Arg::IP_Filter->new(
+                        name => 'IP',
+                        max_occur => 0,
+                        network_prefix => $IP_NETWORK,
+                    ),
+                ],
+            ),
+            make_command(
+                data_key    => 'clear_arp',
+                name        => 'arp',
+                arguments   => [
+                    M6::ArpSponge::Asctl::Arg::IP_Filter->new(
+                        name => 'IP',
+                        max_occur => 0,
+                        network_prefix => $IP_NETWORK,
+                    ),
+                ],
             ),
         ],
-    ),
-    make_command(
-        name        => 'unsponge',
-        arguments   => [
+    ));
+
+    #
+    # command: load status
+    #
+    $term->add_command(make_command(
+        name     => 'load',
+        data_key => 'load_status',
+        callback => undef,
+        commands => [
+            make_command(
+                name        => 'status',
+                data_key    => 'load_status',
+                arguments   => [
+                    Term::CLI::Argument::Filename->new(
+                        name  => 'file',
+                        occur => 1,
+                    ),
+                ],
+            ),
+        ],
+    ));
+
+    #
+    # command: dump status
+    #
+    $term->add_command(make_command(
+        name        => 'dump',
+        data_key    => 'dump_status',
+        callback    => undef,
+        commands    => [
+            make_command(
+                name        => 'status',
+                data_key    => 'dump_status',
+                arguments   => [
+                    Term::CLI::Argument::Filename->new(
+                        name      => 'file',
+                        min_occur => 0,
+                    ),
+                ],
+            ),
+        ],
+    ));
+
+    #
+    # command: probe
+    #
+    $term->add_command(make_command(
+        name      => 'probe',
+        options   => [ 'delay|d=f', 'count|c=i' ],
+        arguments => [
             M6::ArpSponge::Asctl::Arg::IP_Filter->new(
                 name           => 'IP',
                 max_occur      => 0,
                 network_prefix => $IP_NETWORK,
             ),
         ],
-    ),
-);
+    ));
 
-#
-# command: inform X about Y
-#
-$TERM->add_command(make_command(
-    name        => 'inform',
-    options     => [ 'delay|d=f' ],
-    arguments   => [
-        M6::ArpSponge::Asctl::Arg::IP_Filter->new(
-            name           => 'dst_list',
-            occur          => 1,
-            network_prefix => $IP_NETWORK,
-        ),
-    ],
-    commands    => [
+    #
+    # command: show
+    #
+    $term->add_command(make_command(
+        name        => 'show',
+        commands    => [
+            # show arp
+            make_command(
+                name        => 'arp',
+                data_key    => 'show_arp',
+                arguments   => [
+                    M6::ArpSponge::Asctl::Arg::IP_Filter->new(
+                        name           => 'IP',
+                        occur          => 0,
+                        network_prefix => $IP_NETWORK,
+                    ),
+                ],
+            ),
+
+            # show ip
+            make_command(
+                name      => 'ip',
+                data_key  => 'show_ip',
+                arguments => [
+                    M6::ArpSponge::Asctl::Arg::IP_Filter->new(
+                        name           => 'IP',
+                        occur          => 0,
+                        network_prefix => $IP_NETWORK,
+                    ),
+                ],
+            ),
+
+            # show log
+            make_command(
+                name      => 'log',
+                data_key  => 'show_log',
+                arguments => [
+                    Term::CLI::Argument::Number::Int->new(
+                        name      => 'nlines',
+                        min_occur => 0,
+                        min       => 1,
+                    ),
+                ],
+            ),
+
+            # show parameters
+            make_command(
+                name        => 'parameters',
+                data_key    => 'show_parameters',
+            ),
+
+            # show version
+            make_command(
+                name        => 'version',
+                data_key    => 'show_version',
+            ),
+
+            # show status
+            make_command(
+                name => 'status',
+                data_key => 'show_status',
+            ),
+
+            # show uptime
+            make_command(
+                name => 'uptime',
+                data_key => 'show_uptime',
+            ),
+        ]
+    ));
+
+    #
+    # command: sponge & unsponge
+    #
+    $term->add_command(
         make_command(
-            name        => 'about',
-            data_key    => 'inform',
+            name        => 'sponge',
             arguments   => [
                 M6::ArpSponge::Asctl::Arg::IP_Filter->new(
-                    name => 'src_list',
-                    occur => 1,
+                    name => 'IP',
+                    max_occur => 0,
                     network_prefix => $IP_NETWORK,
                 ),
             ],
-        )
-    ]
-));
+        ),
+        make_command(
+            name        => 'unsponge',
+            arguments   => [
+                M6::ArpSponge::Asctl::Arg::IP_Filter->new(
+                    name           => 'IP',
+                    max_occur      => 0,
+                    network_prefix => $IP_NETWORK,
+                ),
+            ],
+        ),
+    );
 
-#
-# command: set
-#
-{
+    #
+    # command: inform X about Y
+    #
+    $term->add_command(make_command(
+        name        => 'inform',
+        options     => [ 'delay|d=f' ],
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg::IP_Filter->new(
+                name           => 'dst_list',
+                occur          => 1,
+                network_prefix => $IP_NETWORK,
+            ),
+        ],
+        commands    => [
+            make_command(
+                name        => 'about',
+                data_key    => 'inform',
+                callback    => undef,
+                arguments   => [
+                    M6::ArpSponge::Asctl::Arg::IP_Filter->new(
+                        name => 'src_list',
+                        occur => 1,
+                        network_prefix => $IP_NETWORK,
+                    ),
+                ],
+            )
+        ]
+    ));
+
+    #
+    # command: set
+    #
     my $set_command = make_command(
         name        => 'set',
         data_key    => 'set',
     );
-    $TERM->add_command($set_command);
+    $term->add_command($set_command);
 
-    #
-    # command: set ip
-    #
+    # set arp_update_flags
+    $set_command->add_command(make_command(
+        name        => 'arp_update_flags',
+        data_key    => 'set_arp_update_flags',
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg::Arp_Update_Flags->new(
+                name           => 'flags',
+                max_occur      => -1,
+            ),
+        ],
+    ));
+
+    # set ip
     $set_command->add_command(make_command(
         name      => 'ip',
         data_key  => 'set_ip',
@@ -379,47 +457,58 @@ $TERM->add_command(make_command(
                     ),
                 ],
             ),
-        ],
-    ));
-
-    #
-    # set arp_update_flags
-    #
-    $set_command->add_command(make_command(
-        name        => 'arp_update_flags',
-        data_key    => 'set_arp_update_flags',
-        arguments   => [
-            M6::ArpSponge::Asctl::Arg::Arp_Update_Flags->new(
-                name           => 'flags',
-                max_occur      => -1,
+            make_command(
+                name     => 'mac',
+                data_key => 'set_ip_mac',
+                arguments => [
+                    M6::ArpSponge::Asctl::Arg::MAC_Address->new(
+                        name      => 'mac',
+                        min_occur => 0,
+                        max_occur => 1,
+                    ),
+                ],
             ),
         ],
     ));
+
+    # set max_pending
+    $set_command->add_command(make_command(
+        name        => 'max_pending',
+        data_key    => 'set_max_pending',
+        arguments   => [
+            Term::CLI::Argument::Number::Int->new(
+                name      => 'nprobes',
+                min       => 1,
+            ),
+        ],
+    ));
+
+    #
+    # command: help
+    #
+    $term->add_command( Term::CLI::Command::Help->new() );
+
+    $term->term->Attribs->{sort_completion_matches} = 0;
+
+    return $term;
 }
 
-#
-# Command: help
-#
-$TERM->add_command( Term::CLI::Command::Help->new() );
 
-#
-# REPL
-#
+##############################################################################
+# Command callbacks.
+##############################################################################
 
-$TERM->term->Attribs->{sort_completion_matches} = 0;
-
-while (defined (my $line = $TERM->readline)) {
-    $TERM->execute_line($line);
+sub callback_noop {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+    my @cmd_path = @{$args{command_path}};
+    my $app = (shift @cmd_path)->name;
+    my $cmd_name = join(' ', map { $_->name } @cmd_path);
+    say "[FIXME] [NOOP] ($app) $cmd_name", map { " <$_>" } @{$args{arguments}};
+    return %args;
 }
 
-print "\n";
-execute_exit(0);
-
-##############################################################################
-# Command execution routines.
-##############################################################################
-
-sub command_exit {
+sub callback_exit {
     my ($cmd, %args) = @_;
     return %args if $args{status} < 0;
     execute_exit(0);
@@ -428,6 +517,189 @@ sub command_exit {
 sub execute_exit {
     exit @_;
 }
+
+sub callback_ping {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+
+    my $opt = $args{options};
+
+    my $count = validate_int(
+        $opt->{count} // 1,
+        name  => 'option count',
+        error => \$args{error},
+        min   => 1
+    );
+    defined $count or return (%args, status => -1);
+
+    my $delay = validate_float(
+        $opt->{delay} // 1,
+        name  => 'option delay',
+        error => \$args{error},
+        min   => 0.01
+    );
+    defined $delay or return (%args, status => -1);
+
+    say "[FIXME] ping count=$count delay=$delay";
+    return %args;
+}
+
+sub callback_clear_ip {
+    my ($cmd, %args) = @_;
+
+    return %args if $args{status} < 0;
+
+    my @cmd_path = @{$args{command_path}};
+
+    my $app = (shift @cmd_path)->name;
+
+    my $cmd_name = join(' ', map { $_->name } @cmd_path);
+
+    say "[FIXME] $cmd_name";
+
+    say dump($args{arguments});
+
+    return %args;
+}
+
+sub callback_clear_arp {
+    my ($cmd, %args) = @_;
+    return callback_noop(@_);
+}
+
+sub callback_load_status {
+    return callback_noop(@_);
+}
+
+sub callback_dump_status {
+    return callback_noop(@_);
+}
+
+sub callback_probe {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+
+    my $opt = $args{options};
+
+    my $count = validate_int(
+        $opt->{count} // 1,
+        name  => 'option count',
+        error => \$args{error},
+        min   => 1
+    );
+    defined $count or return (%args, status => -1);
+
+    my $delay = validate_float(
+        $opt->{delay} // 1,
+        name  => 'option delay',
+        error => \$args{error},
+        min   => 0.01
+    );
+    defined $delay or return (%args, status => -1);
+
+    say "probe count=$count delay=$delay";
+
+    say dump($args{arguments});
+    return %args;
+}
+
+sub callback_show_arp {
+    return callback_noop(@_);
+}
+
+sub callback_show_ip {
+    return callback_noop(@_);
+}
+
+sub callback_show_log {
+    return callback_noop(@_);
+}
+
+sub callback_show_parameters {
+    return callback_noop(@_);
+}
+
+sub callback_show_status {
+    return callback_noop(@_);
+}
+
+sub callback_show_uptime {
+    return callback_noop(@_);
+}
+
+sub callback_show_version {
+    return callback_noop(@_);
+}
+
+sub callback_sponge {
+    return callback_noop(@_);
+}
+
+sub callback_unsponge {
+    return callback_noop(@_);
+}
+
+sub callback_inform {
+    return callback_noop(@_);
+}
+
+sub callback_set_arp_update_flags {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+
+    my @cmd_path = @{$args{command_path}};
+    my $app = (shift @cmd_path)->name;
+    my $cmd_name = join(' ', map { $_->name } @cmd_path);
+
+    my @txt_args = @{$args{arguments}};
+    say "($app) $cmd_name", map { " <$_>" } @txt_args;
+
+    my $flags_arg =
+            M6::ArpSponge::Asctl::Arg::Arp_Update_Flags->new(
+                name           => 'flags',
+                max_occur      => -1,
+            );
+
+    my $flags = $flags_arg->translate(join(',', @txt_args), \%args);
+    say "[FIXME] ($app) $cmd_name -> $flags";
+    return %args;
+}
+
+sub callback_set_ip_alive {
+    return callback_noop(@_);
+}
+
+sub callback_set_ip_dead {
+    return callback_noop(@_);
+}
+
+sub callback_set_ip_pending {
+    return callback_noop(@_);
+}
+
+sub callback_set_ip_mac {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+
+    my @cmd_path = @{$args{command_path}};
+    my $app = (shift @cmd_path)->name;
+    my $cmd_name = join(' ', map { $_->name } @cmd_path);
+
+    my @txt_args = @{$args{arguments}};
+    say "($app) $cmd_name", map { " <$_>" } @txt_args;
+
+    say dump(@txt_args);
+
+    return %args;
+}
+
+sub callback_set_max_pending {
+    return callback_noop(@_);
+}
+
+##############################################################################
+# Argument validation
+##############################################################################
 
 sub validate_num {
     my ($value, %args) = @_;
@@ -465,161 +737,9 @@ sub validate_float {
     return validate_num($value, %args, type => 'Float');
 }
 
-sub command_ping {
-    my ($cmd, %args) = @_;
-    return %args if $args{status} < 0;
-
-    my $opt = $args{options};
-
-    my $count = validate_int(
-        $opt->{count} // 1,
-        name  => 'option count',
-        error => \$args{error},
-        min   => 1
-    );
-    defined $count or return (%args, status => -1);
-
-    my $delay = validate_float(
-        $opt->{delay} // 1,
-        name  => 'option delay',
-        error => \$args{error},
-        min   => 0.01
-    );
-    defined $delay or return (%args, status => -1);
-
-    say "ping count=$count delay=$delay";
-    return %args;
-}
-
-sub command_clear_ip {
-    my ($cmd, %args) = @_;
-
-    return %args if $args{status} < 0;
-
-    my @cmd_path = @{$args{command_path}};
-
-    my $app = (shift @cmd_path)->name;
-
-    my $cmd_name = join(' ', map { $_->name } @cmd_path);
-
-    say "($app) $cmd_name";
-
-    print Dumper($args{arguments});
-
-    return %args;
-}
-
-sub command_clear_arp {
-    my ($cmd, %args) = @_;
-    return command_noop(@_);
-}
-
-sub command_load_status {
-    return command_noop(@_);
-}
-
-sub command_dump_status {
-    return command_noop(@_);
-}
-
-sub command_probe {
-    my ($cmd, %args) = @_;
-    return %args if $args{status} < 0;
-
-    my $opt = $args{options};
-
-    my $count = validate_int(
-        $opt->{count} // 1,
-        name  => 'option count',
-        error => \$args{error},
-        min   => 1
-    );
-    defined $count or return (%args, status => -1);
-
-    my $delay = validate_float(
-        $opt->{delay} // 1,
-        name  => 'option delay',
-        error => \$args{error},
-        min   => 0.01
-    );
-    defined $delay or return (%args, status => -1);
-
-    say "probe count=$count delay=$delay";
-
-    print Dumper($args{arguments});
-    return %args;
-}
-
-sub command_show_arp {
-    return command_noop(@_);
-}
-
-sub command_show_ip {
-    return command_noop(@_);
-}
-
-sub command_show_log {
-    return command_noop(@_);
-}
-
-sub command_show_parameters {
-    return command_noop(@_);
-}
-
-sub command_show_status {
-    return command_noop(@_);
-}
-
-sub command_show_uptime {
-    return command_noop(@_);
-}
-
-sub command_show_version {
-    return command_noop(@_);
-}
-
-sub command_sponge {
-    return command_noop(@_);
-}
-
-sub command_unsponge {
-    return command_noop(@_);
-}
-
-sub command_inform {
-    return command_noop(@_);
-}
-
-sub command_set_arp_update_flags {
-    my ($cmd, %args) = @_;
-    return %args if $args{status} < 0;
-    my @cmd_path = @{$args{command_path}};
-    my $app = (shift @cmd_path)->name;
-    my $cmd_name = join(' ', map { $_->name } @cmd_path);
-    my @txt_args = @{$args{arguments}};
-    say "($app) $cmd_name", map { " <$_>" } @txt_args;
-
-    my $flags_arg =
-            M6::ArpSponge::Asctl::Arg::Arp_Update_Flags->new(
-                name           => 'flags',
-                max_occur      => -1,
-            );
-    my $flags = $flags_arg->translate(join(',', @txt_args), \%args);
-    say "($app) $cmd_name -> $flags";
-    return %args;
-}
-
-sub command_set_ip_alive {
-    return command_noop(@_);
-}
-
-sub command_set_ip_dead {
-    return command_noop(@_);
-}
-
-sub command_set_ip_pending {
-    return command_noop(@_);
-}
+#########################################################################
+Main();
+#########################################################################
 
 __DATA__
 @@ ######################################################################
@@ -881,20 +1001,31 @@ Modify arpsponge IP/ARP state.
 @@ set_ip_alive:summary
 unsponge given IP address(es)
 @@ set_ip_alive:description
-Unsponge the given IP address(es); see also B<unsponge>.
+Unsponge the given IP address(es); see also L<B<unsponge>|/unsponge>.
 
 Optionally associate the given IP address(es) with MAC address I<mac>.
 
 @@ set_ip_dead:summary
 sponge given IP address(es)
 @@ set_ip_dead:description
-Sponge the given IP address(es), i.e. answer ARP requests for them.
+Sponge the given IP address(es), i.e. answer ARP requests on their behalf.
 
 @@ set_ip_pending:summary
 set given IP address(es) in a pending state
 @@ set_ip_pending:description
 Set the given IP address(es) in a pending state, given by the optional
 I<state> argument. Default I<state> is 0.
+
+@@ set_ip_mac:summary
+set the MAC address for given IP address(es) in the ARP table
+@@ set_ip_mac:description
+Same as L<B<set ip IP alive>|/set_ip_alive> (MAC address is mandatory).
+
+@@ set_max_pending:summary
+set maximum number of unanswered probes
+@@ set_max_pending:description
+Set the maximum number of unanswered probes before a "pending" IP
+is sponged.
 
 @@ ######################################################################
 @@ # @@ show:usage
@@ -957,15 +1088,6 @@ Unsponge the given IP address(es); see also C<set ip alive>.
 
 __END__
 
-    'set ip $ip mac $mac' => {
-        '?'        => 'Statically store <ip> -> <mac> in the ARP table.',
-        '$ip'      => { type=>'ip-range'    },
-        '$mac'     => { type=>'mac-address' }, },
-
-    'set max_pending $num' => {
-        '?'        => 'Set max. number of "pending" probes before'
-                      .' sponging an IP',
-        '$num'     => { type=>'int', min=>1 }, },
     'set log_mask $mask' => {
         '?'       => q{Specify a comma-separated list of events that}
                     .q{ should be logged by the daemon (default: all).},
