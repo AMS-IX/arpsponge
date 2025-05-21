@@ -638,8 +638,7 @@ sub get_ip_state_table_s {
 
     my ($nalive, $ndead, $npending) = (0,0,0);
 
-    my $ip;
-    for $ip (sort { $a cmp $b } keys %$states) {
+    for my $ip (sort { $a cmp $b } keys %$states) {
         my $state = $$states{$ip};
         next unless defined $state;
 
