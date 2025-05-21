@@ -29,16 +29,16 @@ use FindBin;
 use List::Util qw( first );
 use Carp qw( croak );
 
+use M6::ArpSponge;
+
 my $NAME     = 'arpsponge';
-my $RELEASE  = '3.17.6';
+our $VERSION = version->parse($M6::ArpSponge::VERSION);
 
 # Directories to search for "ifconfig".
 my @SYS_DIRS = qw(
     /sbin /usr/sbin /bin /usr/bin /usr/ucb
     /usr/local/sbin /usr/local/bin /etc
 );
-
-our $VERSION = version->declare($RELEASE);
 
 ### Function interface:
 use parent qw( Exporter );
@@ -55,7 +55,7 @@ my %Defaults = (
     QUEUE_DEPTH      => 1000,
     MAX_ARP_RATE     => 50,
     NAME             => $NAME,
-    VERSION          => $RELEASE,
+    VERSION          => join('.', $VERSION->tuple),
     IFCONFIG         => _get_ifconfig(),
     IP_CMD           => _get_ip_cmd(),
     SOCK_PERMS       => _get_sock_perms(),
