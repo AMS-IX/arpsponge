@@ -23,7 +23,7 @@ package M6::ArpSponge;
 use 5.014;
 use warnings;
 
-our $VERSION = '3.024006';
+our $VERSION = '3.025000';
 
 1;
 
