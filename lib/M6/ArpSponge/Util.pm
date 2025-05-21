@@ -91,7 +91,8 @@ utility functions.
 
 ###############################################################################
 
-=item X<int2ip>B<int2ip> ( I<num> )
+=item B<int2ip> ( I<num> )
+X<int2ip>
 
 Convert a (long) integer to a dotted decimal IP address. Return the
 dotted decimal string.
@@ -106,7 +107,8 @@ sub int2ip {
 
 ###############################################################################
 
-=item X<ip2int>B<ip2int> ( I<IPSTRING> )
+=item B<ip2int> ( I<IPSTRING> )
+X<ip2int>
 
 Dotted decimal IPv4 address to integer representation.
 
@@ -120,7 +122,8 @@ sub ip2int {
 
 ###############################################################################
 
-=item X<hex2ip>B<hex2ip> ( I<HEXSTRING> )
+=item B<hex2ip> ( I<HEXSTRING> )
+X<hex2ip>
 
 Hexadecimal IPv4 address to dotted decimal representation.
 
@@ -138,7 +141,8 @@ sub hex2ip {
 
 ###############################################################################
 
-=item X<ip2hex>B<ip2hex> ( I<IPSTRING> )
+=item B<ip2hex> ( I<IPSTRING> )
+X<ip2hex>
 
 Dotted decimal IPv4 address to hex representation.
 
@@ -153,7 +157,8 @@ sub ip2hex {
 
 ###############################################################################
 
-=item X<hex2mac>B<hex2mac> ( I<HEXSTRING> )
+=item B<hex2mac> ( I<HEXSTRING> )
+X<hex2mac>
 
 Hexadecimal MAC address to colon-separated hex representation.
 
@@ -171,7 +176,8 @@ sub hex2mac {
 
 ###############################################################################
 
-=item X<mac2hex>B<mac2hex> ( I<macstring> )
+=item B<mac2hex> ( I<macstring> )
+X<mac2hex>
 
 Any MAC address to hex representation.
 
@@ -194,7 +200,8 @@ sub mac2hex {
 
 ###############################################################################
 
-=item X<mac2mac>B<mac2mac> ( I<MACSTRING> )
+=item B<mac2mac> ( I<MACSTRING> )
+X<mac2mac>
 
 Any MAC address to colon-separated hex representation (6 groups of 2 digits).
 
@@ -209,7 +216,8 @@ sub mac2mac {
 
 ###############################################################################
 
-=item X<hex_addr_in_net>B<hex_addr_in_net> ( I<ADDR>, I<NET>, I<PREFIXLEN> )
+=item B<hex_addr_in_net> ( I<ADDR>, I<NET>, I<PREFIXLEN> )
+X<hex_addr_in_net>
 
 Check whether I<ADDR> is a part of I<NET>/I<PREFIXLEN>. The
 I<ADDR> and I<NET> parameters are IP addresses in hexadecimal
@@ -247,10 +255,11 @@ sub hex_addr_in_net {
 
 ###############################################################################
 
-=item X<is_valid_int>B<is_valid_int> ( I<ARG>
+=item B<is_valid_int> ( I<ARG>
 [, B<-min> =E<gt> I<MIN>, B<-max> =E<gt> I<MAX>,
  B<-inclusive> =E<gt> I<BOOL>,
  B<-err> =E<gt> I<REF> ] )
+X<is_valid_int>
 
 Check whether I<ARG> is defined and represents a valid integer. If I<MIN>
 and/or I<MAX> are given and not C<undef>, it also checks the boundaries
@@ -336,10 +345,11 @@ sub is_valid_int {
 
 ###############################################################################
 
-=item X<is_valid_float>B<is_valid_float> ( I<ARG>
+=item B<is_valid_float> ( I<ARG>
 [, B<-min> =E<gt> I<MIN>, B<-max> =E<gt> I<MAX>,
  B<-inclusive> =E<gt> I<BOOL>,
  B<-err> =E<gt> I<REF> ] )
+X<is_valid_float>
 
 Check whether I<ARG> is defined and represents a valid floating point
 number.  If I<MIN> and/or I<MAX> are given and not C<undef>, it also
@@ -515,7 +525,8 @@ sub is_valid_ip {
 
 ###############################################################################
 
-=item X<format_time>B<format_time> ( I<TIME> [, I<SEPARATOR>] )
+=item B<format_time> ( I<TIME> [, I<SEPARATOR>] )
+X<format_time>
 
 Convert I<TIME> (seconds since epoch) to an ISO-8601
 string in the local timezone.
@@ -543,7 +554,8 @@ sub format_time {
     return 'never';
 }
 
-=item X<relative_time>B<relative_time> ( I<TIME> [, I<WITH_DIRECTION>] )
+=item B<relative_time> ( I<TIME> [, I<WITH_DIRECTION>] )
+X<relative_time>
 
 Compare I<TIME> (seconds since epoch) against the current time
 and return a string that indicates the absolute difference.

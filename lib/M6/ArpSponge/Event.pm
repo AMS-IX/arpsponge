@@ -170,7 +170,8 @@ sub is_valid_event_mask {
     return;
 }
 
-=item X<event_mask_split>B<event_mask_split> ( I<MASK> )
+=item B<event_mask_split> ( I<MASK> )
+X<event_mask_split>
 
 Return an array of the individual event mask values that make
 up the compound I<MASK>.

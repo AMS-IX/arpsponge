@@ -832,7 +832,8 @@ I/O mode on these objects is non-blocking.
 
 =over
 
-=item X<new>B<new> ( I<%ARGS> )
+=item B<new> ( I<%ARGS> )
+X<new>
 
 Create a new object instance and return a reference to it. Because
 this object inherits from L<IO::Socket>(3), we must keep the same
@@ -840,7 +841,8 @@ semantics for the arguments.
 
 The L</create_server> method is preferred.
 
-=item X<create_server>B<create_server> ( I<SOCKNAME> [, I<MAXCLIENTS> ] )
+=item B<create_server> ( I<SOCKNAME> [, I<MAXCLIENTS> ] )
+X<create_server>
 
 Create a new server instance, listening on I<SOCKNAME> and returning
 a reference to the client object.

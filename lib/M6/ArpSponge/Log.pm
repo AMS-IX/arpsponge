@@ -278,9 +278,8 @@ sub log_sverbose($@) {
 
 =over
 
-=item X<is_valid_log_level>B<is_valid_log_level> ( I<ARG>
-[, B<-err> =E<gt> I<REF>]
-)
+=item B<is_valid_log_level> ( I<ARG> [, B<-err> =E<gt> I<REF>] )
+X<is_valid_log_level>
 
 Check whether I<ARG> represents a valid syslog level.
 
@@ -302,7 +301,8 @@ sub is_valid_log_level {
     return;
 }
 
-=item X<log_level_to_string>B<log_level_to_string> ( I<LOGLEVEL> )
+=item B<log_level_to_string> ( I<LOGLEVEL> )
+X<log_level_to_string>
 
 Return the string representation of the numerical I<LOGLEVEL>.
 

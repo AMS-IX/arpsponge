@@ -232,7 +232,8 @@ control connection.
 
 =over
 
-=item X<new>B<new> ( I<%ARGS> )
+=item B<new> ( I<%ARGS> )
+X<new>
 
 Create a new object instance and return a reference to it. Because
 this object inherits from L<IO::Socket>(3), we must keep the same
@@ -240,7 +241,8 @@ semantics for the arguments.
 
 The L</create_client> method is preferred.
 
-=item X<create_client>B<create_client> ( I<SOCKNAME> )
+=item B<create_client> ( I<SOCKNAME> )
+X<create_client>
 
 Create a new client instance, connecting to I<SOCKNAME> and return
 a reference to the client object.

@@ -58,7 +58,8 @@ track of IP to MAC mappings.
 
 =over
 
-=item X<new>B<new>
+=item B<new>
+X<new>
 
 Create a new object instance and return a reference to it.
 
@@ -77,7 +78,8 @@ sub new {
 
 =over
 
-=item X<clear>B<clear> ( I<IP> )
+=item B<clear> ( I<IP> )
+X<clear>
 
 Clear the ARP table for I<IP>.
 
@@ -92,7 +94,8 @@ sub clear {
     delete $self->{arp}->{$ip};
 }
 
-=item X<arp>B<arp> ( I<IP> )
+=item B<arp> ( I<IP> )
+X<arp>
 
 Return the MAC address for I<IP>. Returns C<undef> if there is no
 entry for I<IP>.
@@ -101,7 +104,8 @@ entry for I<IP>.
 
 sub arp { $_[0]->{'arp'}->{$_[1]} }
 
-=item X<rarp>B<rarp> ( I<MAC> )
+=item B<rarp> ( I<MAC> )
+X<rarp>
 
 Return an unsorted list of IP addresses that are mapped to I<MAC>.
 
@@ -109,7 +113,8 @@ Return an unsorted list of IP addresses that are mapped to I<MAC>.
 
 sub rarp { keys %{$_[0]->{'rarp'}->{$_[1]}} }
 
-=item X<ip_list>B<ip_list>
+=item B<ip_list>
+X<ip_list>
 
 Return an unsorted list of IP addresses that are present in the ARP table.
 
@@ -117,7 +122,8 @@ Return an unsorted list of IP addresses that are present in the ARP table.
 
 sub ip_list { keys %{$_[0]->{'arp'}} }
 
-=item X<mac_list>B<mac_list>
+=item B<mac_list>
+X<mac_list>
 
 Return an unsorted list of MAC addresses that are present in the ARP table.
 
@@ -125,7 +131,8 @@ Return an unsorted list of MAC addresses that are present in the ARP table.
 
 sub mac_list { sort { ip_sort($a, $b) } keys %{$_[0]->{'rarp'}} }
 
-=item X<add>B<add> ( I<IP>, I<MAC> [, I<TIMESTAMP>] )
+=item B<add> ( I<IP>, I<MAC> [, I<TIMESTAMP>] )
+X<add>
 
 Add I<IP> to I<MAC> mapping to the table. If I<TIMESTAMP> is given, use
 it for the entry's timestamp, otherwise use the current time.

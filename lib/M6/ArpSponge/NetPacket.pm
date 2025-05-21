@@ -150,55 +150,68 @@ Note that these variables are all read-only.
 
 =over
 
-=item X<$ETH_TYPE_IP>I<$ETH_TYPE_IP>, X<$ETH_TYPE_IPv4>I<$ETH_TYPE_IPv4>
+=item I<$ETH_TYPE_IP>, X<$ETH_TYPE_IPv4>I<$ETH_TYPE_IPv4>
+X<$ETH_TYPE_IP>
 
 Ethernet C<type> for IPv4 frames.
 
-=item X<$ETH_TYPE_IPv6>I<$ETH_TYPE_IPv6>
+=item I<$ETH_TYPE_IPv6>
+X<$ETH_TYPE_IPv6>
 
 Ethernet C<type> for IPv6 frames.
 
-=item X<$ETH_TYPE_ARP>I<$ETH_TYPE_ARP>
+=item I<$ETH_TYPE_ARP>
+X<$ETH_TYPE_ARP>
 
 Ethernet C<type> for ARP frames.
 
-=item X<$ETH_ADDR_BROADCAST>I<$ETH_ADDR_BROADCAST>
+=item I<$ETH_ADDR_BROADCAST>
+X<$ETH_ADDR_BROADCAST>
 
 Hex string representing the ethernet broadcast address ('ff' x 6).
 
-=item X<$IPv4_ADDR_BROADCAST>I<$IPv4_ADDR_BROADCAST>
+=item I<$IPv4_ADDR_BROADCAST>
+X<$IPv4_ADDR_BROADCAST>
 
 Hex string representing the IPv4 broadcast address ('ff' x 4).
 
-=item X<$ETH_ADDR_NONE>I<$ETH_ADDR_NONE>
+=item I<$ETH_ADDR_NONE>
+X<$ETH_ADDR_NONE>
 
 Hex string representing the "zero" ethernet address ('00' x 6).
 
-=item X<$IPv4_ADDR_NONE>I<$IPv4_ADDR_NONE>
+=item I<$IPv4_ADDR_NONE>
+X<$IPv4_ADDR_NONE>
 
 Hex string representing the IPv4 "zero" address ('00' x 4).
 
-=item X<$ARP_OPCODE_REQUEST>I<$ARP_OPCODE_REQUEST>
+=item I<$ARP_OPCODE_REQUEST>
+X<$ARP_OPCODE_REQUEST>
 
 ARP C<opcode> for ARP requests.
 
-=item X<$ARP_OPCODE_REPLY>I<$ARP_OPCODE_REPLY>
+=item I<$ARP_OPCODE_REPLY>
+X<$ARP_OPCODE_REPLY>
 
 ARP C<opcode> for ARP replies.
 
-=item X<$ARP_HTYPE_ETHERNET>I<$ARP_HTYPE_ETHERNET>
+=item I<$ARP_HTYPE_ETHERNET>
+X<$ARP_HTYPE_ETHERNET>
 
 ARP C<htype> for Ethernet hardware addresses.
 
-=item X<$ARP_PROTO_IP>I<$ARP_PROTO_IP>, X<$ARP_PROTO_IPv4>I<$ARP_PROTO_IPv4>
+=item I<$ARP_PROTO_IP>, X<$ARP_PROTO_IPv4>I<$ARP_PROTO_IPv4>
+X<$ARP_PROTO_IP>
 
 ARP C<proto> for IPv4 requests/replies.
 
-=item X<$ARP_HLEN_ETHERNET>I<$ARP_HLEN_ETHERNET>
+=item I<$ARP_HLEN_ETHERNET>
+X<$ARP_HLEN_ETHERNET>
 
 Ethernet protocol address length in bytes (6).
 
-=item X<$ARP_PLEN_IPv4>I<$ARP_PLEN_IPv4>
+=item I<$ARP_PLEN_IPv4>
+X<$ARP_PLEN_IPv4>
 
 IP protocol address length in bytes (4).
 
@@ -216,7 +229,8 @@ set. They do not set C<_parent> or C<_frame>.
 
 =over
 
-=item X<decode_ethernet>B<decode_ethernet> ( I<DATA> )
+=item B<decode_ethernet> ( I<DATA> )
+X<decode_ethernet>
 
 (TCP/IP Illustrated, Volume 1, Section 2.2, p21-23.)
 
@@ -257,7 +271,8 @@ sub decode_ethernet {
 
 ###############################################################################
 
-=item X<encode_ethernet>B<encode_ethernet> ( I<HASHREF> )
+=item B<encode_ethernet> ( I<HASHREF> )
+X<encode_ethernet>
 
 (TCP/IP Illustrated, Volume 1, Section 2.2, p21-23.)
 
@@ -294,7 +309,8 @@ sub encode_ethernet {
 
 ###############################################################################
 
-=item X<decode_ip>B<decode_ip> ( I<DATA> )
+=item B<decode_ip> ( I<DATA> )
+X<decode_ip>
 
 Synonymous with L<decode_ipv4()|/decode_ipv4>.
 
@@ -302,7 +318,8 @@ Synonymous with L<decode_ipv4()|/decode_ipv4>.
 
 sub decode_ip { &decode_ipv4 }
 
-=item X<decode_ipv4>B<decode_ipv4> ( I<DATA> )
+=item B<decode_ipv4> ( I<DATA> )
+X<decode_ipv4>
 
 (TCP/IP Illustrated, Volume 1, Section 3.2, p34-37.)
 
@@ -401,7 +418,8 @@ sub decode_ipv4 {
 
 ###############################################################################
 
-=item X<decode_arp>B<decode_arp> ( I<DATA> )
+=item B<decode_arp> ( I<DATA> )
+X<decode_arp>
 
 (TCP/IP Illustrated, Volume 1, Section 4.4, p56-57.)
 
@@ -490,7 +508,8 @@ sub decode_arp {
 
 ###############################################################################
 
-=item X<encode_arp>B<encode_arp> ( I<HASHREF> )
+=item B<encode_arp> ( I<HASHREF> )
+X<encode_arp>
 
 (TCP/IP Illustrated, Volume 1, Section 4.4, p56-57.)
 
