@@ -15,7 +15,7 @@ use warnings;
 use ExtUtils::MakeMaker;
 
 ## List of scripts in "bin" directory.
-## Only if necessary...
+## Only list the distributable stuff.
 my @scripts = qw(
     arpsponge
     arpsponge_defaults
