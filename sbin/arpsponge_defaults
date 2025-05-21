@@ -64,7 +64,7 @@ sub Main {
         }
         my $v = $all{$ARGV[0]};
         say $v // '';;
-        exit defined $v ? 0 : 1;
+        exit(defined $v ? 0 : 1);
     }
 
     my @keys = @ARGV ? sort @ARGV : sort keys %all;
