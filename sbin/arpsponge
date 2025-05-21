@@ -1373,7 +1373,7 @@ I<Options>:
     --sweep-skip-alive
     --verbose[=n]
 
-B</etc/init.d/>rpsponge {B<start>|B<stop>|B<restart>|B<status>}
+B</etc/init.d/arpsponge> {B<start>|B<stop>|B<restart>|B<status>}
 
 =head1 DESCRIPTION
 
