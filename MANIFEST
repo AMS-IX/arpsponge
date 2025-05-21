@@ -27,6 +27,7 @@ lib/M6/ArpSponge/Control/Base.pm
 lib/M6/ArpSponge/Control/Client.pm
 lib/M6/ArpSponge/Control.pm
 lib/M6/ArpSponge/Control/Server.pm
+lib/M6/ArpSponge/Defaults.pm
 lib/M6/ArpSponge/Event.pm
 lib/M6/ArpSponge/Log.pm
 lib/M6/ArpSponge/NetPacket.pm
