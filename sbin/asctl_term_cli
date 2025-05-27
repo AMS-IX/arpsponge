@@ -13,6 +13,7 @@ use M6::ArpSponge::Util qw( ip2int );
 use M6::ArpSponge::Asctl::Arg::IP_Range;
 use M6::ArpSponge::Asctl::Arg::IP_Filter;
 use M6::ArpSponge::Asctl::Arg::Arp_Update_Flags;
+use M6::ArpSponge::Asctl::Arg::Log_Event_Mask;
 use M6::ArpSponge::Asctl::Arg::MAC_Address;
 
 my $opt_verbose = 0;
@@ -483,6 +484,18 @@ sub setup_term_cli {
         ],
     ));
 
+    # set log_mask
+    $set_command->add_command(make_command(
+        name        => 'log_mask',
+        data_key    => 'set_log_mask',
+        arguments   => [
+            M6::ArpSponge::Asctl::Arg::Log_Event_Mask->new(
+                name           => 'mask',
+                max_occur      => -1,
+            ),
+        ],
+    ));
+
     #
     # command: help
     #
@@ -662,6 +675,28 @@ sub callback_set_arp_update_flags {
 
     my $flags = $flags_arg->translate(join(',', @txt_args), \%args);
     say "[FIXME] ($app) $cmd_name -> $flags";
+    return %args;
+}
+
+sub callback_set_log_mask {
+    my ($cmd, %args) = @_;
+    return %args if $args{status} < 0;
+
+    my @cmd_path = @{$args{command_path}};
+    my $app = (shift @cmd_path)->name;
+    my $cmd_name = join(' ', map { $_->name } @cmd_path);
+
+    my @txt_args = @{$args{arguments}};
+    say "($app) $cmd_name", map { " <$_>" } @txt_args;
+
+    my $mask_arg =
+            M6::ArpSponge::Asctl::Arg::Log_Event_Mask->new(
+                name           => 'mask',
+                max_occur      => -1,
+            );
+
+    my $mask = $mask_arg->translate(join(',', @txt_args), \%args);
+    say "[FIXME] ($app) $cmd_name -> $mask";
     return %args;
 }
 
@@ -1082,6 +1117,13 @@ Sponge the given IP address(es); see also C<set ip dead>.
 unsponge given IP address(es)
 @@ unsponge:description
 Unsponge the given IP address(es); see also C<set ip alive>.
+
+@@ ######################################################################
+@@ set_log_mask:summary
+set the log event mask
+@@ set_log_mask:description
+Specify a comma-separated list of events that
+should be logged by the daemon (default: B<all>).
 
 @@ ######################################################################
 @@ END
