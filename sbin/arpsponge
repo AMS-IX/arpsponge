@@ -294,7 +294,7 @@ sub Main {
         static           => $static,
     );
 
-    if ($sponge->my_ip eq $IPv4_ADDR_NONE) {
+    if ($sponge->my_ip eq IPV4_ADDR_NONE) {
         if (!$passive) {
             event_alert(EVENT_STATE,
                 "%s has no IP address; forcing --passive",
@@ -992,7 +992,7 @@ sub process_pkt {
     return if $src_mac eq $sponge->my_mac;
 
     # Always "unsponge" the source IP address on any IP packet.
-    if ($eth_obj->{type} == $ETH_TYPE_IP) {
+    if ($eth_obj->{type} == ETH_TYPE_IP) {
         my $ip_obj  = decode_ipv4($eth_obj->{data});
         my $src_ip  = $ip_obj->{src_ip};
 
@@ -1023,7 +1023,7 @@ sub process_pkt {
         return if $sponge->get_state($dst_ip) != ALIVE();       # IP is alive
 
         my ($dst_mac, $mtime) = $sponge->arp_table($dst_ip);
-        return if !$dst_mac or $dst_mac eq $ETH_ADDR_NONE;      # MAC is valid
+        return if !$dst_mac or $dst_mac eq ETH_ADDR_NONE;      # MAC is valid
         $sponge->send_arp_update(
             tha => $src_mac,
             tpa => $src_ip,
@@ -1034,7 +1034,7 @@ sub process_pkt {
         return;
     }
 
-    return if $eth_obj->{type} != $ETH_TYPE_ARP;
+    return if $eth_obj->{type} != ETH_TYPE_ARP;
 
     # From this point on, we have an ARP packet.
 
@@ -1046,7 +1046,7 @@ sub process_pkt {
     update_state($sponge, $src_ip, $src_mac);
 
     # Ignore anything that is not an ARP "WHO-HAS" request.
-    return if $arp_obj->{opcode} != $ARP_OPCODE_REQUEST;
+    return if $arp_obj->{opcode} != ARP_OPCODE_REQUEST;
 
     # From this point on, we have an ARP "WHO-HAS" request.
 
@@ -1083,7 +1083,7 @@ sub process_pkt {
         return;
     }
 
-    if ($src_ip eq $IPv4_ADDR_NONE) {
+    if ($src_ip eq IPV4_ADDR_NONE) {
         # DHCP duplicate IP detection.
         # See RFC 2131, p38, bottom.
         event_notice(EVENT_SPONGE,

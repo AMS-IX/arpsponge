@@ -249,7 +249,7 @@ sub arp_table {
     my $arp_table = $self->{'arp_table'};
 
     if (@_ >= 3) {
-        if (defined $mac && $mac ne $ETH_ADDR_NONE) {
+        if (defined $mac && $mac ne ETH_ADDR_NONE) {
             return $arp_table->{$ip} = [ $mac, $time // time ];
         }
         delete $self->{'arp_table'}->{$ip};
@@ -385,9 +385,9 @@ sub send_query {
 
     $self->set_state_atime($ip, time);
 
-    $self->send_arp( tha => $ETH_ADDR_BROADCAST,
+    $self->send_arp( tha => ETH_ADDR_BROADCAST,
                      tpa => $ip,
-                     opcode => $ARP_OPCODE_REQUEST );
+                     opcode => ARP_OPCODE_REQUEST );
     return;
 }
 
@@ -412,9 +412,9 @@ sub gratuitous_arp {
 
     my $ip_s = hex2ip($ip);
     $self->send_arp( spa => $ip,
-                     tha => $ETH_ADDR_BROADCAST,
+                     tha => ETH_ADDR_BROADCAST,
                      tpa => $ip,
-                     opcode => $ARP_OPCODE_REQUEST );
+                     opcode => ARP_OPCODE_REQUEST );
 }
 
 ###############################################################################
@@ -432,12 +432,12 @@ sub send_arp {
     $args{sha}      //= $self->my_mac;
     $args{src_mac}  //= $self->my_mac;
     $args{dest_mac} //= $args{tha};
-    $args{opcode}   //= $ARP_OPCODE_REQUEST;
+    $args{opcode}   //= ARP_OPCODE_REQUEST;
 
     my $pkt = encode_ethernet({
                     dest_mac => $args{tha},
                     src_mac  => $args{src_mac},
-                    type     => $ETH_TYPE_ARP,
+                    type     => ETH_TYPE_ARP,
                     data     => encode_arp({
                                     sha => $args{sha},
                                     spa => $args{spa},
@@ -487,7 +487,7 @@ sub send_arp_update {
                          spa => $args{spa},
                          tha => $args{tha},
                          tpa => $args{tpa},
-                         opcode => $ARP_OPCODE_REPLY );
+                         opcode => ARP_OPCODE_REPLY );
     }
 
     if ($update_flags & ARP_UPDATE_REQUEST) {
@@ -495,7 +495,7 @@ sub send_arp_update {
                          spa => $args{spa},
                          tha => $args{tha},
                          tpa => $args{tpa},
-                         opcode => $ARP_OPCODE_REQUEST );
+                         opcode => ARP_OPCODE_REQUEST );
     }
 
     # Third option: fake a gratuitous ARP: "unicast proxy gratuitous ARP
@@ -505,7 +505,7 @@ sub send_arp_update {
                          spa => $args{spa},
                          tha => $args{tha},
                          tpa => $args{spa},
-                         opcode => $ARP_OPCODE_REQUEST );
+                         opcode => ARP_OPCODE_REQUEST );
     }
     return;
 }
@@ -543,7 +543,7 @@ sub send_reply {
     $self->send_arp( spa => $src_ip,
                      tha => $arp_obj->{sha},
                      tpa => $arp_obj->{spa},
-                     opcode => $ARP_OPCODE_REPLY );
+                     opcode => ARP_OPCODE_REPLY );
     return;
 }
 
@@ -596,7 +596,7 @@ sub set_alive {
     my @old_arp = $self->arp_table($ip);
     my $old_state = $self->get_state($ip);
 
-    $mac //= $old_arp[0] // $ETH_ADDR_NONE;
+    $mac //= $old_arp[0] // ETH_ADDR_NONE;
 
     if (log_is_verbose) {
         if (!@old_arp) {

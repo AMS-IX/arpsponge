@@ -56,7 +56,6 @@ WriteMakefile(
         'POSIX'                       => '1.38_03',
         'Pod::Text::Termcap'          => '2.08',
         'Pod::Usage'                  => '1.63',
-        'Readonly'                    => 'v2.0.0',
         'Scalar::Util'                => '1.41',
         'Sys::Syslog'                 => '0.33',
         'Term::CLI'                   => '0.057001',

@@ -25,7 +25,7 @@ use base qw( M6::ArpSponge::Control::Base );
 use IO::Socket;
 use M6::ArpSponge::Const     qw( :states :flags );
 use M6::ArpSponge::Util      qw( :all );
-use M6::ArpSponge::NetPacket qw( :vars );
+use M6::ArpSponge::NetPacket qw( :const );
 use M6::ArpSponge::Log       qw( :func :macros );
 use M6::ArpSponge::Event     qw( :func :macros );
 use Time::HiRes        qw( time );
@@ -733,7 +733,7 @@ sub _cmd_inform {
     }
 
     my ($mac1, $time1) = $sponge->arp_table($ip1);
-    if (!defined $mac1 || $mac1 eq $ETH_ADDR_NONE) {
+    if (!defined $mac1 || $mac1 eq ETH_ADDR_NONE) {
         $self->send_error(hex2ip($ip1), ": no MAC address available");
         return 1;
     }
@@ -746,7 +746,7 @@ sub _cmd_inform {
     }
     else {
         ($mac2, my $time2) = $sponge->arp_table($ip2);
-        if (!defined $mac2 || $mac2 eq $ETH_ADDR_NONE) {
+        if (!defined $mac2 || $mac2 eq ETH_ADDR_NONE) {
             $self->send_error(hex2ip($ip2), ": no MAC address available");
             return 1;
         }
