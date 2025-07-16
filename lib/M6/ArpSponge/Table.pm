@@ -19,13 +19,99 @@
 ###############################################################################
 package M6::ArpSponge::Table;
 
-use strict;
+use 5.014;
+use warnings;
 
+use M6::ArpSponge;
+our $VERSION = $M6::ArpSponge::VERSION;
+
+use Moo;
 use Time::HiRes qw( time );
 
-BEGIN {
-    our $VERSION = 1.03;
+use namespace::clean;
+
+has _arp  => ( is => 'rw', init_arg => undef, default => sub { {} } );
+has _rarp => ( is => 'rw', init_arg => undef, default => sub { {} } );
+
+sub clear_ip {
+    my ($self, $ip) = @_;
+
+    if (my $mac = $self->_arp($ip)) {
+        delete $self->_rarp->{$mac}->{$ip};
+    }
+    delete $self->_arp->{$ip};
 }
+
+sub clear_mac {
+    my ($self, $mac) = @_;
+
+    my $ip_hash = $self->_rarp->{$mac};
+
+    if ($ip_hash) {
+        for my $ip (keys %{$ip_hash}) {
+            delete $self->_arp->{$ip};
+        }
+    }
+    delete $self->_rarp->{$mac};
+}
+
+
+sub lookup_ip {
+    my ($self, $ip) = @_;
+    if (my $e = $self->_arp->{$ip}) {
+        return wantarray ? @{$e} : $e->[0];
+    }
+    return;
+}
+
+
+sub lookup_mac {
+    my ($self, $mac) = @_;
+
+    return keys %{ $self->_rarp->{$mac} // {} };
+}
+
+
+sub purge {
+    my ($self, $timestamp) = @_;
+
+    if (!defined $timestamp) {
+        my $purged = scalar(keys %{$self->_arp});
+        $_[0]->_arp({});
+        $_[0]->_rarp({});
+        return $purged;
+    }
+    
+    my $purged = 0;
+    my $mac_hash = $self->_rarp;
+    while (my ($mac, $ip_hash) = each %{$mac_hash}) {
+        while (my ($ip, $ip_ts) = each %{$ip_hash}) {
+            if ($ip_ts < $timestamp) {
+                delete $ip_hash->{$ip};
+                $purged++;
+            }
+        }
+        if (keys %{$ip_hash} == 0) {
+            delete $mac_hash->{$mac};
+        }
+    }
+    return $purged;
+}
+
+
+sub ip_list  { keys %{$_[0]->_arp} }
+sub mac_list { keys %{$_[0]->_rarp} }
+
+sub add {
+    my ($self, $ip, $mac, $timestamp) = @_;
+    $timestamp //= time;
+    $self->clear_ip($ip);
+    $self->_arp->{$ip} = [ $mac, $timestamp ];
+    $self->_rarp->{$mac}->{$ip} = $timestamp;
+    return $timestamp;
+}
+
+1;
 
 =pod
 
@@ -39,15 +125,22 @@ M6::ArpSponge::Table - keep a table of ARP entries
 
  $table = new M6::ArpSponge::Table;
 
- $table->clear($some_ip);
  $table->add($some_ip, $some_mac);
+ $table->add($some_ip, $some_mac, time);
 
- $mac = $table->arp($some_ip);
- $stamp = $table->mtime($some_ip);
- @iplist = $table->rarp($mac);
+ $mac = $table->lookup_ip($some_ip);
+ ($mac, $tstamp) = $table->lookup_ip($some_ip);
 
- @iplist = $table->ip_list;
- @maclist = $table->mac_list;
+ @ip_list = $table->lookup_mac($mac);
+
+ $table->clear_ip($some_ip);
+ $table->clear_mac($some_mac);
+
+ @ip_list = $table->ip_list;
+ @mac_list = $table->mac_list;
+
+ $purge_count = $table->purge();
+ $purge_count = $table->purge(time - $max_age);
 
 =head1 DESCRIPTION
 
@@ -56,104 +149,75 @@ track of IP to MAC mappings.
 
 =head1 CONSTRUCTOR
 
-=over
+=head2 new
 
-=item B<new>
-X<new>
+    $OBJ = M6::ArpSponge::Table->new();
 
 Create a new object instance and return a reference to it.
 
-=cut
-
-sub new {
-    my ($type, $max_depth) = @_;
-
-    $type = ref $type if ref $type;
-    bless { arp => {}, rarp => {} }, $type;
-}
-
-=back
-
 =head1 METHODS
 
-=over
+=head2 add
 
-=item B<clear> ( I<IP> )
-X<clear>
+    $TIMESTAMP = $OBJ->add( $IP, $MAC );
+    $TIMESTAMP = $OBJ->add( $IP, $MAC, $TIMESTAMP );
 
-Clear the ARP table for I<IP>.
-
-=cut
-
-sub clear {
-    my ($self, $ip) = @_;
-
-    if (my $mac = $self->arp($ip)) {
-        delete $self->{rarp}->{$mac}->{$ip};
-    }
-    delete $self->{arp}->{$ip};
-}
-
-=item B<arp> ( I<IP> )
-X<arp>
-
-Return the MAC address for I<IP>. Returns C<undef> if there is no
-entry for I<IP>.
-
-=cut
-
-sub arp { $_[0]->{'arp'}->{$_[1]} }
-
-=item B<rarp> ( I<MAC> )
-X<rarp>
-
-Return an unsorted list of IP addresses that are mapped to I<MAC>.
-
-=cut
-
-sub rarp { keys %{$_[0]->{'rarp'}->{$_[1]}} }
-
-=item B<ip_list>
-X<ip_list>
-
-Return an unsorted list of IP addresses that are present in the ARP table.
-
-=cut
-
-sub ip_list { keys %{$_[0]->{'arp'}} }
-
-=item B<mac_list>
-X<mac_list>
-
-Return an unsorted list of MAC addresses that are present in the ARP table.
-
-=cut
-
-sub mac_list { sort { ip_sort($a, $b) } keys %{$_[0]->{'rarp'}} }
-
-=item B<add> ( I<IP>, I<MAC> [, I<TIMESTAMP>] )
-X<add>
-
-Add I<IP> to I<MAC> mapping to the table. If I<TIMESTAMP> is given, use
+Add a mapping for I<$IP> to I<$MAC>. If I<$TIMESTAMP> is given, use
 it for the entry's timestamp, otherwise use the current time.
-Returns the timestamp.
+Return the timestamp.
 
-=cut
+=head2 clear_ip
 
-sub add {
-    my ($self, $ip, $mac, $timestamp) = @_;
-    $timestamp //= time;
-    $self->clear($ip);
-    $self->{'arp'}->{$ip} = $mac;
-    $self->{'rarp'}->{$mac}->{$ip} = $timestamp;
-    return $timestamp;
-}
+    $OBJ->clear_ip( $IP );
 
-1;
+Clear the table for I<$IP>.
 
-__END__
+=head2 clear_mac
 
-=back
+    $OBJ->clear_mac( $MAC );
+
+Clear the table for MAC address I<$MAC>.
+
+=head2 ip_list
+
+    @IP_LIST = $OBJ->ip_list();
+
+Return an unsorted list of all IP addresses that are present in the
+ARP table.
+
+=head2 lookup_ip
+
+    $MAC = $OBJ->lookup_ip( $IP );
+    ($MAC, $MTIME) = OBJ->lookup_ip( $IP );
+
+Return the MAC address for I<$IP>
+(or MAC address and last modification time in list context).
+Returns C<undef> (or an empty list) if there is no entry for I<$IP>.
+
+=head2 lookup_mac
+
+    @IP_LIST = $OBJ->lookup_mac( $MAC );
+
+Return an unsorted (possibly empty) list of IP addresses that are mapped
+to I<MAC>.
+
+=head2 mac_list
+
+    @MAC_LIST = $OBJ->mac_list();
+
+Return an unsorted list of MAC addresses that are present in the
+ARP table.
+
+=head2 purge
+
+    $IP_COUNT = $OBJ->purge();
+    $IP_COUNT = $OBJ->purge( $TIMESTAMP );
+
+Delete all entries from the table. If I<$TIMESTAMP> is given,
+only delete entries that are older than I<$TIMESTAMP>
+(that is, entries for which the timestamp falls before I<$TIMESTAMP>).
+
+Return the number of IP entries removed.
 
 =head1 EXAMPLE
 
@@ -161,7 +225,8 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>, L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>.
+L<B<perl>(1)|perl.1>,
+L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge.3>.
 
 =head1 AUTHORS
 
@@ -169,7 +234,5 @@ Steven Bakker at AMS-IX (steven.bakker@ams-ix.net).
 
 =head1 COPYRIGHT
 
-Copyright 2005-2016, AMS-IX B.V.
+Copyright 2005-2025, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
-
-=cut
