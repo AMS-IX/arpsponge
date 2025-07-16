@@ -20,14 +20,13 @@
 ###############################################################################
 package M6::ArpSponge::Queue;
 
-use strict;
+use 5.014;
+use warnings;
 
-BEGIN {
-    our $VERSION = 1.04;
-}
+use M6::ArpSponge;
+our $VERSION = $M6::ArpSponge::VERSION;
 
-our $DFL_DEPTH = 1000;
-
+use M6::ArpSponge::Defaults;
 use M6::ArpSponge::Log;
 
 =pod
@@ -81,16 +80,6 @@ fact no implicit knowledge about the format of the IP and MAC addresses
 in this module; I<ip-address> could stand for I<arbitrary-key> and
 I<mac-address> could stand for I<arbitrary-value>.
 
-=head1 VARIABLES
-
-=over
-
-=item X<$M6::ArpSponge::Queue::DFL_DEPTH>I<$M6::ArpSponge::Queue::DFL_DEPTH>
-
-Default maximum depth for queue objects (1000).
-
-=back
-
 =head1 CONSTRUCTOR
 
 =over
@@ -98,7 +87,10 @@ Default maximum depth for queue objects (1000).
 =item X<new>B<new> ( [ I<MAXDEPTH> ] )
 
 Create a new object instance. Each queue will have a maximum depth
-of I<MAXDEPTH> (or I<$M6::ArpSponge::Queue::DFL_DEPTH> if not given).
+of I<MAXDEPTH>
+(or
+L<B<M6::ArpSponge::Defaults-E<gt>QUEUE_DEPTH>|M6::ArpSponge::Defaults/QUEUE_DEPTH>
+if not given).
 Returns a reference to the newly created object.
 
 =cut
@@ -106,7 +98,7 @@ Returns a reference to the newly created object.
 sub new {
     my ($type, $max_depth) = @_;
 
-    $max_depth //= $DFL_DEPTH;
+    $max_depth //= M6::ArpSponge::Defaults->QUEUE_DEPTH;
 
     $type = ref $type if ref $type;
     bless {'max_depth' => $max_depth, q=>{}}, $type;
