@@ -17,7 +17,7 @@
 # S.Bakker, 2005
 #
 ###############################################################################
-package M6::ArpSponge::Table;
+package M6::ArpSponge::ArpTable;
 
 use 5.014;
 use warnings;
@@ -117,13 +117,13 @@ sub add {
 
 =head1 NAME
 
-M6::ArpSponge::Table - keep a table of ARP entries
+M6::ArpSponge::ArpTable - keep a table of ARP entries
 
 =head1 SYNOPSIS
 
- use M6::ArpSponge::Table;
+ use M6::ArpSponge::ArpTable;
 
- $table = new M6::ArpSponge::Table;
+ $table = M6::ArpSponge::ArpTable->new();
 
  $table->add($some_ip, $some_mac);
  $table->add($some_ip, $some_mac, time);
