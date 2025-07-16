@@ -37,6 +37,7 @@ BEGIN {
             is_valid_int is_valid_float is_valid_ip
             is_valid_bool
             arpflags2int int2arpflags
+            read_from_pipe
         );
     our @EXPORT    = ();
 
@@ -593,6 +594,32 @@ sub relative_time {
         $str .= " $direction";
     }
     return $str;
+}
+
+###############################################################################
+
+=item B<read_from_pipe> ( I<CMD>, [I<ARG>, ...] )
+X<read_from_pipe>
+
+Execute I<CMD> with I<ARG>s, catch F<STDOUT>,
+ignore F<STDERR>.
+
+=cut
+
+sub read_from_pipe {
+    my @cmd = @_;
+
+    open my $save_err, '>&', \*STDERR;
+    open STDERR, '>', '/dev/null';
+
+    open my $fh, '-|', @cmd;
+
+    my $stdout = do { local($/); <$fh> };
+    close $fh;
+
+    open STDERR, '>&', $save_err;
+
+    return $stdout;
 }
 
 1;
