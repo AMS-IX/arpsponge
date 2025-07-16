@@ -188,22 +188,24 @@ sub handle_command {
 sub _get_param_info_s {
     my ($self, $s) = @_;
 
-    my $probesleep = $s->user('probesleep');
+    my $probesleep = $s->get_attr('probesleep');
     my $proberate = $probesleep ? 1/$probesleep : 1e6;
 
     my @response = (
         sprintf("%s=%d\n", 'queue_depth', $s->queuedepth),
         sprintf("%s=%0.2f\n", 'max_rate', $s->max_rate),
-        sprintf("%s=%0.2f\n", 'flood_protection', $s->flood_protection),
+        sprintf("%s=%0.2f\n", 'flood_protection',
+                $s->get_attr('flood_protection')),
         sprintf("%s=%d\n", 'max_pending', $s->max_pending),
-        sprintf("%s=%d\n", 'sweep_period', $s->user('sweep_sec')),
-        sprintf("%s=%d\n", 'sweep_age', $s->user('sweep_age')),
-        sprintf("%s=%d\n", 'sweep_skip_alive', $s->user('sweep_skip_alive')),
+        sprintf("%s=%d\n", 'sweep_period', $s->get_attr('sweep_sec')),
+        sprintf("%s=%d\n", 'sweep_age', $s->get_attr('sweep_age')),
+        sprintf("%s=%d\n", 'sweep_skip_alive',
+                $s->get_attr('sweep_skip_alive')),
         sprintf("%s=%d\n", 'proberate', $proberate),
-        sprintf("%s=%d\n", 'learning', $s->user('learning')),
+        sprintf("%s=%d\n", 'learning', $s->get_attr('learning')),
         sprintf("%s=%d\n", 'dummy', int($s->is_dummy)),
-        sprintf("%s=%d\n", 'passive', $s->user('passive')),
-        sprintf("%s=%d\n", 'static', $s->user('static')),
+        sprintf("%s=%d\n", 'passive', $s->get_attr('passive')),
+        sprintf("%s=%d\n", 'static', $s->get_attr('static')),
         sprintf("%s=%d\n", 'arp_update_flags', $s->arp_update_flags),
         sprintf("%s=%d\n", 'log_level', log_level()),
         sprintf("%s=%d\n", 'log_mask', event_mask()),
@@ -215,13 +217,13 @@ sub _get_status_info_s {
     my ($self, $sponge) = @_;
 
     my $now        = time;
-    my $start_time = $sponge->user('start_time');
-    my $learning   = $sponge->user('learning');
+    my $start_time = $sponge->get_attr('start_time');
+    my $learning   = $sponge->get_attr('learning');
 
     my @response = (
         sprintf("%s=%s\n", 'id', $M6::ArpSponge::Log::Syslog_Ident),
         sprintf("%s=%d\n", 'pid', $$),
-        sprintf("%s=%s\n", 'version', $sponge->user('version')),
+        sprintf("%s=%s\n", 'version', $sponge->get_attr('version')),
         sprintf("%s=%d\n", 'date', $now),
         sprintf("%s=%d\n", 'started', $start_time),
         sprintf("%s=%s\n", 'network', $sponge->network),
@@ -229,7 +231,7 @@ sub _get_status_info_s {
         sprintf("%s=%s\n", 'interface', $sponge->device),
         sprintf("%s=%s\n", 'ip', $sponge->my_ip),
         sprintf("%s=%s\n", 'mac', $sponge->my_mac),
-        sprintf("%s=%d\n", 'next_sweep', $sponge->user('next_sweep')),
+        sprintf("%s=%d\n", 'next_sweep', $sponge->get_attr('next_sweep')),
     );
     return join('', @response);
 }
@@ -253,8 +255,8 @@ sub _get_ip_info_s {
             sprintf("%s=%s\n", 'state', $sponge->state_name($state)),
             sprintf("%s=%s\n", 'queue', $queue->depth($ip)),
             sprintf("%s=%0.2f\n", 'rate',  $queue->rate($ip)),
-            sprintf("%s=%s\n", 'state_changed',  $sponge->state_mtime($ip)),
-            sprintf("%s=%s\n", 'last_queried',   $sponge->state_atime($ip)),
+            sprintf("%s=%s\n", 'state_changed',  $sponge->get_state_mtime($ip)),
+            sprintf("%s=%s\n", 'last_queried',   $sponge->get_state_atime($ip)),
         );
     }
     return join("\n", @output);
@@ -536,9 +538,9 @@ sub _cmd_set_learning {
         return $self->send_error("$cmd <NON-NEGATIVE-INT>");
     }
     $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
-    my $old = $sponge->user('learning');
-    $sponge->user('learning', $int);
-    $int    = $sponge->user('learning');
+    my $old = $sponge->get_attr('learning');
+    $sponge->set_attr(learning => $int);
+    $int    = $sponge->get_attr('learning');
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
 }
 
@@ -578,18 +580,18 @@ sub _cmd_set_sweep_sec {
         return $self->send_error("$cmd <NON-NEGATIVE-INT>");
     }
     $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $sec);
-    my $old = $sponge->user('sweep_sec');
-    $sponge->user('sweep_sec', $sec);
-    my $new = $sponge->user('sweep_sec');
+    my $old = $sponge->get_attr('sweep_sec');
+    $sponge->set_attr(sweep_sec => $sec);
+    my $new = $sponge->get_attr('sweep_sec');
 
     my $next_sweep = 0;
     if ($new >= 1) {
         # Fix sweep age (threshold) if not previously set.
-        if (!$sponge->user('sweep_age')) {
-            $sponge->user('sweep_age', $new);
+        if (!$sponge->get_attr('sweep_age')) {
+            $sponge->set_attr(sweep_age => $new);
         }
         # Determine new "next sweep" time.
-        my $old_next = $sponge->user('next_sweep') // 0;
+        my $old_next = $sponge->get_attr('next_sweep') // 0;
         if ($old_next > $old) {
             # Adjust existing setting.
             $next_sweep = $old_next - $old + $new;
@@ -599,7 +601,7 @@ sub _cmd_set_sweep_sec {
             $next_sweep = time + $new;
         }
     }
-    $sponge->user('next_sweep', $next_sweep);
+    $sponge->set_attr(next_sweep => $next_sweep);
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $new));
 }
 
@@ -611,9 +613,9 @@ sub _cmd_set_sweep_age {
         return $self->send_error("$cmd <POSITIVE-INT>");
     }
     $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $sec);
-    my $old = $sponge->user('sweep_age');
-    $sponge->user('sweep_age', $sec);
-    my $new = $sponge->user('sweep_age');
+    my $old = $sponge->get_attr('sweep_age');
+    $sponge->set_attr(sweep_age => $sec);
+    my $new = $sponge->get_attr('sweep_age');
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $new));
 }
 
@@ -625,9 +627,9 @@ sub _cmd_set_sweep_skip_alive {
         return $self->send_error("$cmd {0|1}");
     }
     $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
-    my $old = $sponge->user('sweep_skip_alive');
-    $sponge->user('sweep_skip_alive', $int);
-    $int = $sponge->user('sweep_skip_alive');
+    my $old = $sponge->get_attr('sweep_skip_alive');
+    $sponge->set_attr(sweep_skip_alive => $int);
+    $int = $sponge->get_attr('sweep_skip_alive');
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
 }
 
@@ -653,9 +655,9 @@ sub _cmd_set_static_mode {
         return $self->send_error("$cmd {0|1}");
     }
     $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
-    my $old = $sponge->user('static');
-    $sponge->user('static', $int);
-    $int    = $sponge->user('static');
+    my $old = $sponge->get_attr('static');
+    $sponge->set_attr(static => $int);
+    $int    = $sponge->get_attr('static');
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
 }
 
@@ -667,9 +669,9 @@ sub _cmd_set_passive_mode {
         return $self->send_error("$cmd {0|1}");
     }
     $self->_log_ctl("[client %d] %s %d", $self->fileno, $cmd, $int);
-    my $old = $sponge->user('passive');
-    $sponge->user('passive', $int);
-    $int    = $sponge->user('passive');
+    my $old = $sponge->get_attr('passive');
+    $sponge->set_attr(passive => $int);
+    $int    = $sponge->get_attr('passive');
     return $self->send_ok(sprintf("old=%d\nnew=%d", $old, $int));
 }
 
@@ -695,10 +697,10 @@ sub _cmd_set_flood_protection {
         return $self->send_error("$cmd <POSITIVE-FLOAT>");
     }
     $self->_log_ctl("[client %d] %s %0.2f", $self->fileno, $cmd, $rate);
-    my $old = $sponge->flood_protection();
-    $sponge->flood_protection($rate);
-    $rate   = $sponge->flood_protection();
-    return $self->send_ok(sprintf("old=%0.2f\nnew=%0.2f", $old, $rate));
+    my $old = $sponge->get_attr('flood_protection');
+    $sponge->set_attr(flood_protection => $rate);
+    my $new = $sponge->get_attr('flood_protection');
+    return $self->send_ok(sprintf("old=%0.2f\nnew=%0.2f", $old, $new));
 }
 
 sub _cmd_set_proberate {
@@ -711,9 +713,9 @@ sub _cmd_set_proberate {
     my $newsleep = 1.0 / $rate;
     $sponge->print_log("[client %d] %s %0.2f (probesleep=%0.2fms)",
                         $self->fileno, $cmd, $rate, $newsleep*1000);
-    my $old = 1.0 / $sponge->user('probesleep');
-    $sponge->user('probesleep', $newsleep);
-    $rate   = 1.0 / $sponge->user('probesleep');
+    my $old = 1.0 / $sponge->get_attr('probesleep');
+    $sponge->set_attr(probesleep => $newsleep);
+    $rate   = 1.0 / $sponge->get_attr('probesleep');
     return $self->send_ok(sprintf("old=%0.2f\nnew=%0.2f", $old, $rate));
 }
 

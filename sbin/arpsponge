@@ -259,32 +259,46 @@ sub Main {
     ####################################################################
     $| = ($verbose > 0 ? 1 : 0);
 
-    my $sponge = M6::ArpSponge::Sponge->new(
-            verbose          => $verbose,
-            is_dummy         => $dummy,
-            queuedepth       => $queuedepth,
-            device           => $device,
-            network          => ip2hex($network->addr),
-            prefixlen        => $network->masklen,
-            max_pending      => $pending,
-            max_rate         => $rate,
-            arp_age          => $age,
-            sponge_net       => $sponge_net,
-            gratuitous       => $gratuitous,
-            flood_protection => $flood_protection,
-        );
+    my $init_state = undef;
+    if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
+        $init_state = is_valid_state($init_arg, -err => \(my $err));
+        if (defined $err) {
+            log_fatal(qq{bad --init argument "$init_arg": $err\n});
+        }
+    }
 
-    $sponge->is_dummy($dummy);
+    my $arp_update_flags = ARP_UPDATE_ALL;
+    if ($arp_update_methods) {
+        $arp_update_flags
+            = parse_update_flags($arp_update_methods, -err => \(my $err));
+        if (defined $err) {
+            log_fatal(qq{bad --arp-update-method argument "%s": %s},
+                      $arp_update_methods, $err);
+        }
+    }
+
+    my $sponge = M6::ArpSponge::Sponge->new(
+        # --- mandatory
+        device           => $device,
+        network          => ip2hex($network->addr),
+        prefixlen        => $network->masklen,
+        # --- optional
+        arp_age          => $age,
+        arp_update_flags => $arp_update_flags,
+        gratuitous       => $gratuitous,
+        init_state       => $init_state,
+        is_dummy         => $dummy,
+        max_pending      => $pending,
+        max_rate         => $rate,
+        queuedepth       => $queuedepth,
+        sponge_net       => $sponge_net,
+    );
 
     # Sanitise proberate
     $proberate = $DFL_PROBERATE if $proberate < 0 || $proberate > 1e6;
 
-    $sponge->user(
+    $sponge->set_attr(
         version          => $VERSION,
-        net_lo           => scalar $network->first->numeric,
-        net_hi           => scalar $network->last->numeric,
-        hex_network      => ip2hex($network->network),
-        hex_broadcast    => ip2hex($network->broadcast),
         start_time       => time,
         statusfile       => $statusfile,
         learning         => $learning,
@@ -292,6 +306,7 @@ sub Main {
         sweep_skip_alive => $sweep_skip_alive,
         passive          => $passive,
         static           => $static,
+        flood_protection => $flood_protection,
     );
 
     if ($sponge->my_ip eq IPV4_ADDR_NONE) {
@@ -300,37 +315,21 @@ sub Main {
                 "%s has no IP address; forcing --passive",
                 $sponge->device, $sponge->my_ip_s
             );
-            $sponge->user('passive', 1);
+            $sponge->set_attr(passive => 1);
             # Signal to other parts of the program that the "passive" mode
             # was forced, so they can issue appropriate warnings.
-            $sponge->user('forced_passive', 1);
+            $sponge->set_attr(forced_passive => 1);
         }
     }
 
     if ($sweep_sec) {
-        $sponge->user(
+        $sponge->set_attr(
             sweep_sec  => $sweep_sec,
             next_sweep => time+$sweep_sec,
             sweep_age  => $sweep_threshold,
         );
     }
 
-    if (defined $init_arg && $init_arg !~ /^\s*none\s*/i) {
-        my $init = is_valid_state($init_arg, -err => \(my $err));
-        if (defined $err) {
-            log_fatal(qq{bad --init argument "$init": $err\n});
-        }
-        init_state($sponge, $init);
-    }
-
-    if ($arp_update_methods) {
-        my $flags = parse_update_flags($arp_update_methods, -err => \(my $err));
-        if (defined $err) {
-            log_fatal(qq{bad --arp-update-method argument "%s": %s},
-                      $arp_update_methods, $err);
-        }
-        $sponge->arp_update_flags($flags);
-    }
 
     ####################################################################
 
@@ -368,7 +367,7 @@ sub Main {
                            $pcap_fd, $sponge->device, $!);
     }
 
-    $sponge->user(
+    $sponge->set_attr(
         pcap_fd => $pcap_fd,
         pcap_fh => $pcap_fh,
     );
@@ -392,7 +391,7 @@ sub Main {
     # $::SIG{'ALRM'} = sub { do_timer($sponge)               };
 
     if ($sweep_at_start) {
-        $sponge->user(next_sweep => time-1);
+        $sponge->set_attr(next_sweep => time-1);
     }
 
     packet_capture_loop($sponge);
@@ -412,7 +411,7 @@ sub create_control_socket {
     my $control_fh = M6::ArpSponge::Control::Server->create_server($Control_Socket)
                         or log_fatal "%s", M6::ArpSponge::Control->error;
 
-    $sponge->user(control => $control_fh);
+    $sponge->set_attr(control => $control_fh);
 
     my @dfl_perms  = split(':', $DFL_SOCK_PERMS);
     my @perms      = split(':', $permissions);
@@ -447,13 +446,13 @@ sub handle_input {
     my ($sponge, $next_alarm) = @_;
 
     my $pcap_h     = $sponge->pcap_handle;
-    my $pcap_fd    = $sponge->user('pcap_fd');
-    my $pcap_fh    = $sponge->user('pcap_fh');
-    my $control_fh = $sponge->user('control');
+    my $pcap_fd    = $sponge->get_attr('pcap_fd');
+    my $pcap_fh    = $sponge->get_attr('pcap_fh');
+    my $control_fh = $sponge->get_attr('control');
     my $control_fd = $control_fh->fileno;
 
     # Prepare the bit vector for the select() calls.
-    my $select = $sponge->user('select');
+    my $select = $sponge->get_attr('select');
 
     # [1] We keep track of the alarms ourselves rather than setting timers
     #     with alarm(), since the ALRM signal handler may be delayed, which
@@ -559,10 +558,10 @@ sub packet_capture_loop {
     my ($sponge) = @_;
 
     # Prepare the bit vector for the select() calls.
-    $sponge->user(
+    $sponge->set_attr(
         select => IO::Select->new(
-            $sponge->user('pcap_fh'),
-            $sponge->user('control'),
+            $sponge->get_attr('pcap_fh'),
+            $sponge->get_attr('control'),
         ),
     );
 
@@ -586,14 +585,14 @@ sub get_status_info_s {
     my ($sponge) = @_;
 
     my $now = time;
-    my $start_time = $sponge->user('start_time');
+    my $start_time = $sponge->get_attr('start_time');
 
-    my $learning = $sponge->user('learning');
+    my $learning = $sponge->get_attr('learning');
 
     my @response = (
         sprintf("%-17s %s\n", 'id:', SYSLOG_IDENT),
         sprintf("%-17s %d\n", 'pid:', $$),
-        sprintf("%-17s %s\n", 'version:', $sponge->user('version')),
+        sprintf("%-17s %s\n", 'version:', $sponge->get_attr('version')),
         sprintf("%-17s %s [%d]\n", 'date:', format_time($now), $now),
         sprintf("%-17s %s [%d]\n", 'started:',
                 format_time($start_time), $start_time),
@@ -605,16 +604,16 @@ sub get_status_info_s {
         sprintf("%-17s %d\n", 'queue depth:', $sponge->queuedepth),
         sprintf("%-17s %0.2f\n", 'max rate:', $sponge->max_rate),
         sprintf("%-17s %0.2f\n", 'flood protection:',
-                $sponge->flood_protection),
+                $sponge->get_attr('flood_protection')),
         sprintf("%-17s %d\n", 'max pending:', $sponge->max_pending),
-        sprintf("%-17s %d sec\n", 'sweep period:', $sponge->user('sweep_sec')),
-        sprintf("%-17s %d sec\n", 'sweep age:', $sponge->user('sweep_age')),
+        sprintf("%-17s %d sec\n", 'sweep period:', $sponge->get_attr('sweep_sec')),
+        sprintf("%-17s %d sec\n", 'sweep age:', $sponge->get_attr('sweep_age')),
         sprintf("%-17s %s\n", 'sweep skip alive:',
-                $sponge->user('sweep_skip_alive') ? "yes" : "no"),
+                $sponge->get_attr('sweep_skip_alive') ? "yes" : "no"),
         sprintf("%-17s %d sec\n", 'proberate:',
-                1/$sponge->user('probesleep')),
+                1/$sponge->get_attr('probesleep')),
         sprintf("%-17s %d sec\n", 'next sweep in:',
-                $sponge->user('next_sweep')-$now),
+                $sponge->get_attr('next_sweep')-$now),
         sprintf("%-17s %s\n", 'learning:',
                 $learning ? "yes ($learning sec left)" : "no"),
         sprintf("%-17s %s\n", 'dummy:',
@@ -644,7 +643,7 @@ sub get_ip_state_table_s {
 
         my $depth = $queue->depth($ip);
         my $rate  = $queue->rate($ip);
-        my $stamp = $sponge->state_mtime($ip);
+        my $stamp = $sponge->get_state_mtime($ip);
 
         $fh->print(
             sprintf("%-17s %-12s %7d %8.3f     %s\n", hex2ip($ip),
@@ -739,10 +738,10 @@ sub reset_timer {
 sub do_timer($) {
     my ($sponge) = @_;
 
-    my $learning = $sponge->user('learning');
+    my $learning = $sponge->get_attr('learning');
     if ($learning > 0) {
         do_learn($sponge);
-        $sponge->user(learning => $learning-1);
+        $sponge->set_attr(learning => $learning-1);
         if ($learning-1 == 0) {
             event_notice(EVENT_STATE, "exiting learning state");
         }
@@ -751,10 +750,10 @@ sub do_timer($) {
 
     do_probe_pending($sponge);
 
-    my $next_sweep = $sponge->user('next_sweep');
+    my $next_sweep = $sponge->get_attr('next_sweep');
     if ($next_sweep && time >= int($next_sweep)) {
         do_sweep($sponge);
-        $sponge->user(next_sweep => time+$sponge->user('sweep_sec'));
+        $sponge->set_attr(next_sweep => time+$sponge->get_attr('sweep_sec'));
     }
     return;
 }
@@ -768,10 +767,10 @@ sub do_timer($) {
 ###############################################################################
 sub do_probe_pending($) {
     my ($sponge) = @_;
-    my $pending  = $sponge->pending;
-    my $sleep    = $sponge->user('probesleep');
+    my $pending  = $sponge->get_all_pending;
+    my $sleep    = $sponge->get_attr('probesleep');
 
-    if (keys %$pending > 0 && $sponge->user('forced_passive')) {
+    if (keys %$pending > 0 && $sponge->get_attr('forced_passive')) {
         # Log reminders that the sponge was started without an IP address,
         # and no --passive flag.
         event_warning(EVENT_STATE,
@@ -791,7 +790,7 @@ sub do_probe_pending($) {
             next;
         }
         $sponge->incr_pending($ip);
-        if (! $sponge->user('passive')) {
+        if (! $sponge->get_attr('passive')) {
             $sponge->send_query($ip);
             log_verbose(2, "probed $ip, state=",
                                 $sponge->get_state($ip), "\n");
@@ -801,22 +800,6 @@ sub do_probe_pending($) {
 
     if ($n > 1 || log_is_verbose() > 1) {
         event_notice(EVENT_STATE, "%d pending address(es) processed", $n);
-    }
-}
-###############################################################################
-# init_state($sponge)
-#
-#    Initialize the states for all IP addresses.
-#
-###############################################################################
-sub init_state {
-    my ($sponge, $state) = @_;
-
-    my $lo = $sponge->user('net_lo');
-    my $hi = $sponge->user('net_hi');
-    for (my $num = $lo; $num <= $hi; $num++) {
-        my $ip = sprintf("%08x", $num);
-        $sponge->set_state($ip, $state, 0);
     }
 }
 
@@ -830,7 +813,7 @@ sub do_learn($) {
     my ($sponge) = @_;
 
     log_verbose(1, "LEARN: ",
-                int($sponge->user('learning')), " secs left\n");
+                int($sponge->get_attr('learning')), " secs left\n");
     return;
 }
 
@@ -846,13 +829,13 @@ sub do_learn($) {
 sub do_sweep {
     my ($sponge, %opts) = @_;
 
-    my $interval   = $opts{'sweep_sec'}  // $sponge->user('sweep_sec');
-    my $threshold  = $opts{'sweep_age'}  // $sponge->user('sweep_age');
-    my $sleep      = $opts{'probesleep'} // $sponge->user('probesleep');
+    my $interval   = $opts{'sweep_sec'}  // $sponge->get_attr('sweep_sec');
+    my $threshold  = $opts{'sweep_age'}  // $sponge->get_attr('sweep_age');
+    my $sleep      = $opts{'probesleep'} // $sponge->get_attr('probesleep');
     my $skip_alive = $opts{'sweep_skip_alive'}
-                      // $sponge->user('sweep_skip_alive');
+                      // $sponge->get_attr('sweep_skip_alive');
 
-    if ($sponge->user('forced_passive')) {
+    if ($sponge->get_attr('forced_passive')) {
         # Log reminders that the sponge was started without an IP address,
         # and no --passive flag.
         event_warning(EVENT_STATE,
@@ -862,20 +845,23 @@ sub do_sweep {
         return;
     }
 
-    return if $sponge->user('passive');
+    return if $sponge->get_attr('passive');
 
     event_notice(EVENT_STATE, "sweeping for quiet entries on %s/%d",
                         hex2ip($sponge->network), $sponge->prefixlen);
 
-    my $lo = $sponge->user('net_lo');
-    my $hi = $sponge->user('net_hi');
+    my $lo = $sponge->network_lo_i;
+    my $hi = $sponge->network_hi_i;
 
     my $nquery = 0;
+
+    # Temporarily lower verbosity for the sweep.
     my $verbose = log_is_verbose();
-    log_is_verbose($verbose-1) if $verbose>0;
+    log_is_verbose($verbose-1) if $verbose > 0;
+
     for (my $num = $lo; $num <= $hi; $num++) {
         my $ip = sprintf("%08x", $num);
-        my $age = time - $sponge->state_mtime($ip);
+        my $age = time - $sponge->get_state_mtime($ip);
 
         my $do_query = 0;
         if ($sponge->get_state($ip) == ALIVE) {
@@ -907,6 +893,7 @@ sub do_sweep {
         }
     }
     log_is_verbose($verbose);
+
     event_notice(EVENT_STATE, "queried $nquery IP address(es)");
 }
 
@@ -941,7 +928,7 @@ sub update_state {
 
     my $state = $sponge->get_state($src_ip) // ALIVE;
 
-    $state = STATIC if $state < ALIVE && $sponge->user('static');
+    $state = STATIC if $state < ALIVE && $sponge->get_attr('static');
 
     if ($state == STATIC) {
         my $err = sprintf(
@@ -1097,14 +1084,14 @@ sub process_pkt {
         # address...
         my $state = $sponge->get_state($dst_ip);
         if (defined $state && $state != ALIVE) {
-            $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
+            $sponge->set_pending($dst_ip, 0) if !$sponge->get_attr('static');
         }
         return;
     }
 
     # Devices ARPing for the network or broadcast address indicate
     # possible bad netmasks.
-    if ($dst_ip eq $sponge->user('hex_network')) {
+    if ($dst_ip eq $sponge->network) {
         event_warning(EVENT_ALIEN,
             "ARP for network address: src.mac=%s arp.spa=%s arp.tpa=%s",
             hex2mac($src_mac),
@@ -1115,7 +1102,7 @@ sub process_pkt {
         return;
     }
 
-    if ($dst_ip eq $sponge->user('hex_broadcast')) {
+    if ($dst_ip eq $sponge->broadcast) {
         event_warning(EVENT_ALIEN,
             "ARP for broadcast address: src.mac=%s arp.spa=%s arp.tpa=%s",
             hex2mac($src_mac),
@@ -1131,7 +1118,7 @@ sub process_pkt {
                           hex2ip($dst_ip), hex2ip($src_ip));
         my $state = $sponge->get_state($dst_ip);
         if ($state <= DEAD) {
-            my $age = time - $sponge->state_mtime($dst_ip);
+            my $age = time - $sponge->get_state_mtime($dst_ip);
             log_sverbose(2, "[sponged=yes; %d secs ago]\n", $age);
         }
         else {
@@ -1142,7 +1129,7 @@ sub process_pkt {
     my $query_time = time;
 
     # Don't do anything else if we are still learning.
-    return if $sponge->user('learning');
+    return if $sponge->get_attr('learning');
 
     $sponge->queue->add($dst_ip, $src_ip, time);
 
@@ -1150,7 +1137,7 @@ sub process_pkt {
 
     if (!defined $state) {
         # State is not defined (yet), so make it pending.
-        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
+        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->get_attr('static');
         return;
     }
 
@@ -1169,10 +1156,10 @@ sub process_pkt {
     return if $sponge->queue->rate($dst_ip) <= $sponge->max_rate;
 
     # Check for flood protection.
-    my $fp_rate = $sponge->flood_protection;
+    my $fp_rate = $sponge->get_attr('flood_protection');
     if (!$fp_rate) {
         # No flood protection, so just set address to pending.
-        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
+        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->get_attr('static');
     }
 
     # In case of flood protection, reduce the queue
@@ -1196,7 +1183,7 @@ sub process_pkt {
     }
 
     if ($sponge->queue->is_full($dst_ip) && $r2 > $sponge->max_rate) {
-        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->user('static');
+        $state = $sponge->set_pending($dst_ip, 0) if !$sponge->get_attr('static');
     }
 
     return;
@@ -1282,8 +1269,8 @@ sub process_signal {
 #
 sub do_status {
     my ($signal, $sponge) = @_;
-    my $fname = $sponge->user('statusfile');
-    my $start_time = $sponge->user('start_time');
+    my $fname = $sponge->get_attr('statusfile');
+    my $start_time = $sponge->get_attr('start_time');
 
     if (!length($fname)) {
         $fname = '/dev/null';

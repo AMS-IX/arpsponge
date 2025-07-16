@@ -26,132 +26,227 @@
 ###############################################################################
 package M6::ArpSponge::Sponge;
 
-use strict;
+use 5.014;
+use warnings;
 
-use base qw( M6::ArpSponge::Base );
+use M6::ArpSponge;
+use M6::ArpSponge::Defaults;
 
-use M6::ArpSponge::Queue;
+our $VERSION = $M6::ArpSponge::VERSION;
+
+use Moo;
+
 use M6::ArpSponge::Event;
 use M6::ArpSponge::Log;
 use M6::ArpSponge::Const      qw( :all );
 use M6::ArpSponge::Util       qw( :all );
 use M6::ArpSponge::NetPacket  qw( :all );
+use M6::ArpSponge::ArpTable;
+use M6::ArpSponge::Queue;
+use M6::ArpSponge::State;
 
-use POSIX               qw( strftime );
-use Net::ARP;
-use IO::Select;
-use IPC::Run qw( run );
+use Types::Standard qw( InstanceOf );
 
-our $VERSION = 1.07;
+use namespace::clean;
 
-# Accessors; use the factory :-)
-__PACKAGE__->mk_accessors(qw(
-                is_dummy
-                my_ip           my_mac
-                network         prefixlen
-                arp_age         gratuitous          flood_protection
-                max_rate        max_pending         sponge_net
-                pcap_handle
-                arp_update_flags
-        ));
+use constant DFL_EMPTY_HASH  => sub { {} };
+use constant DFL_FALSE       => sub { 0 };
+use constant DFL_TRUE        => sub { 1 };
+
+############################################################################
+#
+# Attributes / Constructor arguments
+#
+############################################################################
+has device           => ( is => 'ro', required => 1 );
+has network          => ( is => 'ro', required => 1 );
+has prefixlen        => ( is => 'ro', required => 1 );
+
+has arp_age          => (
+    is => 'rw',
+    default => \&M6::ArpSponge::Defaults::MAX_ARP_AGE
+);
+
+has arp_update_flags => ( is => 'rw', default => \&ARP_UPDATE_ALL );
+
+has flood_protection => (
+    is => 'rw',
+    default => \&M6::ArpSponge::Defaults::FLOOD_PROTECTION,
+);
+
+has gratuitous       => ( is => 'rw', default => DFL_FALSE );
+
+has is_dummy         => ( is => 'rw', default => DFL_FALSE );
+
+has max_pending      => (
+    is      => 'rw',
+    default => \&M6::ArpSponge::Defaults::MAX_PENDING
+);
+
+has max_rate         => (
+    is      => 'rw',
+    default => \&M6::ArpSponge::Defaults::MAX_ARP_RATE
+);
+
+has sponge_net       => ( is => 'rw', default => DFL_FALSE );
+
+has pcap_handle      => ( is => 'rw' );
+
+############################################################################
+#
+# Automatic Attributes
+#
+############################################################################
+has my_ip => (
+    is       => 'lazy',
+    init_arg => undef,
+    builder  => sub { $_[0]->get_ip },
+);
+
+has my_mac => (
+    is       => 'lazy',
+    init_arg => undef,
+    builder  => sub { $_[0]->get_mac },
+);
+
+has queue => (
+    is       => 'ro',
+    isa      => InstanceOf['M6::ArpSponge::Queue'],
+    default  => sub { M6::ArpSponge::Queue->new() },
+    init_arg => undef,
+    handles  => { queuedepth => 'depth' },
+);
+
+has phys_device => (
+    is       => 'lazy',
+    init_arg => undef,
+    builder  => sub { (split(/:/, $_[0]->device))[0] },
+);
+
+has broadcast => (
+    is => 'lazy',
+    builder => sub { ip2hex($_[0]->_network_obj->broadcast->addr) },
+);
+
+has network_lo_i => (
+    is => 'lazy',
+    builder => sub { $_[0]->_network_obj->first->numeric },
+);
+
+has network_hi_i => (
+    is => 'lazy',
+    builder => sub { $_[0]->_network_obj->last->numeric },
+);
+
+############################################################################
+#
+# Internal Attributes
+#
+############################################################################
+has _state_table => (
+    is       => 'ro',
+    isa      => InstanceOf['M6::ArpSponge::State'],
+    default  => sub { M6::ArpSponge::State->new },
+    init_arg => undef,
+    handles => {
+        get_state_atime => 'get_atime',
+        set_state_atime => 'set_atime',
+        get_state_mtime => 'get_mtime',
+        set_state_mtime => 'set_mtime',
+        get_state       => 'get_state',
+        get_state_info  => 'get_state_info',
+        get_all_pending => 'get_all_pending',
+    },
+);
+
+has _arp_table => (
+    is       => 'ro',
+    isa      => InstanceOf['M6::ArpSponge::ArpTable'],
+    default  => sub { M6::ArpSponge::ArpTable->new },
+    init_arg => undef,
+);
+
+has _user  => (
+    is       => 'ro',
+    default  => DFL_EMPTY_HASH,
+    init_arg => undef,
+);
+
+has _ip_all => (
+    is       => 'lazy',
+    default  => DFL_EMPTY_HASH,
+    init_arg => undef,
+    builder  => sub { return { map { $_ => 1 } $_[0]->get_ip_all } }
+);
+
+has _network_obj => (
+    is      => 'lazy',
+    builder => sub {
+        my ($self) = @_;
+        NetAddr::IP->new(hex2ip($self->network)."/".$self->prefixlen);
+    }
+);
 
 ###############################################################################
 #
-#                   User Attributes
+# User Attributes
 #
 ###############################################################################
 
-# $hash = $sponge->user;
-# $val = $sponge->user($attr);
-# $oldval = $sponge->user($attr, $newval);
+# $hash = $sponge->attr;
+# $val = $sponge->attr($attr);
+# $oldval = $sponge->attr($attr, $newval);
 #
-# $old_vals = $sponge->user({
+# $old_vals = $sponge->attr({
 #   $attr => $newval,
 #   ...
 # });
 #
-sub user {
-    if (@_ == 1) {
-        return $_[0]->{'user'};
-    }
-    if (@_ == 2) {
-        return $_[0]->{'user'}->{$_[1]};
-    }
-    if (@_ == 3) {
-        my $old = $_[0]->{'user'}->{$_[1]};
-        $_[0]->{'user'}->{$_[1]} = $_[2];
-        return $old;
-    }
+sub get_attr { return $_[0]->_attr()->{$_[1]} }
+sub del_attr { delete $_[0]->_attr()->{$_[1]} }
 
-    my %old;
-    my ($self, %new) = @_;
-    my $user = $self->{'user'};
+sub set_attr {
+    my ($self, %attr) = @_;
 
-    while (my ($attr, $newval) = each %new) {
-        $old{$attr} = $user->{$attr};
-        $user->{$attr} = $newval;
-    }
-    return \%old;
+    @{$self->_attr}{keys %attr} = values %attr;
+    return;
 }
 
-sub state_name { return state_to_string($_[1]) }
+sub clear_attr {
+    my ($self) = @_;
+    $self->_attr({});
+}
 
 ###############################################################################
 #
-#                   Object Attributes
+# Methods
 #
 ###############################################################################
 
-sub queue            { $_[0]->{'queue'} }
-sub device           { $_[0]->{'device'} }
-sub phys_device      { $_[0]->{'phys_device'} }
-sub pending          { $_[0]->{'pending'} }
+sub is_my_ip        { defined $_[0]->_ip_all->{$_[1]} }
+sub is_my_ip_s      { defined $_[0]->_ip_all->{ip2hex($_[1])} }
 
-sub is_my_ip         { $_[0]->{'ip_all'}->{$_[1]} }
-sub is_my_ip_s       { $_[0]->{'ip_all'}->{ip2hex($_[1])} }
+sub my_ip_s         { return hex2ip($_[0]->my_ip)   }
+sub network_s       { return hex2ip($_[0]->network) }
+sub my_mac_s        { return hex2mac($_[0]->my_mac) }
 
-sub my_ip_s          { return hex2ip($_[0]->my_ip)   }
-sub network_s        { return hex2ip($_[0]->network) }
-sub my_mac_s         { return hex2mac($_[0]->my_mac) }
+###############################################################################
+#
+# State Methods
+#
+###############################################################################
 
-sub state_atime      { $_[0]->{state_atime}->{$_[1]} }
-sub set_state_atime  { $_[0]->{state_atime}->{$_[1]} = $_[2] }
-
-sub state_mtime      { $_[0]->{state_mtime}->{$_[1]} }
-sub set_state_mtime  { $_[0]->{state_mtime}->{$_[1]} = $_[2] }
-
-sub state_table      { $_[0]->{state} }
-sub get_state        { $_[0]->{state}->{$_[1]} }
+sub state_name      { return state_to_string($_[1]) }
 
 sub set_state    {
     my ($self, $ip, $state, $time) = @_;
 
-    if (defined $state) {
-        $time //= time;
-        $self->{state_mtime}->{$ip} = $self->{state_atime}->{$ip} = $time;
-        $self->{state}->{$ip} = $state;
-        if ($state >= PENDING(0)) {
-            return $self->{'pending'}->{$ip} = $state;
-        }
-        delete $self->{'pending'}->{$ip};
-        return $state;
+    $self->_state_table->set_state($ip, $state, $time);
+
+    if (!defined $state) {
+        $self->queue->clear($ip);
     }
-
-    delete $self->{state_mtime}->{$ip};
-    delete $self->{state_atime}->{$ip};
-    delete $self->{state}->{$ip};
-    delete $self->{'pending'}->{$ip};
-    $self->queue->clear($ip);
-    return;
-}
-
-sub queuedepth {
-    return $_[0]->{queuedepth} if @_ < 2;
-
-    my ($self, $depth) = @_;
-    $self->{'queuedepth'} = $depth;
-    $self->queue->max_depth($self->{'queuedepth'});
-    return $self;
+    return $state;
 }
 
 ###############################################################################
@@ -160,33 +255,14 @@ sub queuedepth {
 #    Create a new Sponge object.
 #
 ###############################################################################
-sub new {
-    my ($type, @args) = @_;
+sub BUILD {
+    my ($self, $args) = @_;
 
-    my $self = {
-            'arp_update_flags'  => ARP_UPDATE_ALL,
-            'queuedepth'        => $M6::ArpSponge::Queue::DFL_DEPTH,
-        };
-
-    while (@args >= 2) {
-        my $k = shift @args;
-        my $v = shift @args;
-        $k =~ s/^-//;
-        $self->{lc $k} = $v;
-
+    if (exists $args->{queuedepth}) {
+        $self->queue->depth($args->{queuedepth});
     }
-    bless $self, $type;
 
-    ($self->{'phys_device'}) = split(/:/, $self->{'device'});
-
-    $self->{'ip_all'} = { map { $_ => 1 } $self->get_ip_all };
-    $self->my_ip( $self->get_ip );
-    $self->my_mac( $self->get_mac );
-
-    $self->{user}        = {};
-    $self->{queue}       = new M6::ArpSponge::Queue($self->queuedepth);
-
-    $self->init_all_state();
+    $self->init_all_state($args->{init_state});
 
     if (log_is_verbose) {
         log_sverbose(1, "Device: %s\n", $self->device);
@@ -194,7 +270,6 @@ sub new {
         log_sverbose(1, "MAC:    %s\n", $self->my_mac_s);
         log_sverbose(1, "IP:     %s\n", $self->my_ip_s);
     }
-    return $self;
 }
 
 ###############################################################################
@@ -207,16 +282,22 @@ sub new {
 #
 ###############################################################################
 sub init_all_state {
-    my ($self) = @_;
+    my ($self, $init_state) = @_;
 
-    $self->{pending}     = {};
-    $self->{state}       = {};
-    $self->{state_mtime} = {};
-    $self->{state_atime} = {};
-    $self->{queue}->clear_all();
-    $self->{'arp_table'} = {};
+    $self->_arp_table->purge();
+    $self->_state_table->clear_all();
+    $self->queue->clear_all();
 
     # Build up a bit of state again...
+
+    if (defined $init_state) {
+        my $lo = $self->network_lo_i;
+        my $hi = $self->network_hi_i;
+        for (my $num = $lo; $num <= $hi; $num++) {
+            my $ip = sprintf("%08x", $num);
+            $self->set_state($ip, $init_state, 0);
+        }
+    }
 
     if ($self->sponge_net) {
         my $mask  = oct("0b"."1" x (32 - $self->prefixlen));
@@ -227,9 +308,10 @@ sub init_all_state {
         $self->set_state($bcast, STATIC);
     }
 
-    for my $ip ($self->my_ip, keys %{$self->{'ip_all'}}) {
+    for my $ip ($self->my_ip, keys %{$self->_ip_all}) {
         $self->set_alive($ip, $self->my_mac);
     }
+
     return $self;
 }
 
@@ -242,19 +324,22 @@ sub init_all_state {
 #
 ###############################################################################
 sub arp_table {
+    return $_[0]->_arp_table if @_ == 1;
+
     my ($self, $ip, $mac, $time) = @_;
 
-    return $self->{'arp_table'} if @_ == 1;
-
-    my $arp_table = $self->{'arp_table'};
+    my $arp_table = $self->_arp_table;
 
     if (@_ >= 3) {
         if (defined $mac && $mac ne ETH_ADDR_NONE) {
-            return $arp_table->{$ip} = [ $mac, $time // time ];
+            my @entry = ( $mac, $time // time );
+            $arp_table->{$ip} = \@entry;
+            return @entry;
         }
-        delete $self->{'arp_table'}->{$ip};
+        delete $arp_table->{$ip};
+        return;
     }
-    return $arp_table->{$ip} ? @{$self->{'arp_table'}->{$ip}} : ();
+    return $arp_table->{$ip} ? @{$arp_table->{$ip}} : ();
 }
 
 ###############################################################################
@@ -267,34 +352,35 @@ sub arp_table {
 ###############################################################################
 sub get_mac {
     my $dev = pop @_;
+
     if (ref $dev) { $dev = $dev->device }
 
-    # get_mac is SCARY! and WRONG!
-    my $mac = Net::ARP::get_mac($dev);
+    my @cmd = $^O =~ /linux/i
+                ? (M6::ArpSponge::Defaults->IP_CMD, qw(link show dev), $dev)
+                : (M6::ArpSponge::Defaults->IFCONFIG, $dev);
 
-    #print STDERR "Net::ARP::get_mac($dev) -> \"$mac\"\n";
-    return mac2hex($mac);
+    my $stdout = read_from_pipe(@cmd);
+    if ($stdout =~ m{^ \h* (?:link/)? ether \h+ (?<mac> [\da-f:]+) }mxi) {
+        return mac2hex($+{mac});
+    }
+    return ETH_ADDR_NONE;
 }
 
 ###############################################################################
 # @ip = $sponge->get_ip_all;
 #
-#   Return all IP addresses for physical device $device. This includes all
-#   addresses configured on "sub" interfaces.
+#   Return all IP addresses for all devices. This includes all
+#   addresses configured on "sub" interfaces as well.
 #
 ###############################################################################
 sub get_ip_all {
 
-    my $cmd = $^O =~ /linux/i
-                ? [qw(ip -4 address show)] 
-                : [qw(ifconfig -a)];
+    my @cmd = $^O =~ /linux/i
+                ? (M6::ArpSponge::Defaults->IP_CMD, qw(-4 address show))
+                : (M6::ArpSponge::Defaults->IFCONFIG, qw(-a));
 
-    run $cmd,
-        '<', \undef,
-        '>', \(my $stdout),
-        '2>', '/dev/null';
-
-    my @ip_str = $stdout =~ /^.*inet (?:addr:\s*)?([\d\.]+)/mg;
+    my $stdout = read_from_pipe(@cmd);
+    my @ip_str = $stdout =~ m{^.*inet \h+ (?: addr: \h*)? ([\d.]+)}mxig;
     return map { ip2hex($_) } @ip_str;
 }
 
@@ -310,17 +396,19 @@ sub get_ip {
     my $dev = pop @_;
     if (ref $dev) { $dev = $dev->device }
 
+    my @cmd;
+    if ($^O =~ /linux/i) {
+        @cmd = (
+            M6::ArpSponge::Defaults->IP_CMD,
+            qw(-4 address show dev), $dev, 'primary'
+        );
+    }
+    else {
+        @cmd = (M6::ArpSponge::Defaults->IFCONFIG, $dev);
+    }
 
-    my $cmd = $^O =~ /linux/i
-                ? [qw(ip -4 address show dev), $dev, 'primary']
-                : ['ifconfig', $dev];
-
-    run $cmd,
-        '<', \undef,
-        '>', \(my $stdout),
-        '2>', '/dev/null';
-
-    my ($ip_str) = $stdout =~ /^.*inet (?:addr:\s*)?([\d.]+)/m;
+    my $stdout = read_from_pipe(@cmd) // '';
+    my ($ip_str) = $stdout =~ m{^.*inet \h+ (?: addr: \h*)? ([\d.]+)}mxi;
     return ip2hex($ip_str // '0.0.0.0');
 }
 
