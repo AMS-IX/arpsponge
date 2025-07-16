@@ -27,8 +27,8 @@ This is released as free software, see the "Copying" file that came with this so
     * IO::String
     * IPC::Run
     * JSON::PP
+    * Moo
     * NetAddr::IP
-    * Net::ARP
     * Net::Pcap
     * Pod::Text::Termcap
     * Pod::Usage
@@ -40,6 +40,7 @@ This is released as free software, see the "Copying" file that came with this so
     * Term::ReadLine
     * Term::ReadLine::Gnu
     * Time::HiRes
+    * Types::Standard
     * YAML::PP
 
 Depending on your O/S distribution and version of Perl, some or all of these may already be included in a base install of Perl.
