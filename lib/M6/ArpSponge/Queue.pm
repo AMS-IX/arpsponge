@@ -14,9 +14,6 @@
 #
 #   See the "Copying" file that came with this package.
 #
-# A.Vijn,   2003-2004;
-# S.Bakker, 2004-2010;
-#
 ###############################################################################
 package M6::ArpSponge::Queue;
 
@@ -26,10 +23,156 @@ use warnings;
 use M6::ArpSponge;
 our $VERSION = $M6::ArpSponge::VERSION;
 
+use Moo;
+
 use M6::ArpSponge::Defaults;
 use M6::ArpSponge::Log;
+use Types::Standard qw( Int HashRef );
 
-=pod
+use namespace::clean;
+
+has max_depth => (
+    is      => 'rw',
+    isa     => Int & sub { $_ > 0 },
+    default => \&M6::ArpSponge::Defaults::QUEUE_DEPTH,
+);
+
+has _q => (
+    is       => 'rw',
+    isa      => HashRef,
+    init_arg => undef,
+    default  => sub { {} },
+);
+
+sub clear_all { $_[0]->_q({}) }
+sub clear     { delete $_[0]->{'q'}->{$_[1]} }
+sub get_queue { return $_[0]->_q->{$_[1]} }
+sub is_full   { $_[0]->depth($_[1]) >= $_[0]->max_depth }
+
+sub depth {
+    my $q = $_[0]->get_queue($_[1]);
+    return $q ? int(@$q) : 0
+}
+
+# Slightly tricky calculation. Dumb calculation would be:
+#
+#   n / (Tn - T1)
+#
+# Where "n" is the number of entries, "T1" is the timestamp
+# of the first entry, and "Tn" is the n-th timestamp.
+#
+# However, this skews the calculation somewhat (the shorter the queue, the
+# worse the skew... hey, that rhymes!).
+#
+# Consider the case where we send a packet once every second:
+#
+#   Packet 1 at time 0
+#   Packet 2 at time 1
+#
+# In the queue we now have two entries, with timestamps 0 and 1, resp.
+# Using the above formula, we get a rate of _two_ packets per second!
+# That's clearly wrong. Even worse, the rate slowly aproaches 1 the
+# further we go:
+#
+#   Packet   3 at time  2 => rate = 1.5
+#   Packet   4 at time  3 => rate = 1.3333
+#   Packet   5 at time  4 => rate = 1.2
+#   ...
+#   Packet 100 at time 99 => rate = 1.0101
+#
+# The correct way to handle this is to not count the first entry as part
+# of the "n". After all, the rate of packets is calculated by looking at
+# the gaps between them, and there is no gap _before_ the first packet.
+#
+# Hence, the corrected formula is:
+#
+#   (n-1) / (Tn - T1)
+#
+# Which gives the correct rate of "1" for the above examples.
+#
+sub rate {
+    my $q = $_[0]->get_queue($_[1]);
+
+    return undef if !defined($q) || @$q <= 1;
+
+    my $first = $q->[0][1];
+    my $last  = $q->[$#$q][1];
+    my $time  = ($first < $last) ? $last-$first : 1;
+    my $n = int(@$q)-1;
+
+    return ($n / $time) * 60;
+}
+
+sub add {
+    my ($self, $ip, $src_ip, $val) = @_;
+
+    my $q = ($self->_q->{$ip} //= []);
+
+    if (int(@$q) >= $self->max_depth) {
+        shift @$q;
+    }
+    push @$q, [ $src_ip, $val ];
+    return int(@$q);
+}
+
+sub _get_queue_entry {
+    my ($self, $ip, $index) = @_;
+
+    my $q = $self->get_queue($ip);
+    $index = 0 unless defined($index);
+    if ($index < 0) {
+        $index = int(@$q) + $index;
+        $index = 0 if $index < 0;
+    }
+    return $q->[$index];
+}
+
+
+sub get_timestamp {
+    my ($self, $ip, $index) = @_;
+
+    if (my $entry = $self->_get_queue_entry($ip, $index)) {
+        return $entry->[1];
+    }
+    return undef;
+}
+
+
+sub reduce {
+    my ($self, $ip, $max_rate) = @_;
+
+    my $q = $self->get_queue($ip) or return 0;
+    return 0 if @{$q} == 0;
+
+    if ($max_rate <= 0) {
+        return int(@$q);
+    }
+
+    my $min_delta = 1/$max_rate;
+
+    my @sorted = sort { $$a[0] cmp $$b[0] || $$a[1] <=> $$b[1] } @$q;
+    my @reduced = ();
+    my $prev_entry = undef;
+    for my $entry (@sorted) {
+        if ($prev_entry) {
+            if ($entry->[0] ne $prev_entry->[0] or
+                $entry->[1] - $prev_entry->[1] >= $min_delta)
+            {
+                push @reduced, $prev_entry;
+            }
+        }
+        $prev_entry = $entry;
+    }
+    push @reduced, $prev_entry;
+    @$q = sort { $$a[1] <=> $$b[1] } @reduced;
+    return int(@reduced);
+}
+
+1;
+
+__END__
+
+=encoding UTF-8
 
 =head1 NAME
 
@@ -93,17 +236,6 @@ L<B<M6::ArpSponge::Defaults-E<gt>QUEUE_DEPTH>|M6::ArpSponge::Defaults/QUEUE_DEPT
 if not given).
 Returns a reference to the newly created object.
 
-=cut
-
-sub new {
-    my ($type, $max_depth) = @_;
-
-    $max_depth //= M6::ArpSponge::Defaults->QUEUE_DEPTH;
-
-    $type = ref $type if ref $type;
-    bless {'max_depth' => $max_depth, q=>{}}, $type;
-}
-
 =back
 
 =head1 METHODS
@@ -114,129 +246,34 @@ sub new {
 
 Clear all queues.
 
-=cut
-
-sub clear_all { %{$_[0]->{'q'}} = () }
-
 =item X<clear>B<clear> ( I<IP> )
 
 Clear the queue for I<IP>.
 
-=cut
-
-sub clear     { delete $_[0]->{'q'}->{$_[1]} }
-
 =item X<depth>B<depth> ( I<IP> )
 
 Return the depth of the queue for I<IP>.
-
-=cut
-
-sub depth {
-    my $q = $_[0]->get_queue($_[1]);
-    return $q ? int(@$q) : 0
-}
 
 =item X<rate>B<rate> ( I<IP> )
 
 Return the (average) query rate (as a real number) for I<IP> in queries
 per minute.
 
-=cut
-
-# Slightly tricky calculation. Dumb calculation would be:
-#
-#   n / (Tn - T1)
-#
-# Where "n" is the number of entries, "T1" is the timestamp
-# of the first entry, and "Tn" is the n-th timestamp.
-#
-# However, this skews the calculation somewhat (the shorter the queue, the
-# worse the skew... hey, that rhymes!).
-#
-# Consider the case where we send a packet once every second:
-#
-#   Packet 1 at time 0
-#   Packet 2 at time 1
-#
-# In the queue we now have two entries, with timestamps 0 and 1, resp.
-# Using the above formula, we get a rate of _two_ packets per second!
-# That's clearly wrong. Even worse, the rate slowly aproaches 1 the
-# further we go:
-#
-#   Packet   3 at time  2 => rate = 1.5
-#   Packet   4 at time  3 => rate = 1.3333
-#   Packet   5 at time  4 => rate = 1.2
-#   ...
-#   Packet 100 at time 99 => rate = 1.0101
-#
-# The correct way to handle this is to not count the first entry as part
-# of the "n". After all, the rate of packets is calculated by looking at
-# the gaps between them, and there is no gap _before_ the first packet.
-#
-# Hence, the corrected formula is:
-#
-#   (n-1) / (Tn - T1)
-#
-# Which gives the correct rate of "1" for the above examples.
-#
-# [Statistics: comment/code > 4]
-#
-sub rate {
-    my $q = $_[0]->get_queue($_[1]);
-    return undef if !defined($q) || @$q <= 1;
-    my $first = $q->[0]->[1];
-    my $last  = $q->[$#$q]->[1];
-    my $time  = ($first < $last) ? $last-$first : 1;
-    my $n = int(@$q)-1;
-    return ($n / $time) * 60;
-}
-
 =item B<max_depth>( [ I<depth> ] )
 X<max_depth>
 
 Return or set the maximum depth of the queues.
-
-=cut
-
-sub max_depth {
-    my ($self, @args) = @_;
-    if (@args) {
-        $self->{'max_depth'} = shift @args;
-    }
-    return $self->{'max_depth'}
-}
 
 =item B<is_full> ( I<IP> )
 X<is_full>
 
 Return whether or not the queue for I<IP> is full, i.e. is wrapping.
 
-=cut
-
-sub is_full { $_[0]->depth($_[1]) >= $_[0]->max_depth }
-
 =item X<add>B<add> ( I<IP>, I<SRC_IP>, I<TIMESTAMP> )
 
 Add [I<SRC_IP>, I<TIMESTAMP>] to the queue for I<IP>,
 wrapping the buffer ring if necessary. Returns the new
 queue depth.
-
-=cut
-
-sub add {
-    my ($self, $ip, $src_ip, $val) = @_;
-
-    # Oooh, very h4xx||
-    my $q = $self->{'q'}->{$ip} //
-           ($self->{'q'}->{$ip} = []);
-
-    if (int(@$q) >= $self->max_depth) {
-        shift @$q;
-    }
-    push @$q, [ $src_ip, $val ];
-    return int(@$q);
-}
 
 
 =item X<get_entry>B<get_entry> ( I<IP> [, I<INDEX>] )
@@ -256,20 +293,6 @@ Also:
 
    QUEUE->get( IP, n ) == QUEUE->get-_queue( IP )->[n]
 
-=cut
-
-sub get_entry {
-    my ($self, $ip, $index) = @_;
-
-    my $q = $self->get_queue($ip);
-    $index = 0 unless defined($index);
-    if ($index < 0) {
-        $index = int(@$q) + $index;
-        $index = 0 if $index < 0;
-    }
-    return $q->[$index];
-}
-
 =item X<get_timestamp>B<get> ( I<IP> [, I<INDEX>] )
 
 =item X<get>B<get> ( I<IP> [, I<INDEX>] )
@@ -278,35 +301,11 @@ Return the I<TIMESTAMP> at position I<INDEX>
 in the queue for I<IP>. The value of I<INDEX> has the same meaning
 as for C<get_entry()|/get_entry> above.
 
-=cut
-
-sub get_timestamp {
-    my ($self, $ip, $index) = @_;
-
-    if (my $entry = $self->get_entry($ip, $index)) {
-        return $entry->[1];
-    }
-    return undef;
-}
-
-sub get {
-    my ($self, $ip, $index) = @_;
-
-    if (my $entry = $self->get_entry($ip, $index)) {
-        return $entry->[1];
-    }
-    return undef;
-}
-
 =item X<get_queue>B<get_queue> ( I<IP> )
 
 Return the timestamps for I<IP>.
 I<NOTE:> this is a reference to the internal list of data, so take care
 that you don't inadvertently modify it.
-
-=cut
-
-sub get_queue { return $_[0]->{'q'}->{$_[1]} }
 
 =item X<reduce>B<reduce> ( I<IP>, I<MAX_RATE> )
 
@@ -318,44 +317,6 @@ ignored. This can mitigate the effects of broadcast storms (e.g. due
 to loops) or DoS attacking.
 
 Returns the new queue depth after reducing.
-
-=cut
-
-sub reduce {
-    my ($self, $ip, $max_rate) = @_;
-
-    my $q = $self->get_queue($ip);
-
-    if (!$q || @{$q} == 0) {
-        return 0;
-    }
-    if ($max_rate <= 0) {
-        return int(@$q);
-    }
-
-    my $min_delta = 1/$max_rate;
-
-    my @sorted = sort { $$a[0] cmp $$b[0] || $$a[1] <=> $$b[1] } @$q;
-    my @reduced = ();
-    my $prev_entry = undef;
-    for my $entry (@sorted) {
-        if ($prev_entry) {
-            if ($entry->[0] ne $prev_entry->[0] or
-                $entry->[1] - $prev_entry->[1] >= $min_delta)
-            {
-                push @reduced, $prev_entry;
-            }
-        }
-        $prev_entry = $entry;
-    }
-    push @reduced, $prev_entry;
-    @$q = sort { $$a[1] <=> $$b[1] } @reduced;
-    return int(@reduced);
-}
-
-1;
-
-__END__
 
 =back
 

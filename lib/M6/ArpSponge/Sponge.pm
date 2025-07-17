@@ -14,9 +14,6 @@
 #
 #   See the "Copying" file that came with this package.
 #
-# A.Vijn,   2003-2004;
-# S.Bakker, 2004-2010;
-#
 # IMPORTANT:
 #
 #   * IP and MAC addresses are stored as HEX strings, use
