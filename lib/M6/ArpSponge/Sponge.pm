@@ -223,9 +223,10 @@ sub clear_attr {
 sub is_my_ip        { defined $_[0]->_ip_all->{$_[1]} }
 sub is_my_ip_s      { defined $_[0]->_ip_all->{ip2hex($_[1])} }
 
-sub my_ip_s         { return hex2ip($_[0]->my_ip)   }
-sub network_s       { return hex2ip($_[0]->network) }
-sub my_mac_s        { return hex2mac($_[0]->my_mac) }
+sub my_ip_s         { return hex2ip($_[0]->my_ip)     }
+sub network_s       { return hex2ip($_[0]->network)   }
+sub broadcast_s     { return hex2ip($_[0]->broadcast) }
+sub my_mac_s        { return hex2mac($_[0]->my_mac)   }
 
 ###############################################################################
 #
