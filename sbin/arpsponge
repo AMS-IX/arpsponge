@@ -1,4 +1,4 @@
-#!/usr/bin/env perl -I../lib
+#!/usr/bin/env perl
 ###############################################################################
 #
 # ARP sponge
@@ -53,7 +53,7 @@ use constant SYSLOG_IDENT => M6::ArpSponge::Defaults->NAME;
 my $PROG                 = $FindBin::Script;
 my $VERSION              = M6::ArpSponge::Defaults->VERSION;
 my $RUN_DIR              = M6::ArpSponge::Defaults->RUN_DIR;
-my $DFL_LOG_MASK         = M6::ArpSponge::Defaults->LOG_LEVEL;
+my $DFL_LOG_MASK         = M6::ArpSponge::Defaults->LOG_EVENT_MASK;
 my $DFL_LOG_LEVEL        = M6::ArpSponge::Defaults->LOG_LEVEL;
 my $DFL_RATE             = M6::ArpSponge::Defaults->MAX_ARP_RATE;
 my $DFL_ARP_AGE          = M6::ArpSponge::Defaults->MAX_ARP_AGE;
@@ -81,10 +81,15 @@ my $DFL_SOCK_PERMS       = M6::ArpSponge::Defaults->SOCK_PERMS;
 my $MAX_PKT_PER_CYCLE   = 100;
 my $PCAP_TIMEOUT        = 5;
 
-$::USAGE=<<EOF;
-Usage: $PROG [options] IPADDR/PREFIXLEN dev IFNAME
+my $USAGE_MSG = "Try '$PROG --help' for more information.\n";
+
+my $USAGE=<<EOF;
+Usage:
+
+  $PROG [options] IPADDR/PREFIXLEN dev IFNAME
 
 Options:
+
   --age=secs              - time in seconds until we consider an ARP entry
                             "stale" ($DFL_ARP_AGE)
   --arp-update-method=... - how to update neighbor ARP caches
@@ -172,7 +177,7 @@ sub Main {
         'static!'             => \(my $static),
         'flood-protection=f'  => \(my $flood_protection = $DFL_FLOOD_PROTECTION),
         'gratuitous!'         => \(my $gratuitous),
-        'help|?'              => sub { print $::USAGE; exit 0 },
+        'help|?'              => sub { print $USAGE; exit 0 },
         'init=s'              => \(my $init_arg         = $DFL_INIT),
         'learning=i'          => \(my $learning         = $DFL_LEARN),
         'loglevel=s'          => \(my $loglevel         = $DFL_LOG_LEVEL),
@@ -190,9 +195,9 @@ sub Main {
         'sweep=s'             => \(my $sweep_sec),
         'sweep-at-start!'     => \(my $sweep_at_start),
         'sweep-skip-alive'    => \(my $sweep_skip_alive),
-        'verbose|v+'          => \(my $verbose),
+        'verbose|v+'          => \(my $verbose = 0),
         'version|V'           => sub { print "$PROG $VERSION\n"; exit 0 },
-    ) or pod2usage(2);
+    ) or die($USAGE_MSG);
 
     pod2usage(-exitstatus => 0, -verbose => 2) if $man;
 
@@ -220,8 +225,8 @@ sub Main {
 
     ####################################################################
 
-    log_fatal("Not enough parameters\n$::USAGE") if @ARGV < 3;
-    log_fatal("Too many parameters\n$::USAGE")   if @ARGV > 3;
+    log_fatal("Not enough parameters\n$USAGE_MSG") if @ARGV < 3;
+    log_fatal("Too many parameters\n$$USAGE_MSG")   if @ARGV > 3;
 
     my $network = NetAddr::IP->new($ARGV[0])
         or log_fatal qq{Bad network address or prefix length in "$ARGV[0]"\n};
