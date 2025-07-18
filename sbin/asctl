@@ -1,4 +1,4 @@
-#!@PERL@ -I../lib
+#!/usr/bin/env perl
 # ============================================================================
 #
 #         File:  asctl.pl
@@ -43,7 +43,7 @@ use M6::ArpSponge::Log       qw( :standard :macros );
 use M6::ArpSponge::Util      qw( :all );
 use M6::ArpSponge::ReadLine  qw( :all );
 use M6::ArpSponge::Const     qw( :all );
-use M6::ArpSponge::NetPacket qw( :vars );
+use M6::ArpSponge::NetPacket qw( :const );
 
 my $JSON_OBJ        = JSON::PP->new->pretty(1);
 my $YAML_OBJ        = YAML::PP->new(
@@ -647,7 +647,7 @@ sub expand_ip_filter {
             my ($opts, $reply, $arp_table, $tag_fmt) =
                 shared_show_arp_ip($CONN, 'get_arp');
             my %mac = map { ($_->{'hex_ip'}, $_->{'mac'}) } @$arp_table;
-            @list = grep { exists $mac{$_} && $mac{$_} ne $ETH_ADDR_NONE }
+            @list = grep { exists $mac{$_} && $mac{$_} ne ETH_ADDR_NONE }
                          @list;
 
         }
