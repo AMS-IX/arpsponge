@@ -27,6 +27,7 @@ use M6::ArpSponge;
 our $VERSION = $M6::ArpSponge::VERSION;
 
 use Moo;
+use M6::ArpSponge::Const qw( :states );
 use Types::Standard qw( HashRef );
 use Time::HiRes qw( time );
 
