@@ -37,16 +37,16 @@ has max_depth => (
     default => \&M6::ArpSponge::Defaults::QUEUE_DEPTH,
 );
 
-has _q => (
-    is       => 'rw',
+has _table => (
+    is       => 'ro',
     isa      => HashRef,
     init_arg => undef,
     default  => sub { {} },
 );
 
-sub clear_all { $_[0]->_q({}) }
-sub clear     { delete $_[0]->{'q'}->{$_[1]} }
-sub get_queue { return $_[0]->_q->{$_[1]} }
+sub clear_all { %{$_[0]->_table} = () }
+sub clear     { delete $_[0]->_table->{$_[1]} }
+sub get_queue { return $_[0]->_table->{$_[1]} }
 sub is_full   { $_[0]->depth($_[1]) >= $_[0]->max_depth }
 
 sub depth {
@@ -106,7 +106,7 @@ sub rate {
 sub add {
     my ($self, $ip, $src_ip, $val) = @_;
 
-    my $q = ($self->_q->{$ip} //= []);
+    my $q = ($self->_table->{$ip} //= []);
 
     if (int(@$q) >= $self->max_depth) {
         shift @$q;
@@ -276,7 +276,51 @@ wrapping the buffer ring if necessary. Returns the new
 queue depth.
 
 
-=item X<get_entry>B<get_entry> ( I<IP> [, I<INDEX>] )
+=item B<get_timestamp> ( I<IP> [, I<INDEX>] )
+X<get_timestamp>
+
+Return the I<TIMESTAMP> at position I<INDEX>
+in the queue for I<IP>.
+Index zero (0) gives the oldest time stamp; positive values for
+I<INDEX> give increasingly more recent values. Negative numbers count
+from the end of the queue, so C<-1> gives the most recently added value.
+
+This is equivalent to:
+
+    OBJ->get_queue(IP)->[INDEX]->[1]
+
+But minus definedness/boundary checking.
+
+=item X<get_queue>B<get_queue> ( I<IP> )
+
+Return the timestamps for I<IP> as an ArrayRef:
+
+    [
+        [ SENDER, TIME_0 ], # Oldest.
+        [ SENDER, TIME_2 ],
+        ...
+        [ SENDER, TIME_N ], # Most recent.
+    ]
+
+I<NOTE:> this is a reference to the internal list of data, so take care
+that you don't inadvertently modify it.
+
+=item B<reduce> ( I<IP>, I<MAX_RATE> )
+X<reduce>
+
+Reduce the queue for I<IP> by comparing subsequent pairs of entries for
+each source IP and removing the older one if the time delta between the
+two is below 1/I<MAX_RATE>. This effectively means that a source that's
+sending more than I<MAX_RATE> ARP queries per second will be largely
+ignored. This can mitigate the effects of broadcast storms (e.g. due
+to loops) or DoS attacking.
+
+Returns the new queue depth after reducing.
+
+=begin _INTERNAL
+
+=item B<_get_queue_entry> ( I<IP> [, I<INDEX>] )
+X<_get_queue_entry>
 
 Return the [I<SRC_IP>, I<TIMESTAMP>] data tuple at position I<INDEX>
 in the queue for I<IP>.  Zero (0) is the oldest; positive values for
@@ -293,30 +337,7 @@ Also:
 
    QUEUE->get( IP, n ) == QUEUE->get-_queue( IP )->[n]
 
-=item X<get_timestamp>B<get> ( I<IP> [, I<INDEX>] )
-
-=item X<get>B<get> ( I<IP> [, I<INDEX>] )
-
-Return the I<TIMESTAMP> at position I<INDEX>
-in the queue for I<IP>. The value of I<INDEX> has the same meaning
-as for C<get_entry()|/get_entry> above.
-
-=item X<get_queue>B<get_queue> ( I<IP> )
-
-Return the timestamps for I<IP>.
-I<NOTE:> this is a reference to the internal list of data, so take care
-that you don't inadvertently modify it.
-
-=item X<reduce>B<reduce> ( I<IP>, I<MAX_RATE> )
-
-Reduce the queue for I<IP> by comparing subsequent pairs of entries for
-each source IP and removing the older one if the time delta between the
-two is below 1/I<MAX_RATE>. This effectively means that a source that's
-sending more than I<MAX_RATE> ARP queries per second will be largely
-ignored. This can mitigate the effects of broadcast storms (e.g. due
-to loops) or DoS attacking.
-
-Returns the new queue depth after reducing.
+=end
 
 =back
 
