@@ -24,3 +24,4 @@ dist\.ini
 pod2htm.*\.tmp
 ^(?:.*/)?\..*\.swp$
 \.tdy-orig$
+scratch

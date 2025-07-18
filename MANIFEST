@@ -21,7 +21,6 @@ old_t/testpcap
 init.d/arpsponge
 init.d/Makefile
 lib/M6/ArpSponge.pm
-lib/M6/ArpSponge/Base.pm
 lib/M6/ArpSponge/Const.pm
 lib/M6/ArpSponge/Control/Base.pm
 lib/M6/ArpSponge/Control/Client.pm
@@ -34,7 +33,6 @@ lib/M6/ArpSponge/NetPacket.pm
 lib/M6/ArpSponge/ReadLine.pm
 lib/M6/ArpSponge/Queue.pm
 lib/M6/ArpSponge/Sponge.pm
-lib/M6/ArpSponge/Table.pm
 lib/M6/ArpSponge/Util.pm
 sbin/arpsponge
 sbin/aslogtail
