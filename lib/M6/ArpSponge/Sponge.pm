@@ -111,7 +111,7 @@ has queue => (
     isa      => InstanceOf['M6::ArpSponge::Queue'],
     default  => sub { M6::ArpSponge::Queue->new() },
     init_arg => undef,
-    handles  => { queuedepth => 'depth' },
+    handles  => { queuedepth => 'max_depth' },
 );
 
 has phys_device => (
@@ -163,7 +163,7 @@ has _arp_table => (
     init_arg => undef,
 );
 
-has _user  => (
+has _attr  => (
     is       => 'ro',
     default  => DFL_EMPTY_HASH,
     init_arg => undef,
@@ -257,7 +257,7 @@ sub BUILD {
     my ($self, $args) = @_;
 
     if (exists $args->{queuedepth}) {
-        $self->queue->depth($args->{queuedepth});
+        $self->queue->max_depth($args->{queuedepth});
     }
 
     $self->init_all_state($args->{init_state});
@@ -701,17 +701,15 @@ sub set_alive {
     $self->set_state($ip, ALIVE);
     $self->arp_table($ip, $mac, time);
 
-    if ($old_state == DEAD) {
+    if (defined $old_state && $old_state == DEAD) {
         event_notice(EVENT_SPONGE,
             "unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
         return;
     }
 
-    if ($old_state >= PENDING(0)) {
-        event_notice(EVENT_SPONGE,
-            "clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
-        return;
-    }
+    event_notice(EVENT_SPONGE,
+        "clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+    return;
 }
 
 1;
