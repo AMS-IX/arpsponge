@@ -22,7 +22,8 @@ package M6::ArpSponge::Util;
 use 5.014;
 use warnings;
 
-use POSIX qw( strftime strtod strtol );
+use POSIX qw( strtod strtol );
+use Time::Piece;
 use NetAddr::IP;
 
 BEGIN {
@@ -196,6 +197,7 @@ sub mac2hex {
     my $hex;
     my $pref = '000000000000';
     foreach my $grp (@mac) { $hex .= substr($pref.$grp, -$digits) }
+    $hex =~ m{^[[:xdigit:]]+$} or return undef;
     return lc $hex;
 };
 
@@ -550,7 +552,7 @@ sub format_time {
     my ($time, $separator) = @_;
     if (defined $time && $time > 0) {
         $separator //= 'T';
-        return strftime("%F${separator}%T%z", localtime($time));
+        return localtime->strftime("%F${separator}%T%z");
     }
     return 'never';
 }
@@ -587,7 +589,7 @@ sub relative_time {
         $str .= ", ";
     }
 
-    $str .= strftime("%H:%M:%S", gmtime($diff));
+    $str .= gmtime($diff)->strftime("%H:%M:%S");
 
     if ($with_direction) {
         my $direction = $time > $now ? 'from now' : 'ago';
