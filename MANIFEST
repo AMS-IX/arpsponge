@@ -21,7 +21,9 @@ old_t/testpcap
 init.d/arpsponge
 init.d/Makefile
 lib/M6/ArpSponge.pm
-lib/M6/ArpSponge/Const.pm
+lib/M6/ArpSponge/State.pm
+lib/M6/ArpSponge/UpdateFlags.pm
+lib/M6/ArpSponge/StateTable.pm
 lib/M6/ArpSponge/Control/Base.pm
 lib/M6/ArpSponge/Control/Client.pm
 lib/M6/ArpSponge/Control.pm
@@ -34,6 +36,13 @@ lib/M6/ArpSponge/ReadLine.pm
 lib/M6/ArpSponge/Queue.pm
 lib/M6/ArpSponge/Sponge.pm
 lib/M6/ArpSponge/Util.pm
+lib/M6/ArpSponge/ArpTable.pm
+lib/M6/ArpSponge/Asctl/Arg/Arp_Update_Flags.pm
+lib/M6/ArpSponge/Asctl/Arg/IP_Filter.pm
+lib/M6/ArpSponge/Asctl/Arg/IP_Range.pm
+lib/M6/ArpSponge/Asctl/Arg/Log_Event_Mask.pm
+lib/M6/ArpSponge/Asctl/Arg/MAC_Address.pm
+sbin/asctl_term_cli
 sbin/arpsponge
 sbin/aslogtail
 sbin/asctl
@@ -50,3 +59,8 @@ t/00-compile.t
 t/01-perlcritic.t
 t/02-pod.t
 t/03-pod-coverage.t
+t/05-sponge.t
+t/40-m6_arpsponge_netpacket.t
+t/50-m6_arpsponge_queue.t
+t/60-m6_arpsponge_util.t
+t/70-m6_arpsponge_state.t
