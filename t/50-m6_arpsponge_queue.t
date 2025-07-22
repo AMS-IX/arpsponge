@@ -95,13 +95,21 @@ TEST_ADD_GET : {
     my $got;
 
     $got = $q->get_timestamp($ip);
-    is $got, $first_t, "get_timestamp('$ip') returns first timestamp ($first_t)";
+    is $got, $first_t,
+        "get_timestamp('$ip') returns first timestamp ($first_t)";
 
     $got = $q->get_timestamp($ip, -1);
-    is $got, $last_t, "get_timestamp('$ip', -1) returns last timestamp ($last_t)";
+    is $got, $last_t,
+        "get_timestamp('$ip', -1) returns last timestamp ($last_t)";
+
+    my $index = -2*$MAX_DEPTH;
+    $got = $q->get_timestamp($ip, $index);
+    is $got, $first_t,
+        "get_timestamp('$ip', $index) returns first timestamp ($first_t)";
 
     $q->clear($ip);
-    ok(!defined($q->get_timestamp($ip)), "timestamp for unknown IP returns undef");
+    is $q->get_timestamp($ip), undef,
+        "timestamp for unknown IP returns undef";
 }
 
 TEST_GET_QUEUE : {

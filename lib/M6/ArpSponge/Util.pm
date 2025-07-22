@@ -551,8 +551,8 @@ Will print:
 sub format_time {
     my ($time, $separator) = @_;
     if (defined $time && $time > 0) {
-        $separator //= 'T';
-        return localtime->strftime("%F${separator}%T%z");
+        $separator //= '@';
+        return localtime($time)->strftime("%F${separator}%T%z");
     }
     return 'never';
 }
@@ -568,7 +568,7 @@ If I<WITH_DIRECTION> is true, it will append "ago" or "from now" to the
 string. If not given, it defaults to C<true>.
 
 Example: relative_time(time-103745)
-returns "1 day 4h49m5s ago"
+returns "1 day, 04:49:05 ago"
 
 =cut
 
