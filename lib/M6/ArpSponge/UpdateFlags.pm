@@ -17,7 +17,7 @@
 # S.Bakker, 2011;
 #
 ###############################################################################
-package M6::ArpSponge::Const;
+package M6::ArpSponge::UpdateFlags;
 
 use 5.014;
 use warnings;
@@ -39,6 +39,7 @@ BEGIN {
         ARP_UPDATE_GRATUITOUS
         ARP_UPDATE_NONE
         ARP_UPDATE_ALL
+        ARP_UPDATE_FLAG_NAMES
     );
 
     our @EXPORT_OK = ( @func, @update_flags );
@@ -46,7 +47,7 @@ BEGIN {
 
     our %EXPORT_TAGS = (
         'func'   => \@func,
-        'flags'  => \@update_flags,
+        'const'  => \@update_flags,
         'all'    => [ @func, @update_flags ]
     );
 }
@@ -54,49 +55,41 @@ BEGIN {
 use constant ARP_UPDATE_REPLY      => 0x01;
 use constant ARP_UPDATE_REQUEST    => 0x02;
 use constant ARP_UPDATE_GRATUITOUS => 0x04;
+
 use constant ARP_UPDATE_NONE       => 0x00;
 use constant ARP_UPDATE_ALL        => 0x07;
 
-our $DEBUG = 0;
 
-our %UPDATE_FLAG_TO_STR = (
+my %FLAG_TO_STR = (
     ARP_UPDATE_REPLY()      => 'reply',
     ARP_UPDATE_REQUEST()    => 'request',
     ARP_UPDATE_GRATUITOUS() => 'gratuitous',
 );
 
-our %STR_TO_UPDATE_FLAG = (
+my %STR_TO_FLAG = (
     'none' => ARP_UPDATE_NONE,
     'all'  => ARP_UPDATE_ALL,
-        map { ($UPDATE_FLAG_TO_STR{$_} => $_) } keys %UPDATE_FLAG_TO_STR,
+    (reverse %FLAG_TO_STR),
 );
 
-sub saydebug(@)   { say @_ if $DEBUG }
-sub printdebug(@) { print @_ if $DEBUG }
+sub ARP_UPDATE_FLAG_NAMES {
+    return keys %STR_TO_FLAG;
+}
 
 sub parse_update_flags {
     my ($arg, @opts) = @_;
     my $err_s;
     my %opts = (-err => \$err_s, @opts);
 
-    my $flags = ARP_UPDATE_NONE;
-
-    printdebug "[parse_update_flags] #BEGIN ",
-        "[flags=$flags] ";
-
     if (! defined $arg) {
-        saydebug "arg=UNDEF";
-        saydebug "[parse_update_flags] #END flags=$flags";
-        return $flags;
+        return ARP_UPDATE_NONE;
     }
 
-    saydebug qq{arg="$arg"};
+    my $flags = ARP_UPDATE_NONE;
 
     my $iter = 0;
     for my $method (split(/\s*,\s*/, lc $arg)) {
         $iter++;
-        printdebug "[parse_update_flags] #$iter [flags=$flags] ",
-            "method=$method";
 
         my $negate = 0;
         if ($method =~ s/^\!//) {
@@ -107,34 +100,22 @@ sub parse_update_flags {
             $negate = !$negate;
         }
 
-        saydebug " => [method=$method; negate=$negate]";
-
-        my $int_method = int($STR_TO_UPDATE_FLAG{$method});
+        my $int_method = $STR_TO_FLAG{$method};
         if (! defined $int_method ) {
             ${$opts{-err}} = qq/"$method" is not a valid ARP update flag/;
             return;
         }
 
-        saydebug "[parse_update_flags] #$iter [flags=$flags] ",
-            "$method => $int_method";
-
         if ($negate) {
-            my $mask = ~$int_method & ARP_UPDATE_ALL;
-            $flags &= $mask;
-
-            saydebug "[parse_update_flags] #$iter [flags=$flags] ",
-                "flags = flags & ~($int_method) = ",
-                "flags & $mask = ",
-                $flags;
+            $flags &= (ARP_UPDATE_ALL & ~$int_method);
             next;
         }
+
         $flags |= $int_method;
-        saydebug "[parse_update_flags] #$iter [flags=$flags] ",
-            "flags = flags | $int_method = $flags";
     }
-    saydebug "[parse_update_flags] #END [flags=$flags]";
     return $flags;
 }
+
 
 sub update_flags_to_str {
     my ($arg) = @_;
@@ -143,9 +124,9 @@ sub update_flags_to_str {
     if ($arg == ARP_UPDATE_NONE) {
         return ('none');
     }
-    for my $mask ( sort keys %UPDATE_FLAG_TO_STR ) {
+    for my $mask ( sort keys %FLAG_TO_STR ) {
         if ($arg & $mask) {
-            push @list, $UPDATE_FLAG_TO_STR{$mask};
+            push @list, $FLAG_TO_STR{$mask};
         }
     }
     return @list;
@@ -154,6 +135,60 @@ sub update_flags_to_str {
 1;
 
 __END__
+
+
+=head1 NAME
+
+M6::ArpSponge::UpdateFlags - define constants for arpsponge(1) update flags
+
+
+=head1 SYNOPSIS
+
+    use M6::ArpSponge::UpdateFlags qw( :const );
+
+    say "ARP_UPDATE_REPLY = ", ARP_UPDATE_REPLY;
+
+    use M6::ArpSponge::UpdateFlags qw( :func :const );
+
+    say "Mask reply,gratuitous = ", parse_update_flags("reply,gratuitous");
+
+    my $mask = ARP_UPDATE_ALL;
+
+    printf("Mask 0x%2x = (%s)\n", join(',', update_flags_to_str($mask));
+
+=head1 DESCRIPTION
+
+B<M6::ArpSponge::UpdateFlags> defines constants and conversion functions
+for the "ARP update flags" for the L<B<arpsponge>(1)|arpsponge>.
+
+The update flags are stored as a bitmap, with each update method represented
+by a distinctive bit position.
+
+=head1 CONSTANTS
+
+=item B<ARP_UPDATE_FLAG_NAMES>
+
+List of of all ARP update flag names (see the constants below).
+
+=item B<ARP_UPDATE_REPLY> (name: C<reply>)
+
+Send unsollicited unicast replies as a way to update ARP caches of peers.
+
+=item B<ARP_UPDATE_REQUEST> (name: C<request>)
+
+Send a (proxy) unicast ARP request.
+
+=item B<ARP_UPDATE_GRATUITOUS> (name: C<gratuitous>)
+
+Send a (proxy) gratuitous ARP request.
+
+=item ARP_UPDATE_NONE (name: C<none>)
+
+Mask with no bits set (in other words, 0).
+
+=item ARP_UPDATE_ALL (name: C<all>)
+
+Mask with all bits set (in other words, the disjunction of all methods).
 
 =head1 FUNCTIONS
 
@@ -176,11 +211,6 @@ contain a diagnostic.
 Translate the bits in I<ARG> to ARP update flag names and return a list of
 them.
 
-=head1 COPYRIGHT
+=head1 SEE ALSO
 
-Copyright 2011-2016, AMS-IX B.V.
-Distributed under GPL and the Artistic License 2.0.
-
-=cut
-
-1;
+L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge>.

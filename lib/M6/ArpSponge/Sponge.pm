@@ -35,10 +35,10 @@ use Moo;
 
 use M6::ArpSponge::Event;
 use M6::ArpSponge::Log;
-use M6::ArpSponge::State      qw( :const :func );
-use M6::ArpSponge::Const      qw( :all );
-use M6::ArpSponge::Util       qw( :all );
-use M6::ArpSponge::NetPacket  qw( :all );
+use M6::ArpSponge::State       qw( :const :func );
+use M6::ArpSponge::UpdateFlags qw( :const );
+use M6::ArpSponge::Util        qw( :all );
+use M6::ArpSponge::NetPacket   qw( :all );
 use M6::ArpSponge::ArpTable;
 use M6::ArpSponge::Queue;
 use M6::ArpSponge::StateTable;

@@ -32,11 +32,10 @@ use base qw( Exporter );
 use Term::ReadLine;
 use Term::ReadKey;
 use NetAddr::IP;
-use M6::ArpSponge::Util qw( :all );
-use Data::Dumper;
-use Getopt::Long    qw( GetOptionsFromArray );
-use M6::ArpSponge::Const qw( :flags );
-use Scalar::Util qw( reftype );
+use M6::ArpSponge::Util        qw( :all );
+use Getopt::Long               qw( GetOptionsFromArray );
+use M6::ArpSponge::UpdateFlags qw( :const );
+use Scalar::Util               qw( reftype );
 
 BEGIN {
     use Exporter;

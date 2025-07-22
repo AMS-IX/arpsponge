@@ -23,15 +23,13 @@ use strict;
 use base qw( M6::ArpSponge::Control::Base );
 
 use IO::Socket;
-use M6::ArpSponge::State     qw( :const );
-use M6::ArpSponge::Const     qw( :flags );
-use M6::ArpSponge::Util      qw( :all );
-use M6::ArpSponge::NetPacket qw( :const );
-use M6::ArpSponge::Log       qw( :func :macros );
-use M6::ArpSponge::Event     qw( :func :macros );
-use Time::HiRes        qw( time );
-
-use POSIX qw( strftime );
+use M6::ArpSponge::State       qw( :const );
+use M6::ArpSponge::UpdateFlags qw( :const );
+use M6::ArpSponge::Util        qw( :all );
+use M6::ArpSponge::NetPacket   qw( :const );
+use M6::ArpSponge::Log         qw( :func :macros );
+use M6::ArpSponge::Event       qw( :func :macros );
+use Time::HiRes                qw( time );
 
 BEGIN {
     our $VERSION = '0.04';
