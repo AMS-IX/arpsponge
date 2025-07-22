@@ -166,6 +166,8 @@ by a distinctive bit position.
 
 =head1 CONSTANTS
 
+=over
+
 =item B<ARP_UPDATE_FLAG_NAMES>
 
 List of of all ARP update flag names (see the constants below).
@@ -189,6 +191,8 @@ Mask with no bits set (in other words, 0).
 =item ARP_UPDATE_ALL (name: C<all>)
 
 Mask with all bits set (in other words, the disjunction of all methods).
+
+=back
 
 =head1 FUNCTIONS
 

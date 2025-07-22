@@ -38,12 +38,12 @@ use JSON::PP qw();
 
 use M6::ArpSponge::Control::Client;
 use M6::ArpSponge::Defaults;
-use M6::ArpSponge::Event     qw( :standard );
-use M6::ArpSponge::Log       qw( :standard :macros );
-use M6::ArpSponge::Util      qw( :all );
-use M6::ArpSponge::ReadLine  qw( :all );
-use M6::ArpSponge::Const     qw( :all );
-use M6::ArpSponge::NetPacket qw( :const );
+use M6::ArpSponge::Event       qw( :standard );
+use M6::ArpSponge::Log         qw( :standard :macros );
+use M6::ArpSponge::Util        qw( :all );
+use M6::ArpSponge::ReadLine    qw( :all );
+use M6::ArpSponge::UpdateFlags qw( :const );
+use M6::ArpSponge::NetPacket   qw( :const );
 
 my $JSON_OBJ        = JSON::PP->new->pretty(1);
 my $YAML_OBJ        = YAML::PP->new(

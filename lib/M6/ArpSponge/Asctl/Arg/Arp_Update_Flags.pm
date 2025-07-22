@@ -7,7 +7,7 @@ extends 'Term::CLI::Argument';
 use Term::CLI::Util qw( find_text_matches );
 use M6::ArpSponge::UpdateFlags qw( :const parse_update_flags );
 
-my @Flags = sort ARP_UPDATE_FLAG_NAMES();
+my @Flags = sort { $a cmp $b } ARP_UPDATE_FLAG_NAMES();
 
 use namespace::clean;
 
