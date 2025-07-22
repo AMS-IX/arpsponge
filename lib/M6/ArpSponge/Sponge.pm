@@ -40,7 +40,7 @@ use M6::ArpSponge::Util       qw( :all );
 use M6::ArpSponge::NetPacket  qw( :all );
 use M6::ArpSponge::ArpTable;
 use M6::ArpSponge::Queue;
-use M6::ArpSponge::State;
+use M6::ArpSponge::StateTable;
 
 use Types::Standard qw( InstanceOf );
 
@@ -142,8 +142,8 @@ has network_hi_i => (
 ############################################################################
 has _state_table => (
     is       => 'ro',
-    isa      => InstanceOf['M6::ArpSponge::State'],
-    default  => sub { M6::ArpSponge::State->new },
+    isa      => InstanceOf['M6::ArpSponge::StateTable'],
+    default  => sub { M6::ArpSponge::StateTable->new },
     init_arg => undef,
     handles => {
         get_state_atime => 'get_atime',

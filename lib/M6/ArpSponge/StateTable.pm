@@ -1,6 +1,6 @@
 #===============================================================================
 #
-#       Module:  M6::ArpSponge::State
+#       Module:  M6::ArpSponge::StateTable
 #
 #  Description:  State table for arpsponge.
 #
@@ -18,7 +18,7 @@
 #
 #===============================================================================
 
-package M6::ArpSponge::State;
+package M6::ArpSponge::StateTable;
 
 use 5.014;
 use warnings;
@@ -110,26 +110,22 @@ __END__
 
 =head1 NAME
 
-MODNAME - singing and dancing module
+M6::ArpSponge::StateTable - keep track of IP state for the arpsponge
 
 =head1 SYNOPSIS
 
- use MODNAME;
+ use M6::ArpSponge::StateTable;
 
 =head1 DESCRIPTION
 
-=head1 CONSTANTS
-
 =head1 CONSTRUCTORS
 
-=over
+=head2 new
 
-=item B<new> ( B<key> =E<gt> I<val> ... )
-X<new>
+    OBJ = M6::ArpSponge::StateTable->new();
 
-Create a new MODNAME object and return a reference to it.
-
-=back
+Create a new B<M6::ArpSponge::StateTable> object and return
+a reference to it.
 
 =head1 METHODS
 
@@ -137,21 +133,9 @@ Create a new MODNAME object and return a reference to it.
 
 =head1 EXAMPLES
 
-=head1 FILES
-
-=over
-
-=item F</dev/null>
-
-Bit-bucket.
-
-=back
-
 =head1 SEE ALSO
 
-L<perl>(1).
-
-=head1 CAVEATS
+L<B<perl>(1)|perl>.
 
 =head1 AUTHOR
 
@@ -167,7 +151,3 @@ it under the same terms as Perl itself. See "perldoc perlartistic."
 This software is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-=cut
-
-
