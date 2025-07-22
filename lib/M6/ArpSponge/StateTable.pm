@@ -83,7 +83,7 @@ sub set_atime {
 sub set_state    {
     my ($self, $ip, $state, $time) = @_;
 
-    if (!defined $state) {
+    if (!defined $state || $state == NONE) {
         delete $self->_state->{$ip};
         delete $self->_pending->{$ip};
         return;
