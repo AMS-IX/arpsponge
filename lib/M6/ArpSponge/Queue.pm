@@ -240,50 +240,64 @@ Returns a reference to the newly created object.
 
 =head1 METHODS
 
-=over
+=head2 clear_all
 
-=item X<clear_all>B<clear_all>
+    OBJ->clear_all();
 
 Clear all queues.
 
-=item X<clear>B<clear> ( I<IP> )
+=head2 clear
+
+    OBJ->clear(IP);
 
 Clear the queue for I<IP>.
 
-=item X<depth>B<depth> ( I<IP> )
+=head2 depth
+
+    DEPTH = OBJ->depth(IP);
 
 Return the depth of the queue for I<IP>.
 
-=item X<rate>B<rate> ( I<IP> )
+=head2 rate
+
+    RATE = OBJ->rate(IP);
 
 Return the (average) query rate (as a real number) for I<IP> in queries
 per minute.
 
-=item B<max_depth>( [ I<depth> ] )
-X<max_depth>
+=head2 max_depth
+
+    DEPTH = OBJ->max_depth();
+    OBJ->max_depth(DEPTH);
 
 Return or set the maximum depth of the queues.
 
-=item B<is_full> ( I<IP> )
-X<is_full>
+=head2 is_full
 
-Return whether or not the queue for I<IP> is full, i.e. is wrapping.
+    BOOL = OBJ->is_full(IP);
 
-=item X<add>B<add> ( I<IP>, I<SRC_IP>, I<TIMESTAMP> )
+Return whether or not the queue for I<IP> is full,
+that is, the ring buffer is wrapping.
+
+=head2 add
+
+    OBJ->add(IP, SRC_IP, TIMESTAMP);
 
 Add [I<SRC_IP>, I<TIMESTAMP>] to the queue for I<IP>,
-wrapping the buffer ring if necessary. Returns the new
-queue depth.
+wrapping the ring buffer if necessary.
+Returns the new queue depth.
 
+=head2 get_timestamp
 
-=item B<get_timestamp> ( I<IP> [, I<INDEX>] )
-X<get_timestamp>
+    TSTAMP = OBJ->get_timestamp(IP);
+    TSTAMP = OBJ->get_timestamp(IP, INDEX);
 
-Return the I<TIMESTAMP> at position I<INDEX>
-in the queue for I<IP>.
-Index zero (0) gives the oldest time stamp; positive values for
-I<INDEX> give increasingly more recent values. Negative numbers count
+Return the I<TSTAMP> at position I<INDEX> in the queue for I<IP>.
+Index zero (0) or I<undef> gives the oldest time stamp; positive values
+for I<INDEX> give increasingly more recent values. Negative numbers count
 from the end of the queue, so C<-1> gives the most recently added value.
+If a negative I<INDEX> would result in an index lower than 0, the value
+at index 0 will be returned.
 
 This is equivalent to:
 
@@ -291,7 +305,9 @@ This is equivalent to:
 
 But minus definedness/boundary checking.
 
-=item X<get_queue>B<get_queue> ( I<IP> )
+=head2 get_queue
+
+    QUEUE_REF = OBJ->get_queue(IP);
 
 Return the timestamps for I<IP> as an ArrayRef:
 
@@ -305,8 +321,9 @@ Return the timestamps for I<IP> as an ArrayRef:
 I<NOTE:> this is a reference to the internal list of data, so take care
 that you don't inadvertently modify it.
 
-=item B<reduce> ( I<IP>, I<MAX_RATE> )
-X<reduce>
+=head2 reduce
+
+    OBJ->reduce>(IP, MAX_RATE)
 
 Reduce the queue for I<IP> by comparing subsequent pairs of entries for
 each source IP and removing the older one if the time delta between the
@@ -319,27 +336,31 @@ Returns the new queue depth after reducing.
 
 =begin _INTERNAL
 
-=item B<_get_queue_entry> ( I<IP> [, I<INDEX>] )
-X<_get_queue_entry>
+=head2 _get_queue_entry
+
+    ENTRY = OBJ->_get_queue_entry(IP);
+    ENTRY = OBJ->_get_queue_entry(IP, INDEX);
 
 Return the [I<SRC_IP>, I<TIMESTAMP>] data tuple at position I<INDEX>
-in the queue for I<IP>.  Zero (0) is the oldest; positive values for
-I<INDEX> give increasingly more recent values. Negative numbers count
-from the end of the queue, so C<-1> gives the most recently added value.
+in the queue for I<IP>.
+Index zero (0) or I<undef> gives the oldest entry; positive values
+for I<INDEX> give increasingly more recent entries.
+Negative numbers count from the end of the queue, so C<-1> gives the most
+recently added entry.
+If a negative I<INDEX> would result in an index lower than 0,
+the entry at index 0 will be returned.
 
 Compare:
 
-   QUEUE->get( IP, -n ) == QUEUE->get( IP, QUEUE->depth(IP) - n )
+   QUEUE->_get_queue_entry( IP, -n ) == QUEUE->_get_queue_entry( IP, QUEUE->depth(IP) - n )
 
-   QUEUE->get( IP ) == QUEUE->get( IP, 0 );
+   QUEUE->_get_queue_entry( IP ) == QUEUE->_get_queue_entry( IP, 0 );
 
 Also:
 
    QUEUE->get( IP, n ) == QUEUE->get-_queue( IP )->[n]
 
-=end
-
-=back
+=end _INTERNAL
 
 =head1 EXAMPLE
 

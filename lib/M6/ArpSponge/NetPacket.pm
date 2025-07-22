@@ -33,31 +33,31 @@ use Exporter 'import';
 
 BEGIN {
     my @functions = qw(
-            decode_ethernet decode_ip decode_ipv4 decode_arp
-            encode_ethernet encode_arp
-        );
+        decode_ethernet decode_ip decode_ipv4 decode_arp
+        encode_ethernet encode_arp
+    );
 
     my @constants = qw(
-            ETH_TYPE_IP
-            ETH_TYPE_IPV4
-            ETH_TYPE_ARP
-            ETH_TYPE_IPV6
-            ETH_ADDR_BROADCAST  ETH_ADDR_NONE
-            IPV4_ADDR_BROADCAST IPV4_ADDR_NONE
-            ARP_OPCODE_REQUEST  ARP_OPCODE_REPLY
-            ARP_HTYPE_ETHERNET  ARP_HLEN_ETHERNET
-            ARP_PROTO_IPV4      ARP_PLEN_IPV4
-            ARP_PROTO_IP
-        );
+        ETH_TYPE_IP
+        ETH_TYPE_IPV4
+        ETH_TYPE_ARP
+        ETH_TYPE_IPV6
+        ETH_ADDR_BROADCAST  ETH_ADDR_NONE
+        IPV4_ADDR_BROADCAST IPV4_ADDR_NONE
+        ARP_OPCODE_REQUEST  ARP_OPCODE_REPLY
+        ARP_HTYPE_ETHERNET  ARP_HLEN_ETHERNET
+        ARP_PROTO_IPV4      ARP_PLEN_IPV4
+        ARP_PROTO_IP
+    );
 
     our @EXPORT_OK = ( @functions, @constants );
     our @EXPORT    = ();
 
     our %EXPORT_TAGS = (
-            'all'    => [ @EXPORT_OK ],
-            'func'   => [ @functions ],
-            'const'  => [ @constants ],
-        );
+        'all'    => [ @EXPORT_OK ],
+        'func'   => [ @functions ],
+        'const'  => [ @constants ],
+    );
 }
 
 # The only things we're interested in right now...

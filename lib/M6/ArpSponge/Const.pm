@@ -22,16 +22,20 @@ package M6::ArpSponge::Const;
 use 5.014;
 use warnings;
 
-use parent qw( Exporter );
+use M6::ArpSponge;
+
+our $VERSION = $M6::ArpSponge::VERSION;
+
+use Exporter 'import';
 
 BEGIN {
-    our $VERSION = 1.02;
-
-    my @func   = qw(
+    my @func = qw(
         parse_update_flags update_flags_to_str is_valid_state
         state_to_string
     );
+
     my @states = qw( STATIC DEAD ALIVE PENDING NONE );
+
     my @update_flags = qw(
         ARP_UPDATE_REPLY
         ARP_UPDATE_REQUEST
@@ -81,13 +85,13 @@ sub PENDING { 0 + $_[$#_] };
 sub saydebug(@)   { say @_ if $DEBUG }
 sub printdebug(@) { print @_ if $DEBUG }
 
-our %STATE_TO_STR = (
+my %STATE_TO_STR = (
         STATIC() => 'STATIC',
         DEAD()   => 'DEAD',
         ALIVE()  => 'ALIVE',
     );
 
-our %STR_TO_STATE = (
+my %STR_TO_STATE = (
         'PENDING' => PENDING(0),
         map { ($STATE_TO_STR{$_} => $_) } keys %STATE_TO_STR,
     );
