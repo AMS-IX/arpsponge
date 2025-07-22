@@ -30,11 +30,8 @@ use Exporter 'import';
 
 BEGIN {
     my @func = qw(
-        parse_update_flags update_flags_to_str is_valid_state
-        state_to_string
+        parse_update_flags update_flags_to_str
     );
-
-    my @states = qw( STATIC DEAD ALIVE PENDING NONE );
 
     my @update_flags = qw(
         ARP_UPDATE_REPLY
@@ -44,14 +41,13 @@ BEGIN {
         ARP_UPDATE_ALL
     );
 
-    our @EXPORT_OK = ( @func, @states, @update_flags );
+    our @EXPORT_OK = ( @func, @update_flags );
     our @EXPORT    = ();
 
     our %EXPORT_TAGS = (
         'func'   => \@func,
-        'states' => \@states,
         'flags'  => \@update_flags,
-        'all'    => [ @func, @states, @update_flags ]
+        'all'    => [ @func, @update_flags ]
     );
 }
 
@@ -75,72 +71,8 @@ our %STR_TO_UPDATE_FLAG = (
         map { ($UPDATE_FLAG_TO_STR{$_} => $_) } keys %UPDATE_FLAG_TO_STR,
 );
 
-# State constants/macros
-use constant STATIC  => -3;
-use constant DEAD    => -2;
-use constant ALIVE   => -1;
-
-sub PENDING { 0 + $_[$#_] };
-
 sub saydebug(@)   { say @_ if $DEBUG }
 sub printdebug(@) { print @_ if $DEBUG }
-
-my %STATE_TO_STR = (
-        STATIC() => 'STATIC',
-        DEAD()   => 'DEAD',
-        ALIVE()  => 'ALIVE',
-    );
-
-my %STR_TO_STATE = (
-        'PENDING' => PENDING(0),
-        map { ($STATE_TO_STR{$_} => $_) } keys %STATE_TO_STR,
-    );
-
-=over
-
-=item B<state_to_string> ( I<ARG> )
-X<state_to_string>
-
-=cut
-
-sub state_to_string {
-    my ($state) = @_;
-
-    return 'NONE' if !defined $state;
-    return $STATE_TO_STR{$state} // 'ILLEGAL' if $state < PENDING(0);
-    return sprintf("PENDING(%d)", $state - PENDING(0));
-}
-
-=item B<is_valid_state> ( I<ARG> [, B<-err =E<gt>> I<REF> )
-X<is_valid_state>
-
-=cut
-
-sub is_valid_state {
-    my $arg = uc $_[0];
-    my $err_s;
-    my %opts = (-err => \$err_s, @_[1..$#_]);
-
-    $arg =~ s/^\s+//;
-    $arg =~ s/\s+$//;
-
-    return $STR_TO_STATE{$arg} if exists $STR_TO_STATE{$arg};
-
-    ${$opts{-err}} = q/"$arg" is not a valid state/;
-    return;
-}
-
-=item B<parse_update_flags> ( I<ARG> [, B<-err> =E<gt> I<REF>] )
-X<parse_update_flags>
-
-Check whether I<ARG> represents a valid list of ARP update flags. Returns an
-integer representing the flags on success, C<undef> on error. Note that an
-undefined I<ARG> is still valid, and represents C<ARP_UPDATE_NONE>.
-
-If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
-contain a diagnostic.
-
-=cut
 
 sub parse_update_flags {
     my ($arg, @opts) = @_;
@@ -204,14 +136,6 @@ sub parse_update_flags {
     return $flags;
 }
 
-=item B<update_flags_to_str> ( I<ARG> )
-X<update_flags_to_str>
-
-Translate the bits in I<ARG> to ARP update flag names and return a list of
-them.
-
-=cut
-
 sub update_flags_to_str {
     my ($arg) = @_;
     my @list;
@@ -227,7 +151,30 @@ sub update_flags_to_str {
     return @list;
 }
 
-=back
+1;
+
+__END__
+
+=head1 FUNCTIONS
+
+=head2 parse_update_flags
+
+    FLAG_MASK = parse_update_flags(STR);
+    FLAG_MASK = parse_update_flags(STR, -err => REF);
+
+Check whether I<ARG> represents a valid list of ARP update flags. Returns an
+integer representing the flags on success, C<undef> on error. Note that an
+undefined I<ARG> is still valid, and represents C<ARP_UPDATE_NONE>.
+
+If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
+contain a diagnostic.
+
+=head2 update_flags_to_str
+
+    FLAG_STR_LIST = update_flags_to_str(ARG);
+
+Translate the bits in I<ARG> to ARP update flag names and return a list of
+them.
 
 =head1 COPYRIGHT
 

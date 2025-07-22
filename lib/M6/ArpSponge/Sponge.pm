@@ -35,6 +35,7 @@ use Moo;
 
 use M6::ArpSponge::Event;
 use M6::ArpSponge::Log;
+use M6::ArpSponge::State      qw( :const :func );
 use M6::ArpSponge::Const      qw( :all );
 use M6::ArpSponge::Util       qw( :all );
 use M6::ArpSponge::NetPacket  qw( :all );

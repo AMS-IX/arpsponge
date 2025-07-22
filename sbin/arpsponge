@@ -42,6 +42,7 @@ use M6::ArpSponge::Sponge;
 use M6::ArpSponge::Log        qw( :standard );
 use M6::ArpSponge::Event      qw( :standard );
 use M6::ArpSponge::Const      qw( :all );
+use M6::ArpSponge::State      qw( :const );
 use M6::ArpSponge::Defaults;
 use M6::ArpSponge::Util       qw( :all );
 use M6::ArpSponge::Control::Server;

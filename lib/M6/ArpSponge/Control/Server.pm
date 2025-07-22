@@ -23,7 +23,8 @@ use strict;
 use base qw( M6::ArpSponge::Control::Base );
 
 use IO::Socket;
-use M6::ArpSponge::Const     qw( :states :flags );
+use M6::ArpSponge::State     qw( :const );
+use M6::ArpSponge::Const     qw( :flags );
 use M6::ArpSponge::Util      qw( :all );
 use M6::ArpSponge::NetPacket qw( :const );
 use M6::ArpSponge::Log       qw( :func :macros );
