@@ -133,7 +133,7 @@ sub AUTOLOAD {
 
 __END__
 
-=pod
+=encoding utf8
 
 =head1 NAME
 
@@ -154,8 +154,8 @@ M6::ArpSponge::Defaults - default parameters for the arpsponge
 
 =head1 DESCRIPTION
 
-This class defines default parameters for the L<arpsponge>(8) and related
-programs.
+This class defines default parameters for the L<B<arpsponge>(8)|arpsponge>
+and related programs.
 
 Some parameters are OS dependent and will be determined at run-time.
 
@@ -165,7 +165,7 @@ Some parameters are OS dependent and will be determined at run-time.
 
     %DEFAULTS = M6::ArpSponge::Defaults->all();
 
-Return all defaults as a list (hash), where keys (e.g. C<NAME>)
+Return all defaults as a list (hash), where keys (e.g. C<MAX_ARP_AGE>)
 maps to a value.
 
 =head2 get
@@ -173,8 +173,8 @@ maps to a value.
     $VAL = M6::ArpSponge::Defaults->get( $KEY );
 
 Return the default value for parameter I<$KEY>; lookup is case-insensitive,
-although camel case is replaced with underscores (so C<maxArpAge> becomes
-C<MAX_ARP_AGE>).
+although camel case and spaces are replaced with underscores
+(so C<maxArpAge> and C<max ARP age> become C<MAX_ARP_AGE>).
 
 =head2 Per-parameters methods
 
@@ -191,7 +191,7 @@ Valid method names correspond to the keys in the hash returned by L</all>:
 
 =item B<BIN_DIR>
 
-System-dependent.
+System-dependent, determined at run-time.
 Directory where the C<arpsponge> executable is installed.
 
 =item B<FLOOD_PROTECTION>
@@ -200,7 +200,7 @@ Default flood protection parameter.
 
 =item B<IFCONFIG>
 
-System-dependent.
+System-dependent, determined at run-time.
 Path to the L<ifconfig>(8) executable.
 
 =item B<INIT_STATE>
@@ -209,7 +209,7 @@ Initialisation state for IP addresses at startup.
 
 =item B<IP_CMD>
 
-System-dependent.
+System-dependent, determined at run-time.
 Path to the L<ip>(8) executable (typically only on Linux systems).
 
 =item B<LEARN_TIME>
@@ -253,13 +253,13 @@ Size of "ARP queue" for each IP address.
 
 =item B<RUN_DIR>
 
-System-dependent.
+System-dependent, determined at run-time.
 Volatile "run" directory for the arpsponge, typically 
 F</run/arpsponge> or F</var/run/arpsponge>.
 
 =item B<SOCK_PERMS>
 
-System-dependent.
+System-dependent, determined at run-time.
 Control socket permissions (I<user>B<:>I<group>B<:>I<mode>).
 
 =item B<VERSION>
@@ -301,7 +301,7 @@ Steven Bakker E<lt>Steven.Bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2024.
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2024 AMS-IX B.V.; All rights reserved.
+Copyright E<copy> 2025 AMS-IX B.V.; All rights reserved.
 
 This module is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. See "perldoc perlartistic."
