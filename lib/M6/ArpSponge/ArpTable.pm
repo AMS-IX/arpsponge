@@ -36,23 +36,28 @@ has _rarp => ( is => 'rw', init_arg => undef, default => sub { {} } );
 sub clear_ip {
     my ($self, $ip) = @_;
 
-    if (my $mac = $self->_arp($ip)) {
-        delete $self->_rarp->{$mac}->{$ip};
+    my $entry = delete $self->_arp->{$ip}
+        or return;
+
+    my $mac = $entry->[0];
+    my $rarp = $self->_rarp;
+    if (keys %{$rarp->{$mac}} == 1) {
+        delete $rarp->{$mac};
     }
-    delete $self->_arp->{$ip};
+    else {
+        delete $rarp->{$mac}->{$ip};
+    }
 }
 
 sub clear_mac {
     my ($self, $mac) = @_;
 
-    my $ip_hash = $self->_rarp->{$mac};
+    my $ip_hash = delete $self->_rarp->{$mac}
+        or return;
 
-    if ($ip_hash) {
-        for my $ip (keys %{$ip_hash}) {
-            delete $self->_arp->{$ip};
-        }
+    for my $ip (keys %{$ip_hash}) {
+        delete $self->_arp->{$ip};
     }
-    delete $self->_rarp->{$mac};
 }
 
 
@@ -84,14 +89,17 @@ sub purge {
     
     my $purged = 0;
     my $mac_hash = $self->_rarp;
-    while (my ($mac, $ip_hash) = each %{$mac_hash}) {
-        while (my ($ip, $ip_ts) = each %{$ip_hash}) {
+    my $ip_hash = $self->_arp;
+    while (my ($mac, $mac_ip_hash) = each %{$mac_hash}) {
+        while (my ($ip, $ip_ts) = each %{$mac_ip_hash}) {
             if ($ip_ts < $timestamp) {
                 delete $ip_hash->{$ip};
+                delete $mac_ip_hash->{$ip};
                 $purged++;
             }
         }
-        if (keys %{$ip_hash} == 0) {
+        my $k = int(keys %{$mac_ip_hash});
+        if (keys %{$mac_ip_hash} == 0) {
             delete $mac_hash->{$mac};
         }
     }
@@ -106,6 +114,7 @@ sub add {
     my ($self, $ip, $mac, $timestamp) = @_;
     $timestamp //= time;
     $self->clear_ip($ip);
+    return if !defined $mac;
     $self->_arp->{$ip} = [ $mac, $timestamp ];
     $self->_rarp->{$mac}->{$ip} = $timestamp;
     return $timestamp;
