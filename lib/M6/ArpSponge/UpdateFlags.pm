@@ -107,7 +107,7 @@ sub parse_update_flags {
         }
 
         if ($negate) {
-            $flags &= (ARP_UPDATE_ALL & ~$int_method);
+            $flags &= ARP_UPDATE_ALL & ~int($int_method);
             next;
         }
 
@@ -121,15 +121,14 @@ sub update_flags_to_str {
     my ($arg) = @_;
     my @list;
 
-    if ($arg == ARP_UPDATE_NONE) {
-        return ('none');
-    }
+    $arg //= ARP_UPDATE_NONE;
     for my $mask ( sort keys %FLAG_TO_STR ) {
         if ($arg & $mask) {
             push @list, $FLAG_TO_STR{$mask};
         }
     }
-    return @list;
+    return @list if @list;
+    return ('none');
 }
 
 1;
