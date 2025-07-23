@@ -125,21 +125,40 @@ TEST_PURGE : {
 TEST_CLEAR_IP : {
     $table->purge();
     
-    my $mac = 'd6:35:c0:8f:ee:9c';
-    my $ip1 = '198.51.100.1';
-    my $ip2 = '198.51.100.2';
+    my $mac1 = 'd6:35:c0:8f:ee:9c';
+    my $mac2 = 'd6:35:c0:8f:ee:9d';
+    my $ip1  = '198.51.100.1';
+    my $ip2  = '198.51.100.2';
+    my $ip3  = '198.51.100.3';
 
     my $ip1_h = ip2hex($ip1);
     my $ip2_h = ip2hex($ip2);
-    my $mac_h = mac2hex($mac);
+    my $ip3_h = ip2hex($ip3);
+    my $mac1_h = mac2hex($mac1);
+    my $mac2_h = mac2hex($mac2);
 
-    $table->add($ip1_h, $mac_h);
-    $table->add($ip2_h, $mac_h);
+    $table->add($ip1_h, $mac1_h);
+    $table->add($ip2_h, $mac1_h);
 
-    my @ip_list = $table->ip_list;
+    my @ip_list;
+    my @mac_list;
+
+    @ip_list = $table->ip_list;
     is int(@ip_list), 2, "add(IP1, MAC) + add(IP2, MAC) => ip_list has 2 entries";
-    my @mac_list = $table->mac_list;
+    @mac_list = $table->mac_list;
     is int(@mac_list), 1, "add(IP1, MAC) + add(IP2, MAC) => mac_list has 1 entry";
+
+    $table->clear_ip($ip3_h);
+    @ip_list = $table->ip_list;
+    is int(@ip_list), 2, "clear_ip(IP3) => ip_list still has 2 entries";
+    @mac_list = $table->mac_list;
+    is int(@mac_list), 1, "clear_ip(IP3) => => mac_list still has 1 entry";
+
+    $table->clear_mac($mac2_h);
+    @ip_list = $table->ip_list;
+    is int(@ip_list), 2, "clear_mac(MAC2) => ip_list still has 2 entries";
+    @mac_list = $table->mac_list;
+    is int(@mac_list), 1, "clear_mac(MAC2) => => mac_list still has 1 entry";
 
     $table->clear_ip($ip1_h);
     @ip_list = $table->ip_list;
@@ -154,15 +173,15 @@ TEST_CLEAR_IP : {
     is int(@mac_list), 0, "clear_ip(IP2) => mac_list has 0 entries";
 
     $table->purge();
-    $table->add($ip1_h, $mac_h);
-    $table->add($ip2_h, $mac_h);
+    $table->add($ip1_h, $mac1_h);
+    $table->add($ip2_h, $mac1_h);
 
     @ip_list = $table->ip_list;
     is int(@ip_list), 2, "add(IP1, MAC) + add(IP2, MAC) => ip_list has 2 entries";
     @mac_list = $table->mac_list;
     is int(@mac_list), 1, "add(IP1, MAC) + add(IP2, MAC) => mac_list has 1 entry";
 
-    $table->clear_mac($mac_h);
+    $table->clear_mac($mac1_h);
     @ip_list = $table->ip_list;
     is int(@ip_list), 0, "clear_mac(MAC) => ip_list has 0 entries";
     @mac_list = $table->mac_list;
