@@ -20,7 +20,6 @@ use 5.014;
 use warnings;
 
 use Test2::V0;
-use POSIX qw( strftime );
 
 use M6::ArpSponge::State qw(:all);
 use Data::Dumper;
