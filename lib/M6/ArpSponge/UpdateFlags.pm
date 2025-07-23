@@ -52,13 +52,13 @@ BEGIN {
     );
 }
 
-use constant ARP_UPDATE_REPLY      => 0x01;
-use constant ARP_UPDATE_REQUEST    => 0x02;
-use constant ARP_UPDATE_GRATUITOUS => 0x04;
-
-use constant ARP_UPDATE_NONE       => 0x00;
-use constant ARP_UPDATE_ALL        => 0x07;
-
+use constant {
+    ARP_UPDATE_REPLY      => 0x01,
+    ARP_UPDATE_REQUEST    => 0x02,
+    ARP_UPDATE_GRATUITOUS => 0x04,
+    ARP_UPDATE_NONE       => 0x00,
+    ARP_UPDATE_ALL        => 0x07,
+};
 
 my %FLAG_TO_STR = (
     ARP_UPDATE_REPLY()      => 'reply',
