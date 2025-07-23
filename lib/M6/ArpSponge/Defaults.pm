@@ -23,8 +23,8 @@ package M6::ArpSponge::Defaults;
 
 use 5.014;
 use warnings;
-use version;
 
+use version;
 use FindBin;
 use List::Util qw( first );
 use Carp qw( croak );
@@ -67,15 +67,14 @@ sub all { return %Defaults }
 
 sub get {
     my $key = pop @_;
-    return $Defaults{
-        uc(
-            $key =~ s{ ([a-z])([A-Z]) }{$1_$2}rxg
-        )
-    }
+    $key =~ s{\s+}{_}gx;
+    $key =~ s{ ([a-z])([A-Z]) }{$1_$2}gx;
+
+    return $Defaults{uc $key};
 }
 
 sub _get_ifconfig {
-    state $ifconfig =
+    my $ifconfig =
         first { -f $_ && -x $_ }
             map { "$_/ifconfig" } @SYS_DIRS;
 
@@ -84,7 +83,7 @@ sub _get_ifconfig {
 
 
 sub _get_ip_cmd {
-    state $ip_cmd =
+    my $ip_cmd =
         first { -f $_ && -x $_ }
             map { "$_/ip" } @SYS_DIRS;
 
@@ -93,7 +92,7 @@ sub _get_ip_cmd {
 
 
 sub _get_bin_dir {
-    state $bin_dir =
+    my $bin_dir =
         first { -f $_ && -x $_ }
             map { "$_/$NAME" } ($FindBin::Bin, @SYS_DIRS);
 
@@ -104,36 +103,29 @@ sub _get_bin_dir {
 
 
 sub _get_sock_perms {
-    state $perms;
+    my $user = my $group = 'root';
 
-    if (!defined $perms) {
-        my $user = my $group = 'root';
-
-        if ($^O eq 'linux') {
-            $group = 'adm';
-        }
-        elsif ($^O =~ /bsd$/) {
-            $group = 'wheel';
-        }
-
-        $perms = "$user:$group:0660";
+    if ($^O eq 'linux') {
+        $group = 'adm';
+    }
+    elsif ($^O =~ /bsd$/) {
+        $group = 'wheel';
     }
 
-    return $perms;
+    return "$user:$group:0660";
 }
 
 
 sub _get_run_dir {
-    state $base = first { -d $_ } qw( /run /var/run /tmp );
-    state $rundir = "$base/$NAME";
-    return $rundir;
+    my $base = first { -d $_ } qw( /run /var/run /tmp );
+    return "$base/$NAME";
 }
 
 sub AUTOLOAD {
     our $AUTOLOAD;              # keep 'use strict' happy
-    my $program = $AUTOLOAD;
-    $program =~ s/.*:://;
-    return $Defaults{$program} if exists $Defaults{$program};
+    my $func_name = $AUTOLOAD;
+    $func_name =~ s/^.*:://;
+    return $Defaults{$func_name} if exists $Defaults{$func_name};
     croak "Undefined subroutine &$AUTOLOAD";
 }
 
