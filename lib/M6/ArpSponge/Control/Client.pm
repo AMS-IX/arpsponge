@@ -1,4 +1,3 @@
-#############################################################################
 ##############################################################################
 #
 # ARP sponge control socket.
@@ -193,7 +192,7 @@ sub send_command {
 
 __END__
 
-=pod
+=encoding utf8
 
 =head1 NAME
 
@@ -225,7 +224,7 @@ M6::ArpSponge::Control::Client - client part of arpsponge control
 =head1 DESCRIPTION
 
 This module implements the client side of the
-L<arpsponge>(8)
+L<B<arpsponge>(1)|arpsponge>
 control connection.
 
 =head1 CONSTRUCTORS
@@ -235,9 +234,10 @@ control connection.
 =item B<new> ( I<%ARGS> )
 X<new>
 
-Create a new object instance and return a reference to it. Because
-this object inherits from L<IO::Socket>(3), we must keep the same
-semantics for the arguments.
+Create a new object instance and return a reference to it.
+Because this object inherits from
+L<B<IO::Socket>(3)|IO::Socket>,
+we must keep the same semantics for the arguments.
 
 The L</create_client> method is preferred.
 
@@ -263,12 +263,13 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ArpSponge::Sponge>(3),
-L<M6::ArpSponge::Control>(3),
-L<M6::ArpSponge::Control::Base>(3),
-L<M6::ArpSponge::Control::Server>(3),
-L<IO::Socket|IO::Socket>(3),
-L<arpsponge|arpsponge>(8), L<asctl>(1).
+L<B<arpsponge>(1)|arpsponge>,
+L<B<asctl>(1)|asctl>,
+L<B<IO::Socket>(3)|IO::Socket>,
+L<B<M6::ArpSponge::Control>(3)|M6::ArpSponge::Control>,
+L<B<M6::ArpSponge::Control::Base>(3)|M6::ArpSponge::Control::Base>,
+L<B<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server>,
+L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge>.
 
 =head1 AUTHORS
 
@@ -276,7 +277,5 @@ Steven Bakker at AMS-IX (steven.bakker@ams-ix.net).
 
 =head1 COPYRIGHT
 
-Copyright 2011-2016, AMS-IX B.V.
+Copyright E<copy> 2011-2016, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
-
-=cut

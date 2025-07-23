@@ -2542,6 +2542,8 @@ Main();
 
 __END__
 
+=encoding utf8
+
 =head1 NAME
 
 asctl - Arp Sponge ConTroL utility
@@ -2565,7 +2567,8 @@ asctl - Arp Sponge ConTroL utility
 
 =head1 DESCRIPTION
 
-The C<asctl> program connects to a running L<arpsponge(8)|arpsponge>'s control
+The C<asctl> program connects to a running
+L<B<arpsponge>(1)|arpsponge>'s control
 socket, and executes commands that either come from standard input, or from
 the command line.
 
@@ -2663,7 +2666,7 @@ the I<file> argument is given or not.
 Without a I<file> argument, the I<asctl> process will send a C<USR1> signal to
 the L<arpsponge|arpsponge> daemon, causing B<it> to dump its status to its
 C<--dumpfile> argument which is fixed at daemon startup. See also
-L<arpsponge|arpsponge>(8). This command can typically only be executed by
+L<B<arpsponge>(1)|arpsponge>. This command can typically only be executed by
 the owner of the daemon's process (typically C<root>).
 
 With a I<file> argument, the I<asctl> process will query the daemon and write a
@@ -2866,7 +2869,7 @@ its neighbors' ARP caches.
 
 This value is used for manual C<inform> commands as well as automatic inform
 actions (see L<--arp-update-methods|arpsponge/--arp-update-methods> in the
-L<arpsponge>(1) manpage).
+L<B<arpsponge>(1)|arpsponge> manpage).
 
 Assuming we want to update I<stanley> about I<livingston>, the possible
 values for I<flag> are:
@@ -2964,7 +2967,7 @@ Switch in to/out of learning mode
 X<set log_level>
 
 Set the level of logging for the daemon. Values are the same as
-L<syslog(3)|syslog> levels. In decreasing importance:
+L<B<syslog>(3)|syslog.3> levels. In decreasing importance:
 
 =over
 
@@ -3233,9 +3236,9 @@ F</run/arpsponge/>I<ifname>F</control>.
 
 =head1 SEE ALSO
 
-L<arpsponge|arpsponge>(8),
-L<M6::ArpSponge::Defaults>(3),
-L<tail|tail>(1).
+L<B<arpsponge>(1)|arpsponge.1>,
+L<B<syslog>(3)|syslog.3>,
+L<B<M6::ArpSponge::Defaults>(3)|M6::ArpSponge::Defaults>.
 
 =head1 AUTHOR
 
@@ -3243,5 +3246,5 @@ Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2011.
 
 =head1 COPYRIGHT
 
-Copyright 2011-2021, AMS-IX B.V.
+Copyright E<copy> 2011-2021, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.

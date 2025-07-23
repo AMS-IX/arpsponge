@@ -217,7 +217,7 @@ values to be shifted off the queue.
 
 =head1 IP AND MAC ADDRESS REPRESENTATION
 
-Although the L<arpsponge>(8) stores IP and MAC addresses as hexadecimal
+Although the L<arpsponge>(1) stores IP and MAC addresses as hexadecimal
 strings, and this object module is designed to do the same, there is in
 fact no implicit knowledge about the format of the IP and MAC addresses
 in this module; I<ip-address> could stand for I<arbitrary-key> and

@@ -104,7 +104,7 @@ sub _get_data {
 
 __END__
 
-=pod
+=encoding utf8
 
 =head1 NAME
 
@@ -161,7 +161,7 @@ notably the SIGPIPE when writing to a disconnected peer).
 =head1 CONSTRUCTORS
 
 This object defines no constructors of its own, i.e. it
-inherits from L<IO::Socket::UNIX>(3).
+inherits from L<B<IO::Socket::UNIX>(3)|IO::Socket::UNIX.3>.
 
 =head1 METHODS
 
@@ -230,11 +230,13 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ArpSponge::Control>(3),
-L<M6::ArpSponge::Control::Server>(3),
-L<M6::ArpSponge::Control::Client>(3),
-L<IO::Socket|IO::Socket>(3),
-L<arpsponge|arpsponge>(8).
+L<B<arpsponge>(1)|arpsponge>,
+L<B<asctl>(1)|asctl>,
+L<B<IO::Socket>(3)|IO::Socket.3>,
+L<B<IO::Socket::UNIX>(3)|IO::Socket::UNIX.3>,
+L<B<M6::ArpSponge::Control>(3)|M6::ArpSponge::Control>,
+L<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client>,
+L<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server>.
 
 =head1 AUTHORS
 
@@ -242,7 +244,5 @@ Steven Bakker at AMS-IX (steven.bakker@ams-ix.net).
 
 =head1 COPYRIGHT
 
-Copyright 2011-2016, AMS-IX B.V.
+Copyright E<copy> 2011-2016, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
-
-=cut

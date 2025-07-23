@@ -154,7 +154,7 @@ M6::ArpSponge::Defaults - default parameters for the arpsponge
 
 =head1 DESCRIPTION
 
-This class defines default parameters for the L<B<arpsponge>(8)|arpsponge>
+This class defines default parameters for the L<B<arpsponge>(1)|arpsponge>
 and related programs.
 
 Some parameters are OS dependent and will be determined at run-time.
@@ -222,7 +222,7 @@ Which even types to log.
 
 =item B<LOG_LEVEL>
 
-At which level log events are sent to L<syslog>(2).
+At which level log events are sent to L<syslog>(3).
 
 =item B<MAX_ARP_AGE>
 

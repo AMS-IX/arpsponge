@@ -820,7 +820,7 @@ M6::ArpSponge::Control::Server - server implementation for arpsponge control
 =head1 DESCRIPTION
 
 This module implements the server side of the
-L<arpsponge>(8)
+L<B<arpsponge>(1)|arpsponge>
 control connection.
 
 The
@@ -869,7 +869,7 @@ L<M6::ArpSponge::Control>(3),
 L<M6::ArpSponge::Control::Base>(3),
 L<M6::ArpSponge::Control::Client>(3),
 L<IO::Socket|IO::Socket>(3),
-L<arpsponge|arpsponge>(8), L<asctl>(1).
+L<arpsponge|arpsponge>(1), L<asctl>(1).
 
 =head1 AUTHORS
 

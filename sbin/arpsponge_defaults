@@ -197,7 +197,8 @@ B<arpsponge_defaults> B<--manual>
 
 =head1 DESCRIPTION
 
-Print default values of L<arpsponge>(8) parameters.
+Print default values of
+L<B<arpsponge>(1)|arpsponge> parameters.
 
 If given a I<param> argument, print the value of that single
 I<param>. Otherwise, print all parameters, formatted as
@@ -229,7 +230,8 @@ Print a brief help message to F<STDOUT> and exit.
 =item B<--manual>
 X<--manual>
 
-Display the program's L<man>(1) manual page and exit.
+Display the program's
+L<B<man>(1)|man> manual page and exit.
 
 =item B<--prefix>=I<var_prefix>, B<-p> I<var_prefix>
 X<--prefix>X<--p>
@@ -306,7 +308,7 @@ One or more errors occurred.
 
 =head1 SEE ALSO
 
-L<arpsponge>(8).
+L<B<arpsponge>(1)|arpsponge>.
 
 =head1 AUTHOR
 

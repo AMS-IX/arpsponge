@@ -40,7 +40,7 @@ sub _set_error {
 
 __END__
 
-=pod
+=encoding utf8
 
 =head1 NAME
 
@@ -67,21 +67,23 @@ M6::ArpSponge::Control - client/server implementation for arpsponge control
 The C<M6::ArpSponge::Control> modules implement a simple client/server
 protocol for controlling the ARP sponge using UNIX domain sockets.
 
-The server (L<arpsponge>) uses a
-L<M6::ArpSponge::Control::Server>
-object, the client (L<asctl>) uses
-L<M6::ArpSponge::Control::Client>.
+The server (L<B<arpsponge>|arpsponge>) uses a
+L<B<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server>
+object, the client (L<B<asctl>|asctl>) uses
+L<B<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client>.
 
 The implementation consists of a fairly thin wrapper around
-L<IO::Socket::UNIX>(3p), with sponge command handling in the
-L<M6::ArpSponge::Control::Server>
+L<B<IO::Socket::UNIX>(3)|IO::Socket::UNIX>,
+with sponge command handling in the
+L<B<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server>
 part.
 
 You will probably never have to deal with this module directly,
 but rather use
-L<M6::ArpSponge::Control::Server>
+L<B<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server>
 or
-L<M6::ArpSponge::Control::Client>.
+L<B<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client>
+instead.
 
 =head1 PROTOCOL
 
@@ -118,7 +120,7 @@ The client should be aware that these lines can show up where
 normal command output is expected.
 
 The
-L<M6::ArpSponge::Control::Client>
+L<B<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client>
 object knows how to handle this and will store logging information
 in an internal buffer.
 
@@ -129,7 +131,7 @@ in an internal buffer.
 =item X<$M6::ArpSponge::Control::Error>I<$M6::ArpSponge::Control::Error>
 
 Global control socket error message. Use
-L<_set_error|/_set_error> and L<error|/error>
+L<B<_set_error>|/_set_error> and L<B<error>|/error>
 to manipulate this variable.
 
 =item X<$M6::ArpSponge::Control::BUFSIZ>I<$M6::ArpSponge::Control::BUFSIZ>
@@ -140,7 +142,8 @@ L<M6::ArpSponge::Control::Base/_get_data>.
 =item X<$M6::ArpSponge::Control::MAXLOGLINES>I<$M6::ArpSponge::Control::MAXLOGLINES>
 
 Maximum number of log lines that a
-L<M6::ArpSponge::Control::Client> should buffer internally.
+L<B<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client>
+should buffer internally.
 
 =back
 
@@ -167,12 +170,13 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ArpSponge::Control::Server>,
-L<M6::ArpSponge::Control::Client>,
-L<M6::ArpSponge::Control::Base>,
-L<M6::ArpSponge::Sponge>(3),
-L<IO::Socket|IO::Socket>(3),
-L<arpsponge>(8), L<asctl>(1).
+L<B<arpsponge>(1)|arpsponge>,
+L<B<asctl>(1)|asctl>,
+L<B<IO::Socket>(3)|IO::Socket>,
+L<B<M6::ArpSponge::Control::Base>(3)|M6::ArpSponge::Control::Base>,
+L<B<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client>,
+L<B<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server>,
+L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge>,
 
 =head1 AUTHORS
 

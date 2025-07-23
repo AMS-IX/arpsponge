@@ -1452,7 +1452,7 @@ hosts.
 
 =head3 Logging
 
-The program writes sponge/unsponge events to L<syslogd(8)|syslogd> with
+The program writes sponge/unsponge events to L<B<syslog>(3)|syslog.3> with
 priority C<info>.
 
 It can also write more detailed event to clients on the control socket
@@ -1555,7 +1555,8 @@ equivalent:
 
 Default value is C<all>.
 
-This value is also used by the L<inform|asctl/inform> command of L<asctl>(1).
+This value is also used by the L<inform|asctl/inform> command of
+L<B<asctl>(1)|asctl.1>.
 
 =item B<--control>=I<socket>
 X<--control>
@@ -1581,7 +1582,7 @@ the standard input, output and error file descriptors and writes its
 PID to I<pidfile>.
 
 This option turns off C<--verbose> and enables logging to
-L<syslogd(8)|syslogd>.
+L<B<syslog>(3)|syslog.3>.
 
 =item B<--passive>
 X<--passive>
@@ -1693,7 +1694,9 @@ A value of zero (0) disables the initial learning state.
 =item B<--loglevel>=I<level>
 X<--loglevel>
 
-Logging level for L<syslogd(8)|syslogd> logging. Default is C<info>.
+Logging level for
+L<B<syslog>(3)|syslog.3>
+logging. Default is C<info>.
 
 =item B<--logmask>=[B<!>|B<+>]I<event>,...
 X<--logmask>
@@ -1883,7 +1886,7 @@ Write status to I<file> when receiving the C<HUP> or C<USR1> signal.
 Default is "I<rundir>/B<status>".
 
 Note that the daemon has no way of reloading this data, other than through the
-L<asctl|asctl>(8) utility.
+L<B<asctl>(1)|asctl> utility.
 
 =item B<--sweep>=I<interval>/I<threshold>
 X<--sweep>
@@ -1934,8 +1937,9 @@ but without an ARP entry are queried anyway.
 X<--verbose>
 
 Be verbose; print information on F<STDOUT>;
-This options turns off logging to L<syslogd(8)|syslogd> and
-causes the information to be printed to F<STDOUT> instead.
+This options turns off logging to
+L<B<syslog>(3)|syslog.3>
+and causes the information to be printed to F<STDOUT> instead.
 The higher the level I<n> (default is 1 if not given), the
 more detailed information is printed.  Not recommended for
 production use.
@@ -2026,15 +2030,20 @@ Now F</tmp/sponge.out> should contain something like:
 
 =head1 SYSTEM INIT SCRIPT
 
-The sponge can be started by an L<init(1)|init> script,
-F</etc/init.d/arpsponge>. This script looks for the following files:
+The sponge can be started by an
+L<B<init>(1)|init>
+script,
+F</etc/init.d/arpsponge>.
+This script looks for the following files:
 
 =over 4
 
 =item F<@ETC_DEFAULT@/arpsponge/defaults>
 
 Contains default options for every sponge instance. The options are
-specified as L<sh(1)|sh> shell variables.
+specified as
+L<B<sh>(1)|sh.1>
+shell variables.
 
 =item F<@ETC_DEFAULT@/arpsponge/interfaces.d/if_name>
 
@@ -2087,7 +2096,7 @@ files can still explicitly override this value.
 
 =item I<DUMMY_MODE> (boolean)
 
-Use C<--dummy> on the sponge. Note that L<asctl(8)|asctl> clients can
+Use C<--dummy> on the sponge. Note that L<B<asctl>(1)|asctl> clients can
 (re-)set this value on the fly.
 
 =item I<GRATUITOUS> (boolean)
@@ -2206,46 +2215,54 @@ Init script for the arpsponge.
 
 =item F</etc/defaults/arpsponge/defaults>
 
-Contains default options for the sponge's L<init(1)|init> script.
+Contains default options for the sponge's
+L<B<init>(1)|init> script.
 
 =item F</etc/defaults/arpsponge/interfaces.d/if_name>
 
 Contains interface specific options for the sponge on I<ethX>.
 This I<must> define the C<NETWORK> variable.
 
-This is used by the sponge's L<init(1)|init> script, see
-also L<SYSTEM INIT SCRIPT|/SYSTEM INIT SCRIPT>.
+This is used by the sponge's
+L<B<init>(1)|init> script,
+see also L<SYSTEM INIT SCRIPT|/SYSTEM INIT SCRIPT>.
 
 =item F</etc/defaults/arpsponge/ethX> (LEGACY)
 
 Contains (I<LEGACY>) interface specific options for the sponge on I<ethX>.
 This I<must> define the C<NETWORK> variable.
 
-This is used by the sponge's L<init(1)|init> script, see
-also L<SYSTEM INIT SCRIPT|/SYSTEM INIT SCRIPT>.
+This is used by the sponge's
+L<B<init>(1)|init> script,
+see also L<SYSTEM INIT SCRIPT|/SYSTEM INIT SCRIPT>.
 
 =item F</run/arpsponge/if_name/status>
 
 Status file for the sponge daemon that runs on interface I<if_name>.
-This is set up by the sponge's L<init(1)|init> script.
+This is set up by the sponge's
+L<B<init>(1)|init> script.
 
 =item F</run/arpsponge/if_name/control>
 
-Control socket for L<asctl>(8).
-This is set up by the sponge's L<init(1)|init> script.
+Control socket for L<B<asctl>(8)|asctl>.
+This is set up by the sponge's
+L<B<init>(1)|init> script.
 
 =item F</run/arpsponge/if_name/pid>
 
 PID file for the sponge daemon that runs on interface I<if_name>.
-This is set up by the sponge's L<init(1)|init> script.
+This is set up by the sponge's
+L<B<init>(1)|init> script.
 
 =back
 
 =head1 SEE ALSO
 
-L<asctl(8)|asctl>,
-L<aslogtail(8)|aslogtail>,
-L<perl(1)|perl>, L<arp(8)|arp>.
+L<B<arp>(8)|arp.8>,
+L<B<asctl>(1)|asctl.1>,
+L<B<aslogtail>(1)|aslogtail.1>,
+L<B<init>(1)|init.1>,
+L<B<sh>(1)|sh.1>.
 
 =over
 

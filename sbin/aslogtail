@@ -136,6 +136,8 @@ Main();
 
 __END__
 
+=encoding utf8
+
 =head1 NAME
 
 aslogtail - Arp Sponge log tail
@@ -154,14 +156,15 @@ B<aslogtail>
 =head1 DESCRIPTION
 
 The C<aslogtail> program functions like C<tail>, but instead of operating
-on a file, it connects to a running L<arpsponge(8)|arpsponge>'s control
+on a file, it connects to a running
+L<B<arpsponge>(1)|arpsponge>'s control
 socket, reads log events from the daemon and prints them to F<stdout>.
 
 By default, the program connects to the first control socket it finds in
 F</run/arpsponge> (see L<FILES|/FILES>), but see L<OPTIONS|/OPTIONS> below
 for ways to override this.
 
-Like L<tail(1)|tail>, it prints 10 lines of log by default and supports
+Like L<B<tail>(1)|tail>, it prints 10 lines of log by default and supports
 "follow" mode (L<--follow|/--follow>).
 
 Output is in the form of:
@@ -228,9 +231,9 @@ F</run/arpsponge/>I<ifname>F</control>.
 
 =head1 SEE ALSO
 
-L<arpsponge|arpsponge>(8),
-L<asctl|asctl>(8),
-L<tail|tail>(1).
+L<B<arpsponge>(1)|arpsponge>,
+L<B<asctl>(1)|asctl>,
+L<B<tail>(1)|tail.1>.
 
 =head1 AUTHOR
 
@@ -238,7 +241,5 @@ Steven Bakker E<lt>steven.bakker@ams-ix.netE<gt>.
 
 =head1 COPYRIGHT
 
-Copyright 2011-2016, AMS-IX B.V.
+Copyright E<copy> 2011-2016, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
-
-=cut

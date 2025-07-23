@@ -46,7 +46,7 @@ M6::ArpSponge - the AMS-IX ARP sponge
 This module is only used as a placeholder for the package version.
 
 The real magic happens in other modules in the C<M6::ArpSponge>
-name space, L<arpsponge>(8), and L<asctl>(8).
+name space, L<arpsponge>(1), and L<asctl>(1).
 
 =head1 VARIABLES
 
@@ -60,7 +60,7 @@ The package's version.
 
 =head1 SEE ALSO
 
-L<arpsponge>(8), L<asctl>(8).
+L<arpsponge>(1), L<asctl>(1).
 
 =head1 AUTHOR
 
