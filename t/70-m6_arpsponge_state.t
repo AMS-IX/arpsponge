@@ -22,7 +22,6 @@ use warnings;
 use Test2::V0;
 
 use M6::ArpSponge::State qw(:all);
-use Data::Dumper;
 
 my %name_map = (
     'DEAD'       => DEAD,
