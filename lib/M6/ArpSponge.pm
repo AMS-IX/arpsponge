@@ -46,7 +46,7 @@ M6::ArpSponge - the AMS-IX ARP sponge
 This module is only used as a placeholder for the package version.
 
 The real magic happens in other modules in the C<M6::ArpSponge>
-name space, L<arpsponge>(1), and L<asctl>(1).
+name space, L<B<arpsponge>(1)|arpsponge.1>, and L<B<asctl>(1)|asctl.1>.
 
 =head1 VARIABLES
 
@@ -60,7 +60,7 @@ The package's version.
 
 =head1 SEE ALSO
 
-L<arpsponge>(1), L<asctl>(1).
+L<B<arpsponge>(1)|arpsponge.1>, L<B<asctl>(1)|asctl.1>.
 
 =head1 AUTHOR
 
@@ -76,3 +76,4 @@ it under the same terms as Perl itself. See "perldoc perlartistic."
 This software is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
