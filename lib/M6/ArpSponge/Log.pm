@@ -24,7 +24,7 @@ use strict;
 
 use base qw( Exporter );
 
-use POSIX               qw( strftime );
+use Time::Piece         qw( localtime );
 use Sys::Syslog         qw( :standard :macros );
 
 BEGIN {
@@ -212,7 +212,7 @@ sub print_log_level {
         syslog($level, $format, @args);
         return;
     }
-    my $head = strftime("%Y-%m-%d %H:%M:%S ", localtime(time))
+    my $head = localtime->strftime("%Y-%m-%d %H:%M:%S ")
              . $Syslog_Ident . "[$$]:";
     print STDOUT map { "$head $_\n" } split(/\n/, sprintf($format, @args));
     return;
@@ -257,7 +257,7 @@ sub log_verbose($@) {
     my ($level, @args)  = @_;
 
     if (log_is_verbose >= $level) {
-        print STDOUT strftime("%Y-%m-%d %H:%M:%S ", localtime(time)), @args;
+        print STDOUT localtime->strftime("%Y-%m-%d %H:%M:%S "), @args;
     }
 }
 
@@ -271,7 +271,7 @@ sub log_verbose($@) {
 sub log_sverbose($@) {
     my ($level, $fmt, @args) = @_;
     if (log_is_verbose >= $level) {
-        print STDOUT strftime("%Y-%m-%d %H:%M:%S ", localtime(time)),
+        print STDOUT localtime->strftime("%Y-%m-%d %H:%M:%S "),
                      sprintf($fmt, @args);
     }
 }
