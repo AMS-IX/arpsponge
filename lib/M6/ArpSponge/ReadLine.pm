@@ -866,10 +866,10 @@ AMS-IX extensions on top of Term::ReadLine.
 
 =head1 SEE ALSO
 
-L<Term::ReadKey|Term::ReadKey>(3pm),
-L<Term::ReadLine|Term::ReadLine>(3pm),
-L<Term::ReadLine::Gnu|Term::ReadLine::Gnu>(3pm),
-L<perl(1)|perl>.
+L<B<Term::ReadKey>(3pm)|Term::ReadKey.3pm>,
+L<B<Term::ReadLine>(3pm)|Term::ReadLine.3pm>,
+L<B<Term::ReadLine::Gnu>(3pm)|Term::ReadLine::Gnu.3pm>,
+L<B<perl>(1)|perl.1>.
 
 =head1 AUTHOR
 

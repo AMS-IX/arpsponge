@@ -580,9 +580,9 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>,
-L<M6::ArpSponge::Util(3)|M6::ArpSponge::Util>,
-L<NetPacket(3)|NetPacket>.
+L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge.3>,
+L<B<M6::ArpSponge::Util>(3)|M6::ArpSponge::Util.3>,
+L<B<NetPacket>(3)|NetPacket.3>.
 
 =head1 AUTHORS
 

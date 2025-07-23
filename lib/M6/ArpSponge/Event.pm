@@ -134,7 +134,7 @@ Log an I<EVENT> at level I<LOGLEVEL>, with the message specified by
 the I<FMT> format string and any additional arguments.
 
 If I<EVENT> matches the current event mask and I<LOGLEVEL> passes
-the current log level threshold, the message is logged (L<M6::ArpSponge::Log>),
+the current log level threshold, the message is logged (L<B<M6::ArpSponge::Log>(1)|M6::ArpSponge::Log.1>),
 otherwise it is discarded.
 
 =cut

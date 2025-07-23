@@ -206,7 +206,7 @@ M6::ArpSponge::Queue - ARP query queue.
 
 =head1 DESCRIPTION
 
-This object class is used by the L<M6::ArpSponge::Sponge|M6::ArpSponge::Sponge>
+This object class is used by the L<B<M6::ArpSponge::Sponge>(1)|M6::ArpSponge::Sponge.1>
 module to store [source, timestamp] tuples for ARP queries.
 
 The object holds a collection of circular buffers that are accessed by
@@ -217,7 +217,7 @@ values to be shifted off the queue.
 
 =head1 IP AND MAC ADDRESS REPRESENTATION
 
-Although the L<arpsponge>(1) stores IP and MAC addresses as hexadecimal
+Although the L<B<arpsponge>(1)|arpsponge.1> stores IP and MAC addresses as hexadecimal
 strings, and this object module is designed to do the same, there is in
 fact no implicit knowledge about the format of the IP and MAC addresses
 in this module; I<ip-address> could stand for I<arbitrary-key> and
@@ -432,8 +432,8 @@ Output:
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>, L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>,
-L<M6::ArpSponge::Util(3)|M6::ArpSponge::Util>.
+L<B<perl>(1)|perl.1>, L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge.3>,
+L<B<M6::ArpSponge::Util>(3)|M6::ArpSponge::Util.3>.
 
 =head1 AUTHORS
 

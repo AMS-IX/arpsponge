@@ -837,7 +837,7 @@ I/O mode on these objects is non-blocking.
 X<new>
 
 Create a new object instance and return a reference to it. Because
-this object inherits from L<IO::Socket>(3), we must keep the same
+this object inherits from L<B<IO::Socket>(3)|IO::Socket.3>, we must keep the same
 semantics for the arguments.
 
 The L</create_server> method is preferred.
@@ -864,12 +864,12 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<M6::ArpSponge::Sponge>(3),
-L<M6::ArpSponge::Control>(3),
-L<M6::ArpSponge::Control::Base>(3),
-L<M6::ArpSponge::Control::Client>(3),
-L<IO::Socket|IO::Socket>(3),
-L<arpsponge|arpsponge>(1), L<asctl>(1).
+L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge.3>,
+L<B<M6::ArpSponge::Control>(3)|M6::ArpSponge::Control.3>,
+L<B<M6::ArpSponge::Control::Base>(3)|M6::ArpSponge::Control::Base.3>,
+L<B<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client.3>,
+L<B<IO::Socket>(3)|IO::Socket.3>,
+L<B<arpsponge>(1)|arpsponge.1>, L<B<asctl>(1)|asctl.1>.
 
 =head1 AUTHORS
 

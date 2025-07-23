@@ -154,7 +154,8 @@ L<M6::ArpSponge::Control::Server|/M6::ArpSponge::Control::Server>
 and
 L<M6::ArpSponge::Control::Client|/M6::ArpSponge::Control::Client>.
 
-It is a fairly thin wrapper around L<IO::Socket::UNIX>(3p),
+It is a fairly thin wrapper around
+L<B<IO::Socket::UNIX>(3p)|IO::Socket::UNIX.3p>,
 implementing some defaults and handling exceptions (most
 notably the SIGPIPE when writing to a disconnected peer).
 
@@ -235,8 +236,8 @@ L<B<asctl>(1)|asctl>,
 L<B<IO::Socket>(3)|IO::Socket.3>,
 L<B<IO::Socket::UNIX>(3)|IO::Socket::UNIX.3>,
 L<B<M6::ArpSponge::Control>(3)|M6::ArpSponge::Control>,
-L<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client>,
-L<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server>.
+L<B<M6::ArpSponge::Control::Client>(3)|M6::ArpSponge::Control::Client.3>,
+L<B<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server.3>.
 
 =head1 AUTHORS
 

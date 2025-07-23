@@ -636,7 +636,7 @@ See the L</SYNOPSIS> section.
 
 =head1 SEE ALSO
 
-L<perl(1)|perl>, L<M6::ArpSponge::Sponge(3)|M6::ArpSponge::Sponge>.
+L<B<perl>(1)|perl.1>, L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge.3>.
 
 =head1 AUTHORS
 

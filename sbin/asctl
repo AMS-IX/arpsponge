@@ -2601,12 +2601,12 @@ Print debugging information to F<stderr> while executing.
 =item B<--interface>=I<ifname>
 X<--interface>
 
-Connect to the L<arpsponge> instance for interface I<ifname>.
+Connect to the L<B<arpsponge>(1)|arpsponge.1> instance for interface I<ifname>.
 
 =item B<--rundir>=I<dir>
 X<--rundir>
 
-Override the default top directory for the L<arpsponge> control files.
+Override the default top directory for the L<B<arpsponge>(1)|arpsponge.1> control files.
 See also L<FILES|/FILES> below.
 
 =item B<--socket>=I<sock>
@@ -2664,7 +2664,7 @@ This command will actually do two very different things, depending on whether
 the I<file> argument is given or not.
 
 Without a I<file> argument, the I<asctl> process will send a C<USR1> signal to
-the L<arpsponge|arpsponge> daemon, causing B<it> to dump its status to its
+the L<B<arpsponge>(1)|arpsponge.1> daemon, causing B<it> to dump its status to its
 C<--dumpfile> argument which is fixed at daemon startup. See also
 L<B<arpsponge>(1)|arpsponge>. This command can typically only be executed by
 the owner of the daemon's process (typically C<root>).
@@ -3153,7 +3153,7 @@ This is the default.
 
 =item C<raw>
 
-Print the raw response from the L<arpsponge> daemon.
+Print the raw response from the L<B<arpsponge>(1)|arpsponge.1> daemon.
 
 =item C<json>, C<yaml>
 
@@ -3229,7 +3229,7 @@ Shortcuts for C<--format=X>.
 =item F</run/arpsponge>
 
 Default top-level directory location for per-interface control sockets:
-the L<arpsponge> on interface I<ifname> will have its control socket at
+the L<B<arpsponge>(1)|arpsponge.1> on interface I<ifname> will have its control socket at
 F</run/arpsponge/>I<ifname>F</control>.
 
 =back

@@ -201,7 +201,7 @@ Default flood protection parameter.
 =item B<IFCONFIG>
 
 System-dependent, determined at run-time.
-Path to the L<ifconfig>(8) executable.
+Path to the L<B<ifconfig>(8)|ifconfig.8> executable.
 
 =item B<INIT_STATE>
 
@@ -210,7 +210,7 @@ Initialisation state for IP addresses at startup.
 =item B<IP_CMD>
 
 System-dependent, determined at run-time.
-Path to the L<ip>(8) executable (typically only on Linux systems).
+Path to the L<B<ip>(8)|ip.8> executable (typically only on Linux systems).
 
 =item B<LEARN_TIME>
 
@@ -222,7 +222,7 @@ Which even types to log.
 
 =item B<LOG_LEVEL>
 
-At which level log events are sent to L<syslog>(3).
+At which level log events are sent to L<B<syslog>(3)|syslog.3>.
 
 =item B<MAX_ARP_AGE>
 
@@ -293,7 +293,7 @@ Will print (output broken to multiple lines for readability):
 
 =head1 SEE ALSO
 
-L<perl>(1).
+L<B<perl>(1)|perl.1>.
 
 =head1 AUTHOR
 

@@ -189,7 +189,7 @@ Stay connected and print each log line as it comes in from the daemon.
 
 =item B<--interface>=I<ifname>
 
-Connect to the L<arpsponge> instance for interface I<ifname>.
+Connect to the L<B<arpsponge>(1)|arpsponge.1> instance for interface I<ifname>.
 
 =item X<--raw>X<--noraw>B<--raw>, B<--noraw>
 
@@ -202,7 +202,7 @@ and I<message> is the log message.
 
 =item B<--rundir>=I<dir>
 
-Override the default top directory for the L<arpsponge> control files.
+Override the default top directory for the L<B<arpsponge>(1)|arpsponge.1> control files.
 See also L<FILES|/FILES> below.
 
 =item B<--socket>=I<sock>
@@ -224,7 +224,7 @@ The C<--verbose> flag causes the program to be a little more talkative.
 =item F</run/arpsponge>
 
 Default top-level directory location for per-interface control sockets:
-the L<arpsponge> on interface I<ifname> will have its control socket at
+the L<B<arpsponge>(1)|arpsponge.1> on interface I<ifname> will have its control socket at
 F</run/arpsponge/>I<ifname>F</control>.
 
 =back
