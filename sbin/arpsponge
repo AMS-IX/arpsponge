@@ -40,7 +40,7 @@ use IO::Socket;
 
 use M6::ArpSponge::Sponge;
 use M6::ArpSponge::Log         qw( :standard );
-use M6::ArpSponge::Event       qw( :standard );
+use M6::ArpSponge::Event       qw( :const :func );
 use M6::ArpSponge::State       qw( :const );
 use M6::ArpSponge::UpdateFlags qw( :const );
 use M6::ArpSponge::Util        qw( :all );

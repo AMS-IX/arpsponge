@@ -1,7 +1,6 @@
 ###############################################################################
-###############################################################################
 #
-# Logging for the ARP Sponge.
+# Logging level/event definitions for the ARP Sponge.
 #
 #   Copyright 2014-2016 AMS-IX B.V.; All rights reserved.
 #
@@ -20,30 +19,30 @@
 ###############################################################################
 package M6::ArpSponge::Event;
 
-use strict;
+use 5.014;
+use warnings;
 
-use parent qw( Exporter );
+use M6::ArpSponge;
+our $VERSION = $M6::ArpSponge::VERSION;
 
-use M6::ArpSponge::Log        qw( :standard :macros );
+use Exporter 'import';
+
+use M6::ArpSponge::Log qw( :standard :macros );
 
 BEGIN {
-    our $VERSION   = 1.00;
-
-    our @func = (qw(
+    my @func = (qw(
             event_log
             event_mask
-            event_mask_split
             event_mask_to_str
-            event_names event_values
             is_event_mask
-            is_valid_event_mask
             parse_event_mask
         ),
         map { "event_$_" }
             qw( emerg alert crit err warning notice info debug )
     );
 
-    our @macros = qw(
+    my @const = qw(
+        EVENT_NAMES
         EVENT_IO
         EVENT_ALIEN
         EVENT_SPOOF
@@ -55,30 +54,29 @@ BEGIN {
         EVENT_NONE
     );
 
+    our @EXPORT      = ();
+    our @EXPORT_OK   = (@func, @const);
     our %EXPORT_TAGS = (
-        'standard' => [ @func, @macros ],
-        'macros'   => \@macros,
+        'const'    => \@const,
         'func'     => \@func,
-        'all'      => [ @func, @macros ],
+        'all'      => \@EXPORT_OK,
     );
-    our @EXPORT_OK = @{ $EXPORT_TAGS{'all'} };
-    our @EXPORT    = @{ $EXPORT_TAGS{'standard'} };
 }
 
 #############################################################################
 use constant {
-    EVENT_IO     => 0x0001,
-    EVENT_ALIEN  => 0x0002,
-    EVENT_SPOOF  => 0x0004,
-    EVENT_STATIC => 0x0008,
-    EVENT_SPONGE => 0x0010,
-    EVENT_CTL    => 0x0020,
-    EVENT_STATE  => 0x0040,
-    EVENT_ALL    => 0xffff,
-    EVENT_NONE   => 0x0000,
+    EVENT_IO     => 0x01,
+    EVENT_ALIEN  => 0x02,
+    EVENT_SPOOF  => 0x04,
+    EVENT_STATIC => 0x08,
+    EVENT_SPONGE => 0x10,
+    EVENT_CTL    => 0x20,
+    EVENT_STATE  => 0x40,
+    EVENT_ALL    => 0x7f,
+    EVENT_NONE   => 0x00,
 };
 
-our %EVENT_MASK_TO_STR = (
+my %EVENT_MASK_TO_STR = (
     EVENT_IO()     => 'io',
     EVENT_ALIEN()  => 'alien',
     EVENT_SPOOF()  => 'spoof',
@@ -88,17 +86,15 @@ our %EVENT_MASK_TO_STR = (
     EVENT_STATE()  => 'state',
 );
 
-our %STR_TO_EVENT_MASK = (
+my %STR_TO_EVENT_MASK = (
     reverse(%EVENT_MASK_TO_STR),
     'all'  => EVENT_ALL(),
     'none' => EVENT_NONE(),
 );
 
-our $Default_Mask = EVENT_ALL();
+my $Event_Mask   = EVENT_ALL();
 
 #############################################################################
-
-my $Event_Mask    = EVENT_ALL();
 
 sub __event_getset {
     my $ref = $_[0];
@@ -110,8 +106,7 @@ sub __event_getset {
     return $$ref;
 }
 
-sub event_names     { return sort keys %STR_TO_EVENT_MASK }
-sub event_values    { return sort keys %EVENT_MASK_TO_STR }
+sub EVENT_NAMES     { return sort keys %STR_TO_EVENT_MASK }
 
 sub event_mask      { return __event_getset(\$Event_Mask, @_) }
 sub is_event_mask   { return ($_[0] & $Event_Mask) != 0 }
@@ -125,6 +120,76 @@ sub event_notice  { event_log(LOG_NOTICE,   $_[0], @_[1..$#_]) }
 sub event_info    { event_log(LOG_INFO,     $_[0], @_[1..$#_]) }
 sub event_debug   { event_log(LOG_DEBUG,    $_[0], @_[1..$#_]) }
 
+sub event_log($$@) {
+    my ($level, $event, @args) = @_;
+
+    if ($event & $Event_Mask) {
+        print_log_level($level, @args);
+    }
+}
+
+
+sub parse_event_mask {
+    my $arg = $_[0];
+    my $err_s;
+    my %opts = (-err => \$err_s, @_[1..$#_]);
+
+    return event_mask() if ! defined $arg;
+
+    my $mask;
+    for my $event (split(/\s*,\s*/, lc $arg)) {
+        my $negate = 0;
+
+        if ($event =~ s/^\!//) {
+            $negate = 1;
+            $mask //= event_mask();
+        }
+        elsif ($event =~ s/^\+//) {
+            $mask //= event_mask();
+        }
+        else {
+            $mask //= EVENT_NONE;
+        }
+
+        if ($event eq 'none') {
+            $event = 'all';
+            $negate = !$negate;
+        }
+
+        my $int_event = $STR_TO_EVENT_MASK{$event};
+        if (!defined $int_event) {
+            ${$opts{-err}} = qq/"$event" is not a valid event name/;
+            return;
+        }
+
+        if ($negate) {
+            $mask &= EVENT_ALL & ~int($int_event);
+            next;
+        }
+        $mask |= $int_event;
+    }
+    return $mask;
+}
+
+
+sub event_mask_to_str {
+    my ($arg) = @_;
+    my @list;
+
+    $arg //= EVENT_NONE;
+    for my $mask (sort keys %EVENT_MASK_TO_STR) {
+        if ($arg & $mask) {
+            push @list, $EVENT_MASK_TO_STR{$mask};
+        }
+    }
+    return int(@list) ? @list : ('none');
+}
+
+1;
+__END__
+
+=encoding utf8
+
 =over
 
 =item B<event_log> ( I<LOGLEVEL>, I<EVENT>, I<FMT> [, I<ARG>, ... ] )
@@ -137,55 +202,6 @@ If I<EVENT> matches the current event mask and I<LOGLEVEL> passes
 the current log level threshold, the message is logged (L<B<M6::ArpSponge::Log>(1)|M6::ArpSponge::Log.1>),
 otherwise it is discarded.
 
-=cut
-
-sub event_log($$@) {
-    my ($level, $event, @args) = @_;
-
-    if ( ($event & $Event_Mask) and ($level <= log_level()) ) {
-        print_log_level($level, @args);
-    }
-}
-
-=item B<is_valid_event_mask> ( I<STRING> [, B<-err> =E<gt> I<REF>] )
-X<is_valid_event_mask>
-
-Check whether the I<STRING> represents a valid log event.
-
-If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
-contain a diagnostic.
-
-=cut
-
-sub is_valid_event_mask {
-    my ($arg) = @_;
-    my $err_s;
-    my %opts = (-err => \$err_s, @_[1..$#_]);
-
-    if (defined (my $level = $STR_TO_EVENT_MASK{lc $arg}) ) {
-        return $level;
-    }
-
-    ${$opts{-err}} = q/"$arg" is not a valid event mask/;
-    return;
-}
-
-=item B<event_mask_split> ( I<MASK> )
-X<event_mask_split>
-
-Return an array of the individual event mask values that make
-up the compound I<MASK>.
-
-    @list = event_mask_split($mask);
-    print map { event_mask_to_str($_)."\n" } @list;
-
-=cut
-
-sub event_mask_split {
-    my $mask = int($_[0]);
-    return sort grep { $_ & $mask } keys %EVENT_MASK_TO_STR;
-}
-
 =item B<parse_event_mask>
 ( I<ARG> [, B<-err> =E<gt> I<REF>] )
 X<parse_event_mask>
@@ -197,75 +213,15 @@ undefined I<ARG> is still valid, and represents the current mask.
 If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
 contain a diagnostic.
 
-=cut
-
-sub parse_event_mask {
-    my $arg = $_[0];
-    my $err_s;
-    my %opts = (-err => \$err_s, @_[1..$#_]);
-
-    return event_mask() if ! defined $arg;
-    my $mask;
-    for my $event (split(/\s*,\s*/, lc $arg)) {
-        my $negate = 0;
-        my $cumulative = 0;
-
-        my $first_char = substr($event, 0, 1);
-        if ($first_char eq '!') {
-            substr($event, 0, 1) = '';
-            $negate = 1;
-            $mask //= event_mask();
-        }
-        elsif ($first_char eq '+') {
-            substr($event, 0, 1) = '';
-            $mask //= event_mask();
-        }
-        else {
-            $mask //= EVENT_NONE;
-        }
-
-        if ($event eq 'none') {
-            $event = 'all';
-            $negate = !$negate;
-        }
-
-        if (!exists $STR_TO_EVENT_MASK{$event}) {
-            ${$opts{-err}} = qq/"$event" is not a valid event name/;
-            return;
-        }
-
-        if ($negate) {
-            $mask &= ~ int($STR_TO_EVENT_MASK{$event});
-            next;
-        }
-        $mask |= $STR_TO_EVENT_MASK{$event};
-    }
-    return $mask;
-}
-
 =item B<event_mask_to_str> ( I<ARG> )
 X<event_mask_to_str>
 
 Translate the bits in I<ARG> to event mask names and return a list of
 them.
 
-=cut
-
-sub event_mask_to_str {
-    my ($mask) = @_;
-
-    return if !$mask;
-
-    return map { $EVENT_MASK_TO_STR{$_} } event_mask_split($mask);
-}
-
 =back
 
 =head1 COPYRIGHT
 
-Copyright 2014-2016, AMS-IX B.V.
+Copyright E<copy> 2014-2016, AMS-IX B.V.
 Distributed under GPL and the Artistic License 2.0.
-
-=cut
-
-1;

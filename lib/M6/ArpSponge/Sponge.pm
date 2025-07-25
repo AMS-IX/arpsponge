@@ -33,8 +33,8 @@ our $VERSION = $M6::ArpSponge::VERSION;
 
 use Moo;
 
-use M6::ArpSponge::Event;
 use M6::ArpSponge::Log;
+use M6::ArpSponge::Event       qw( :const :func );
 use M6::ArpSponge::State       qw( :const :func );
 use M6::ArpSponge::UpdateFlags qw( :const );
 use M6::ArpSponge::Util        qw( :all );

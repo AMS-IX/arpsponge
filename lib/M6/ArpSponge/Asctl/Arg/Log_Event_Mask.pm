@@ -5,9 +5,9 @@ use Moo;
 extends 'Term::CLI::Argument';
 
 use Term::CLI::Util qw( find_text_matches );
-use M6::ArpSponge::Event qw( event_names parse_event_mask );
+use M6::ArpSponge::Event qw( EVENT_NAMES parse_event_mask );
 
-my @Events = event_names();
+my @Events = EVENT_NAMES();
 
 use namespace::clean;
 

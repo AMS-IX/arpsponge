@@ -28,7 +28,7 @@ use M6::ArpSponge::UpdateFlags qw( :const );
 use M6::ArpSponge::Util        qw( :all );
 use M6::ArpSponge::NetPacket   qw( :const );
 use M6::ArpSponge::Log         qw( :func :macros );
-use M6::ArpSponge::Event       qw( :func :macros );
+use M6::ArpSponge::Event       qw( :func :const );
 use Time::HiRes                qw( time );
 
 BEGIN {

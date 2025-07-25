@@ -87,10 +87,7 @@ sub parse_update_flags {
 
     my $flags = ARP_UPDATE_NONE;
 
-    my $iter = 0;
     for my $method (split(/\s*,\s*/, lc $arg)) {
-        $iter++;
-
         my $negate = 0;
         if ($method =~ s/^\!//) {
             $negate = 1;

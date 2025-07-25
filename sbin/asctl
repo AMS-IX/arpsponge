@@ -38,7 +38,7 @@ use JSON::PP qw();
 
 use M6::ArpSponge::Control::Client;
 use M6::ArpSponge::Defaults;
-use M6::ArpSponge::Event       qw( :standard );
+use M6::ArpSponge::Event       qw( :func :const );
 use M6::ArpSponge::Log         qw( :standard :macros );
 use M6::ArpSponge::Util        qw( :all );
 use M6::ArpSponge::ReadLine    qw( :all );
@@ -765,7 +765,7 @@ sub complete_log_mask {
     DEBUG "\ncomplete_log_mask partial:<$partial>; prefix:<$prefix>";
 
     my @names;
-    for my $name (event_names()) {
+    for my $name (EVENT_NAMES) {
         if (substr($name, 0, length($partial)) eq $partial) {
             push @names, $name;
         }
