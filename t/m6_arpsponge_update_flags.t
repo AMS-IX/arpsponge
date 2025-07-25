@@ -93,7 +93,7 @@ for my $test (@PARSE_TESTS) {
             "parse_update_flags($arg_str) sets appropriate error message";
     }
     else {
-        is $err, undef, "parse_update_flags(undef) returns no error";
+        is $err, undef, "parse_update_flags($arg_str) returns no error";
     }
 }
 
