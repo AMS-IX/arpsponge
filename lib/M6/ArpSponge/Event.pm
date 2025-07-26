@@ -121,10 +121,10 @@ sub event_info    { event_log(LOG_INFO,     $_[0], @_[1..$#_]) }
 sub event_debug   { event_log(LOG_DEBUG,    $_[0], @_[1..$#_]) }
 
 sub event_log($$@) {
-    my ($level, $event, @args) = @_;
+    my ($priority, $event, @args) = @_;
 
     if ($event & $Event_Mask) {
-        print_log_level($level, @args);
+        print_log_level($priority, @args);
     }
 }
 
@@ -192,14 +192,17 @@ __END__
 
 =over
 
-=item B<event_log> ( I<LOGLEVEL>, I<EVENT>, I<FMT> [, I<ARG>, ... ] )
+=item B<event_log>
 X<event_log>
 
-Log an I<EVENT> at level I<LOGLEVEL>, with the message specified by
+    event_log(PRIORITY, EVENT, FMT [, ARG, ... ] )
+
+Log an I<EVENT> at level I<PRIORITY>, with the message specified by
 the I<FMT> format string and any additional arguments.
 
-If I<EVENT> matches the current event mask and I<LOGLEVEL> passes
-the current log level threshold, the message is logged (L<B<M6::ArpSponge::Log>(1)|M6::ArpSponge::Log.1>),
+If I<EVENT> matches the current event mask the message is logged
+with L<B<print_log_level>()|M6::ArpSponge::Log/print_log_level>,
+(see L<B<M6::ArpSponge::Log>|M6::ArpSponge::Log>),
 otherwise it is discarded.
 
 =item B<parse_event_mask>
