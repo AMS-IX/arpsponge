@@ -25,7 +25,10 @@ use strict;
 use base qw( Exporter );
 
 use Time::Piece         qw( localtime );
-use Sys::Syslog         qw( :standard :macros );
+use Sys::Syslog         qw(
+    :macros
+    openlog closelog syslog
+);
 
 BEGIN {
     our $VERSION   = 1.00;
@@ -212,7 +215,7 @@ sub print_log_level {
         syslog($level, $format, @args);
         return;
     }
-    my $head = localtime->strftime("%Y-%m-%d %H:%M:%S ")
+    my $head = localtime->strftime("%FT%T%z ")
              . $Syslog_Ident . "[$$]:";
     print STDOUT map { "$head $_\n" } split(/\n/, sprintf($format, @args));
     return;
