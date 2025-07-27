@@ -1,5 +1,4 @@
 ###############################################################################
-###############################################################################
 #
 # Logging for the ARP Sponge.
 #
@@ -20,19 +19,22 @@
 ###############################################################################
 package M6::ArpSponge::Log;
 
-use strict;
+use 5.014;
+use warnings;
+use FindBin;
 
-use base qw( Exporter );
+use M6::ArpSponge;
+our $VERSION = $M6::ArpSpong::VERSION;
 
-use Time::Piece         qw( localtime );
-use Sys::Syslog         qw(
+use Exporter qw( import );
+use Time::Piece qw( localtime );
+
+use Sys::Syslog qw(
     :macros
     openlog closelog syslog
 );
 
 BEGIN {
-    our $VERSION   = 1.00;
-
     our @func = qw(
         init_log
         print_log
@@ -51,6 +53,7 @@ BEGIN {
         is_valid_log_level log_level_to_string
         add_notify remove_notify print_notify
         get_log_buffer clear_log_buffer log_buffer_size
+        log_ident
     );
 
     our @macros = qw(
@@ -58,47 +61,39 @@ BEGIN {
         LOG_WARNING LOG_NOTICE LOG_INFO LOG_DEBUG
     );
 
-    our @vars = qw(
-        $FACILITY
-        $LOGOPT
-        $Debug
-        $Verbose
+    our %EXPORT_TAGS = (
+        'standard' => \@func,
+        'macros'   => \@macros,
+        'func'     => \@func,
+        'all'      => [ @func, @macros ],
     );
 
-    our %EXPORT_TAGS = (
-            'standard' => \@func,
-            'macros'   => \@macros,
-            'vars'     => \@vars,
-            'func'     => \@func,
-            'all'      => [ @func, @macros, @vars ],
-        );
     our @EXPORT_OK = @{ $EXPORT_TAGS{'all'} };
     our @EXPORT    = @{ $EXPORT_TAGS{'standard'} };
 }
 
-our $FACILITY  = 'user';
-our $LOGOPT    = 'pid';
+my $FACILITY  = 'user';
+my $LOGOPT    = 'pid';
 
 #############################################################################
-our $Debug          = 0;
-our $Verbose        = 0;
-our $Syslog_Ident   = $0;
-
+my $Debug          = 0;
+my $Verbose        = 0;
+my $Syslog_Ident   = $FindBin::Script;
 #############################################################################
-our $Default_Level  = LOG_NOTICE;
+my $DEFAULT_PRIO   = LOG_NOTICE;
 
-our %STR_TO_LOGLEVEL = (
-        'emerg'   => LOG_EMERG,
-        'alert'   => LOG_ALERT,
-        'crit'    => LOG_CRIT,
-        'err'     => LOG_ERR,
-        'warning' => LOG_WARNING,
-        'notice'  => LOG_NOTICE,
-        'info'    => LOG_INFO,
-        'debug'   => LOG_DEBUG,
-    );
+my %STR_TO_LOG_PRIO = (
+    'emerg'   => LOG_EMERG,
+    'alert'   => LOG_ALERT,
+    'crit'    => LOG_CRIT,
+    'err'     => LOG_ERR,
+    'warning' => LOG_WARNING,
+    'notice'  => LOG_NOTICE,
+    'info'    => LOG_INFO,
+    'debug'   => LOG_DEBUG,
+);
 
-our %LOGLEVEL_TO_STR = reverse %STR_TO_LOGLEVEL;
+our %LOG_PRIO_TO_STR = reverse %STR_TO_LOG_PRIO;
 
 #############################################################################
 
@@ -121,12 +116,13 @@ sub __log_getset {
 
 sub init_log {
     $Syslog_Ident = @_ ? $_[0] : $0;
-    $Syslog_Ident =~ s|.*/||;
+    $Syslog_Ident =~ s{.*/}{};
     openlog($Syslog_Ident, $LOGOPT, $FACILITY);
     $Notify = IO::Select->new();
     return 1;
 }
 
+sub log_ident       { return __log_getset(\$Syslog_Ident, @_) }
 sub log_buffer_size { return __log_getset(\$Log_Buffer_Size, @_) }
 sub log_is_verbose  { return __log_getset(\$Verbose, @_) }
 sub log_level       { return __log_getset(\$Log_Level, @_) }
@@ -229,7 +225,7 @@ sub print_log_level {
 ###############################################################################
 sub print_log {
     my ($format, @args) = @_;
-    print_log_level($Default_Level, $format, @args);
+    print_log_level($DEFAULT_PRIO, $format, @args);
 }
 
 ###############################################################################
@@ -296,7 +292,7 @@ sub is_valid_log_level {
     my $err_s;
     $opts{-err} //= $err_s;
 
-    if (defined (my $level = $STR_TO_LOGLEVEL{lc $arg}) ) {
+    if (defined (my $level = $STR_TO_LOG_PRIO{lc $arg}) ) {
         return $level;
     }
 
@@ -315,12 +311,12 @@ sub log_level_to_string {
     my $level = int($_[0]);
 
     if ($level > LOG_DEBUG()) {
-        return $LOGLEVEL_TO_STR{LOG_DEBUG()};
+        return $LOG_PRIO_TO_STR{LOG_DEBUG()};
     }
     if ($level < LOG_EMERG()) {
-        return $LOGLEVEL_TO_STR{LOC_EMERG()};
+        return $LOG_PRIO_TO_STR{LOC_EMERG()};
     }
-    return $LOGLEVEL_TO_STR{$level};
+    return $LOG_PRIO_TO_STR{$level};
 }
 
 =back
