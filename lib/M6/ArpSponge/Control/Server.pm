@@ -220,7 +220,7 @@ sub _get_status_info_s {
     my $learning   = $sponge->get_attr('learning');
 
     my @response = (
-        sprintf("%s=%s\n", 'id', log_ident()),
+        sprintf("%s=%s\n", 'id', LOG_IDENT),
         sprintf("%s=%d\n", 'pid', $$),
         sprintf("%s=%s\n", 'version', $sponge->get_attr('version')),
         sprintf("%s=%d\n", 'date', $now),
