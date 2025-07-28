@@ -30,10 +30,7 @@ my %PRIO_LOOKUP = map {(
         lc $PRIO_NAME{$_} => $_,
 )} keys %PRIO_NAME;
 
-has _mockobj_list => (
-    is => 'rw',
-    default => sub { $_[0]->_build__mockobj_list },
-);
+has _mockobj_list => ( is => 'rw' );
 
 has log_buffer  => (
     is      => 'lazy',
@@ -46,6 +43,37 @@ has logopt      => (is => 'rwp', init_arg => undef);
 has facility    => (is => 'rwp', init_arg => undef);
 has log_is_open => (is => 'rwp', init_arg => undef);
 
+sub BUILD {
+    my ($self, $args) = @_;
+
+    my @namespace;
+    if (!exists $args->{namespace}) {
+        @namespace = ( 'Sys::Syslog' );
+
+        my $caller;
+        my $up = 1;
+
+        while ($caller = caller($up)) {
+            last if $caller ne __PACKAGE__;
+            $up++;
+        }
+        if ($caller) {
+            push @namespace, $caller;
+        }
+    }
+    elsif (defined (my $namespace = $args->{namespace})) {
+        if (!ref $namespace) {
+            @namespace = ( $namespace );
+        }
+        else {
+            @namespace = @{$namespace};
+        }
+    }
+
+    my $list = $self->_build__mockobj_list(@namespace);
+    $self->_mockobj_list($list);
+}
+
 sub _prio_lookup {
     my $prio = lc $_[0];
     if (exists $PRIO_LOOKUP{$prio}) {
@@ -57,20 +85,13 @@ sub _prio_lookup {
 }
 
 sub _build__mockobj_list {
-    my ($self) = @_;
+    my ($self, @namespace) = @_;
 
     my @obj_list;
 
-    my $caller;
-    my $up = 1;
-    while ($caller = caller($up)) {
-        last if $caller ne __PACKAGE__;
-        $up++;
+    for my $ns (@namespace) {
+        push @obj_list, $self->_build__mockobj($ns);
     }
-    if ($caller) {
-        push @obj_list, $self->_build__mockobj($caller);
-    }
-    push @obj_list, $self->_build__mockobj('Sys::Syslog');
     return \@obj_list;
 }
 
