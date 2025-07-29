@@ -187,10 +187,6 @@ sub test_ipv4 : Test(no_plan) {
     $got_ip_hash = decode_ipv4();
     is_deeply($got_ip_hash, {}, 'decode_ipv4()');
 
-  # Test whether we can really call the decode_ip alias.
-    $got_ip_hash = decode_ipv4($ipv4_data);
-    is_deeply($got_ip_hash, $ip_hash, 'decode_ip(SYN)');
-
   # Invalidate header length, just for kicks.
     substr($ipv4_data, 0, 1) = pack('H2', '44');
     $got_ip_hash = decode_ipv4($ipv4_data);

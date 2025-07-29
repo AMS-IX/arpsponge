@@ -33,7 +33,7 @@ use Exporter 'import';
 
 BEGIN {
     my @functions = qw(
-        decode_ethernet decode_ip decode_ipv4 decode_arp
+        decode_ethernet decode_ipv4 decode_arp
         encode_ethernet encode_arp
     );
 
@@ -97,8 +97,6 @@ sub encode_ethernet {
     return pack( 'H12H12na*', @{$self}{qw( dest_mac src_mac type data )} );
 }
 
-
-sub decode_ip { &decode_ipv4 }
 
 sub decode_ipv4 {
     my ($pkt) = @_;
@@ -381,10 +379,6 @@ Integer denoting the Ethernet type field.
 Payload data of the Ethernet frame.
 
 =back
-
-=head2 decode_ip
-
-Synonymous with L<B<decode_ipv4()>|/decode_ipv4>.
 
 =head2 decode_ipv4
 
