@@ -8,6 +8,8 @@ use warnings;
 #use Test2::V0;
 use Test::More;
 use Test::Output;
+use Test::Exception;
+
 use FindBin;
 
 use lib "$FindBin::Bin/lib";
@@ -21,7 +23,6 @@ my $mock = Test::Mock::Sys::Syslog->new(namespace => 'M6::ArpSponge::Log');
 subtest 'init_log' => sub {
     ok init_log(), "init_log() returns true";
     is LOG_IDENT, $FindBin::Script, "init_log() sets LOG_IDENT to \$FindBin::Script";
-    end_log();
 
     ok init_log('test'), "init_log('test') returns true";
     is LOG_IDENT, 'test', "init_log('test') sets LOG_IDENT to 'test'";
@@ -246,4 +247,69 @@ subtest 'log_is_verbose' => sub {
 
 };
 
+subtest 'log_buffer_size' => sub {
+    $mock->clear_log_buffer();
+    log_is_verbose(0);
+    clear_log_buffer();
+    my $bufsiz = 4;
+    log_buffer_size($bufsiz);
+
+    for my $i (1..$bufsiz) {
+        print_log("message %d", $i);
+    }
+
+    my $buf = get_log_buffer();
+    is int(@{$buf}), $bufsiz,
+        "log buffer holds $bufsiz lines after $bufsiz messages";
+
+    my ($got_tstamp, $got_msg);
+
+    ($got_tstamp, $got_msg) = @{$buf->[0]};
+    like $got_msg, qr{message 1},
+            "first message matches 'message 1'";
+    ($got_tstamp, $got_msg) = @{$buf->[-1]};
+    like $got_msg, qr{message $bufsiz},
+            "last message matches 'message $bufsiz'";
+
+    my $new_n = $bufsiz + 1;
+    print_log("message $new_n");
+
+    is int(@{$buf}), $bufsiz,
+        "log buffer holds $bufsiz lines after ${new_n} messages";
+
+    ($got_tstamp, $got_msg) = @{$buf->[0]};
+    unlike $got_msg, qr{message 1},
+            "oldest message ('message 1') has been removed";
+
+    ($got_tstamp, $got_msg) = @{$buf->[-1]};
+    like $got_msg, qr{message $new_n},
+            "last message now matches 'message $new_n'";
+
+    my $old_size = int(@{$buf});
+    $bufsiz--;
+    log_buffer_size($bufsiz);
+    my $new_size = int(@{$buf});
+
+    is $new_size, $bufsiz,
+        "log buffer reduced to $bufsiz lines after log_buffer_size($bufsiz)";
+};
+
+subtest 'log_fatal' => sub {
+    throws_ok { log_fatal('a FATAL message') } qr{a FATAL message},
+        "log_fatal(\$msg) dies with appropriate message";
+
+    my $buf = $mock->log_buffer();
+    my ($prio, $msg) = @{$buf->[-1]};
+    like $msg, qr{a FATAL message},
+        "log_fatal() logs appropriate message";
+
+    my $crit = uc log_level_to_string(LOG_CRIT);
+    is $prio, $crit,
+        "log_fatal() logs message at '$crit' level";
+
+    throws_ok { log_fatal('a FATAL message from %d', $$) }
+        qr{a FATAL message from $$},
+        "log_fatal(\$fmt, \@args) dies with appropriate message";
+
+};
 done_testing();
