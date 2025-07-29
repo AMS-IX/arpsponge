@@ -33,7 +33,7 @@ use List::Util qw( min max );
 
 use Sys::Syslog qw(
     :macros
-    openlog closelog syslog
+    openlog closelog syslog setlogmask
 );
 
 BEGIN {
@@ -155,10 +155,18 @@ sub log_buffer_size  {
 }
 
 sub log_is_verbose   { return __log_getset(\$Verbose, @_) }
-sub log_level        { return __log_getset(\$Log_Level, @_) }
 sub is_log_level     { return $_[0] <= $Log_Level }
 sub get_log_buffer   { return \@Log_Buffer }
 sub clear_log_buffer { @Log_Buffer = () }
+
+sub log_level {
+    my $old = $Log_Level;
+    if (@_) {
+        $Log_Level = shift @_;
+        setlogmask(LOG_UPTO($Log_Level));
+    }
+    return $old;
+}
 
 sub log_emerg        { print_log_level(LOG_EMERG,    @_) }
 sub log_alert        { print_log_level(LOG_ALERT,    @_) }
@@ -192,8 +200,6 @@ sub remove_notify {
 #   Print message on the notify handles.
 ###############################################################################
 sub _print_notify($@) {
-    $Notify || return;
-
     my $msg = sprintf(@_);
     for my $fh ($Notify->can_write(0)) {
         $fh->send_log($msg);
@@ -209,25 +215,24 @@ sub print_log_level {
     return if !is_log_level($level);
 
     # Add message to circular log buffer.
-    foreach (split(/\n/, sprintf($format, @args))) {
+    my $msg = @args ?  sprintf($format, @args) : $format;
+    my $is_verbose = log_is_verbose() > 0;
+    my $tstamp = _log_tstamp();
+
+    foreach my $line (split(/\n/, $msg)) {
         if (int(@Log_Buffer) >= $Log_Buffer_Size) {
             shift @Log_Buffer;
         }
-        push @Log_Buffer, [ time, $_ ];
-    }
+        push @Log_Buffer, [ time, $line ];
 
-    _print_notify($format, @args);
+        _print_notify($line);
 
-    if (log_is_verbose() <= 0) {
-        syslog($level, $format, @args);
-        return;
-    }
-
-    # Verbose mode; don't syslog(), but print to STDOUT.
-    my $tstamp = _log_tstamp();
-    my $msg = @args ? sprintf($format, @args) : $format;
-    foreach (split(/\n/, $msg)) {
-        printf STDOUT "%s %s[%d]: %s\n", $tstamp, $SYSLOG_IDENT, $$, $_;
+        if ($is_verbose) {
+            printf STDOUT "%s %s[%d]: %s\n", $tstamp, $SYSLOG_IDENT, $$, $line;
+        }
+        else {
+            syslog($level, $line);
+        }
     }
     return;
 }
