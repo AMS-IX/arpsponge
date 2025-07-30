@@ -37,7 +37,6 @@ BEGIN {
             format_time relative_time hex_addr_in_net
             is_valid_int is_valid_float is_valid_ip
             is_valid_bool
-            arpflags2int int2arpflags
             read_from_pipe
         );
     our @EXPORT    = ();
