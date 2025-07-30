@@ -19,7 +19,7 @@
 use 5.014;
 use warnings;
 
-use Test2::V0;
+use Test::More;
 
 use M6::ArpSponge::State qw(:all);
 
