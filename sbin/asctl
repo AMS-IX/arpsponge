@@ -118,7 +118,7 @@ my %TYPE_CONVERSION_MAP = (
         fmt => '%s',
     },
     log_mask => {
-        convert => sub { join(',', event_mask_to_str($_[0])) },
+        convert => sub { join(',', event_mask_to_string($_[0])) },
         save_raw => 'raw_%s',
         convert_raw => sub { ($_[0] // 0) + 0 },
         fmt => '%s',

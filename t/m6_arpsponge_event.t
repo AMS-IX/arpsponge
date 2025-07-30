@@ -40,8 +40,7 @@ imported_ok(qw(
         EVENT_NONE
         event_log
         event_mask
-        event_mask_to_str
-        is_event_mask
+        event_mask_to_string
         parse_event_mask
     ),
     (map { "event_$_" }
@@ -175,7 +174,7 @@ subtest 'event_mask' => sub {
             $arg, $curr, $expected);
 };
 
-subtest 'event_mask_to_str' => sub {
+subtest 'event_mask_to_string' => sub {
     my @STR_TESTS = (
         { arg => undef,
             expected => ['none'] },
@@ -195,33 +194,12 @@ subtest 'event_mask_to_str' => sub {
         my @expected = sort @{$expected};
         my $exp_str = "(".join(', ', map { qq{'$_'} } @expected).")";
 
-        my @got = sort (event_mask_to_str($arg));
+        my @got = sort (event_mask_to_string($arg));
 
-        is \@got, \@expected, "event_mask_to_str($arg_str) returns $exp_str";
+        is \@got, \@expected,
+            "event_mask_to_string($arg_str) returns $exp_str";
     }
 };
-
-subtest 'is_event_mask' => sub {
-    event_mask(EVENT_IO|EVENT_CTL);
-    my $arg;
-    my $curr = event_mask();
-
-    $arg = EVENT_IO;
-    ok is_event_mask($arg),
-        sprintf("is_event_mask(0x%02x) (curr=0x%02x) returns true", $arg, $curr);
-
-    $arg = EVENT_CTL;
-    ok is_event_mask($arg),
-        sprintf("is_event_mask(0x%02x) (curr=0x%02x) returns true", $arg, $curr);
-
-    $arg = EVENT_ALIEN;
-    ok !is_event_mask($arg),
-        sprintf("is_event_mask(0x%02x) (curr=0x%02x) returns false", $arg, $curr);
-};
-
-sub BREAKPOINT() {
-    return 0;
-}
 
 subtest 'event_logging' => sub {
     my $mock = Test::Mock::Sys::Syslog->new(namespace => 'M6::ArpSponge::Log');
@@ -248,7 +226,6 @@ subtest 'event_logging' => sub {
         my $msg = "an IO event at level \U$prio_name\E";
 
         $mock->clear_log_buffer();
-        BREAKPOINT();
         $func->(EVENT_IO, $msg);
         
         my $buf = $mock->log_buffer();

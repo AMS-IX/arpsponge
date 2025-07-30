@@ -33,8 +33,7 @@ BEGIN {
     my @func = (qw(
             event_log
             event_mask
-            event_mask_to_str
-            is_event_mask
+            event_mask_to_string
             parse_event_mask
         ),
         map { "event_$_" }
@@ -109,7 +108,6 @@ sub __event_getset {
 sub EVENT_NAMES     { return sort keys %STR_TO_EVENT_MASK }
 
 sub event_mask      { return __event_getset(\$Event_Mask, @_) }
-sub is_event_mask   { return ($_[0] & $Event_Mask) != 0 }
 
 sub event_emerg   { event_log(LOG_EMERG,    $_[0], @_[1..$#_]) }
 sub event_alert   { event_log(LOG_ALERT,    $_[0], @_[1..$#_]) }
@@ -172,7 +170,7 @@ sub parse_event_mask {
 }
 
 
-sub event_mask_to_str {
+sub event_mask_to_string {
     my ($arg) = @_;
     my @list;
 
