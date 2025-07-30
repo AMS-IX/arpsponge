@@ -110,7 +110,7 @@ M6::ArpSponge::State - singing and dancing module
 
 =head1 SYNOPSIS
 
- use M6::ArpSponge::State;
+  use M6::ArpSponge::State;
 
 =head1 DESCRIPTION
 
@@ -146,12 +146,12 @@ is in "pending" (pre-sponge) state.
 
 =head2 is_valid_state
 
-    STATE_VAL = is_valid_state(STR);
-    STATE_VAL = is_valid_state(STR, -err => REF);
+  STATE_VAL = is_valid_state(STR);
+  STATE_VAL = is_valid_state(STR, -err => REF);
 
 =head2 state_to_string
 
-    STR = state_to_string(STATE_VAL)
+  STR = state_to_string(STATE_VAL)
 
 =head1 EXAMPLES
 

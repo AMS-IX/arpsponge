@@ -242,46 +242,46 @@ Returns a reference to the newly created object.
 
 =head2 clear_all
 
-    OBJ->clear_all();
+  OBJ->clear_all();
 
 Clear all queues.
 
 =head2 clear
 
-    OBJ->clear(IP);
+  OBJ->clear(IP);
 
 Clear the queue for I<IP>.
 
 =head2 depth
 
-    DEPTH = OBJ->depth(IP);
+  DEPTH = OBJ->depth(IP);
 
 Return the depth of the queue for I<IP>.
 
 =head2 rate
 
-    RATE = OBJ->rate(IP);
+  RATE = OBJ->rate(IP);
 
 Return the (average) query rate (as a real number) for I<IP> in queries
 per minute.
 
 =head2 max_depth
 
-    DEPTH = OBJ->max_depth();
-    OBJ->max_depth(DEPTH);
+  DEPTH = OBJ->max_depth();
+  OBJ->max_depth(DEPTH);
 
 Return or set the maximum depth of the queues.
 
 =head2 is_full
 
-    BOOL = OBJ->is_full(IP);
+  BOOL = OBJ->is_full(IP);
 
 Return whether or not the queue for I<IP> is full,
 that is, the ring buffer is wrapping.
 
 =head2 add
 
-    OBJ->add(IP, SRC_IP, TIMESTAMP);
+  OBJ->add(IP, SRC_IP, TIMESTAMP);
 
 Add [I<SRC_IP>, I<TIMESTAMP>] to the queue for I<IP>,
 wrapping the ring buffer if necessary.
@@ -289,8 +289,8 @@ Returns the new queue depth.
 
 =head2 get_timestamp
 
-    TSTAMP = OBJ->get_timestamp(IP);
-    TSTAMP = OBJ->get_timestamp(IP, INDEX);
+  TSTAMP = OBJ->get_timestamp(IP);
+  TSTAMP = OBJ->get_timestamp(IP, INDEX);
 
 Return the I<TSTAMP> at position I<INDEX> in the queue for I<IP>.
 Index zero (0) or I<undef> gives the oldest time stamp; positive values
@@ -301,29 +301,29 @@ at index 0 will be returned.
 
 This is equivalent to:
 
-    OBJ->get_queue(IP)->[INDEX]->[1]
+  OBJ->get_queue(IP)->[INDEX]->[1]
 
 But minus definedness/boundary checking.
 
 =head2 get_queue
 
-    QUEUE_REF = OBJ->get_queue(IP);
+  QUEUE_REF = OBJ->get_queue(IP);
 
 Return the timestamps for I<IP> as an ArrayRef:
 
-    [
-        [ SENDER, TIME_0 ], # Oldest.
-        [ SENDER, TIME_2 ],
-        ...
-        [ SENDER, TIME_N ], # Most recent.
-    ]
+  [
+      [ SENDER, TIME_0 ], # Oldest.
+      [ SENDER, TIME_2 ],
+      ...
+      [ SENDER, TIME_N ], # Most recent.
+  ]
 
 I<NOTE:> this is a reference to the internal list of data, so take care
 that you don't inadvertently modify it.
 
 =head2 reduce
 
-    OBJ->reduce>(IP, MAX_RATE)
+  OBJ->reduce>(IP, MAX_RATE)
 
 Reduce the queue for I<IP> by comparing subsequent pairs of entries for
 each source IP and removing the older one if the time delta between the
@@ -338,8 +338,8 @@ Returns the new queue depth after reducing.
 
 =head2 _get_queue_entry
 
-    ENTRY = OBJ->_get_queue_entry(IP);
-    ENTRY = OBJ->_get_queue_entry(IP, INDEX);
+  ENTRY = OBJ->_get_queue_entry(IP);
+  ENTRY = OBJ->_get_queue_entry(IP, INDEX);
 
 Return the [I<SRC_IP>, I<TIMESTAMP>] data tuple at position I<INDEX>
 in the queue for I<IP>.
@@ -364,71 +364,70 @@ Also:
 
 =head1 EXAMPLE
 
-    use M6::ArpSponge::Queue;
-    use M6::ArpSponge::Util qw( :all );
-    use Time::HiRes qw( usleep time );
-    use POSIX qw( strftime );
+  use M6::ArpSponge::Queue;
+  use M6::ArpSponge::Util qw( :all );
+  use Time::HiRes qw( usleep time );
+  use POSIX qw( strftime );
 
-    my $some_ip_s = '10.1.1.1';
-    my $some_ip   = ip2hex($some_ip_s);
-    my @src_ip    = map { ip2hex($_) } qw(10.1.1.2 10.1.1.3 10.1.1.4);
-    my $max_rate  = 10;
+  my $some_ip_s = '10.1.1.1';
+  my $some_ip   = ip2hex($some_ip_s);
+  my @src_ip    = map { ip2hex($_) } qw(10.1.1.2 10.1.1.3 10.1.1.4);
+  my $max_rate  = 10;
 
-    $q = new M6::ArpSponge::Queue(100);
+  $q = new M6::ArpSponge::Queue(100);
 
-    printf("Filling queue for $some_ip_s (max %d)\n", $q->max_depth);
+  printf("Filling queue for $some_ip_s (max %d)\n", $q->max_depth);
 
-    $q->clear($some_ip);
-    my $n = 0;
-    while (!$q->is_full($some_ip)) {
-        my $src_ip = $src_ip[$n];
-        $n = ($n + 1) % int(@src_ip);
-        $q->add($some_ip, $src_ip, time);
-        print STDERR sprintf("\rdepth: %3d", $q->depth($some_ip));
-        usleep(rand(5e4));
-    }
-    print "\rBefore reduce:\n";
-    printf(" depth: %3d\n", $q->depth($some_ip));
-    print strftime(" first: %H:%M:%S\n",
+  $q->clear($some_ip);
+  my $n = 0;
+  while (!$q->is_full($some_ip)) {
+     my $src_ip = $src_ip[$n];
+     $n = ($n + 1) % int(@src_ip);
+     $q->add($some_ip, $src_ip, time);
+     print STDERR sprintf("\rdepth: %3d", $q->depth($some_ip));
+     usleep(rand(5e4));
+  }
+  print "\rBefore reduce:\n";
+  printf(" depth: %3d\n", $q->depth($some_ip));
+  print strftime(" first: %H:%M:%S\n",
+                 localtime($q->get($some_ip, 0)));
+  print strftime(" last:  %H:%M:%S\n",
+                 localtime($q->get($some_ip, -1)));
+  printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
+
+  #$" = ",";
+  #foreach $entry (@{$q->get_queue($some_ip)}) {
+  #   print qq{[@$entry]\n};
+  #}
+
+  $q->reduce($some_ip, $max_rate);
+  print "\nAfter reduce:\n";
+  printf(" depth: %3d\n", $q->depth($some_ip));
+  print strftime(" first: %H:%M:%S\n",
                    localtime($q->get($some_ip, 0)));
-    print strftime(" last:  %H:%M:%S\n",
+  print strftime(" last:  %H:%M:%S\n",
                    localtime($q->get($some_ip, -1)));
-    printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
+  printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
 
-    #$" = ",";
-    #foreach $entry (@{$q->get_queue($some_ip)}) {
-    #   print qq{[@$entry]\n};
-    #}
-
-    $q->reduce($some_ip, $max_rate);
-    print "\nAfter reduce:\n";
-    printf(" depth: %3d\n", $q->depth($some_ip));
-    print strftime(" first: %H:%M:%S\n",
-                   localtime($q->get($some_ip, 0)));
-    print strftime(" last:  %H:%M:%S\n",
-                   localtime($q->get($some_ip, -1)));
-    printf(" rate:  %0.2f queries/minute\n", $q->rate($some_ip));
-
-    #foreach $entry (@{$q->get_queue($some_ip)}) {
-    #   print qq{[@$entry]\n};
-    #}
-
+  #foreach $entry (@{$q->get_queue($some_ip)}) {
+  #   print qq{[@$entry]\n};
+  #}
 
 Output:
 
-    Filling queue for 10.1.1.1 (max 100)
-    100
-    Before reduce:
-     depth: 100
-     first: 00:43:44
-     last:  08:43:04
-     rate:  2451.50 queries/minute
+  Filling queue for 10.1.1.1 (max 100)
+  100
+  Before reduce:
+   depth: 100
+   first: 00:43:44
+   last:  08:43:04
+   rate:  2451.50 queries/minute
 
-    After reduce:
-     depth:  18
-     first: 00:18:08
-     last:  08:43:04
-     rate:  438.50 queries/minute
+  After reduce:
+   depth:  18
+   first: 00:18:08
+   last:  08:43:04
+   rate:  438.50 queries/minute
 
 =head1 SEE ALSO
 

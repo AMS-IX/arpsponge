@@ -324,7 +324,7 @@ they I<do not> set C<_parent> or C<_frame>.)
 
 =head2 decode_ethernet
 
-    HASHREF = decode_ethernet( DATA );
+  HASHREF = decode_ethernet( DATA );
 
 (TCP/IP Illustrated, Volume 1, Section 2.2, p21-23.)
 
@@ -353,7 +353,7 @@ Payload data of the Ethernet frame.
 
 =head2 encode_ethernet
 
-    DATA = encode_ethernet( HASHREF );
+  DATA = encode_ethernet( HASHREF );
 
 (TCP/IP Illustrated, Volume 1, Section 2.2, p21-23.)
 
@@ -382,7 +382,7 @@ Payload data of the Ethernet frame.
 
 =head2 decode_ipv4
 
-    HASHREF = decode_ipv4( DATA );
+  HASHREF = decode_ipv4( DATA );
 
 (TCP/IP Illustrated, Volume 1, Section 3.2, p34-37.)
 
@@ -447,7 +447,7 @@ Payload data of the IP datagram.
 
 =head2 decode_arp
 
-    HASHREF = decode_arp( DATA );
+  HASHREF = decode_arp( DATA );
 
 (TCP/IP Illustrated, Volume 1, Section 4.4, p56-57.)
 
@@ -510,7 +510,7 @@ sure you don't get nonsense.
 
 =head2 encode_arp
 
-    DATA = encode_arp( HASHREF )
+  DATA = encode_arp( HASHREF )
 
 (TCP/IP Illustrated, Volume 1, Section 4.4, p56-57.)
 

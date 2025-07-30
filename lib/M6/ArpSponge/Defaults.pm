@@ -163,14 +163,14 @@ Some parameters are OS dependent and will be determined at run-time.
 
 =head2 all
 
-    %DEFAULTS = M6::ArpSponge::Defaults->all();
+  %DEFAULTS = M6::ArpSponge::Defaults->all();
 
 Return all defaults as a list (hash), where keys (e.g. C<MAX_ARP_AGE>)
 maps to a value.
 
 =head2 get
 
-    $VAL = M6::ArpSponge::Defaults->get( $KEY );
+  $VAL = M6::ArpSponge::Defaults->get( $KEY );
 
 Return the default value for parameter I<$KEY>; lookup is case-insensitive,
 although camel case and spaces are replaced with underscores
@@ -178,9 +178,9 @@ although camel case and spaces are replaced with underscores
 
 =head2 Per-parameters methods
 
-    $VAL = M6::ArpSponge::Defaults->MAX_ARP_AGE;
-    $VAL = M6::ArpSponge::Defaults->FLOOD_PROTECTION;
-    ...
+  $VAL = M6::ArpSponge::Defaults->MAX_ARP_AGE;
+  $VAL = M6::ArpSponge::Defaults->FLOOD_PROTECTION;
+  ...
 
 Instead of using L</get> to get a specific parameter, you can also call
 a class method with the parameter name.
@@ -272,24 +272,40 @@ Package version.
 
 =head2 Access all parameters
 
+Code:
+
   my %h = M6::ArpSponge::Defaults->all();
   say join(" ", sort keys %h);
 
-Will print (output broken to multiple lines for readability):
+Will print (output spread over multiple lines for readability):
 
-  BIN_DIR FLOOD_PROTECTION IFCONFIG INIT_STATE IP_CMD LEARN_TIME
-  LOG_EVENT_MASK LOG_LEVEL MAX_ARP_AGE MAX_ARP_RATE MAX_PENDING NAME
+  BIN_DIR FLOOD_PROTECTION IFCONFIG INIT_STATE IP_CMD LEARN_TIME \
+  LOG_EVENT_MASK LOG_LEVEL MAX_ARP_AGE MAX_ARP_RATE MAX_PENDING NAME \
   PROBE_RATE QUEUE_DEPTH RUN_DIR SOCK_PERMS VERSION
 
 =head2 Access parameter by name
 
-  chomp(my $key = <>);
+Code:
 
-  say "$key = ", M6::ArpSponge::Defaults->get( $key );
+  for my $key (qw( flood_protection init_state InitState )) {
+      say "$key = ", M6::ArpSponge::Defaults->get( $key );
+  }
+
+Will print:
+
+  flood_protection = 3
+  init_state = -1
+  InitState = -1
 
 =head2 Access parameter as method
 
+Code:
+
   say "MAX_ARP_AGE = ", M6::ArpSponge::Defaults->MAX_ARP_AGE;
+
+Will print:
+
+  MAX_ARP_AGE = 600
 
 =head1 SEE ALSO
 

@@ -304,8 +304,8 @@ These functions are convenience wrappers around L<B<event_log>()|/event_log>:
 
 =head2 event_log
 
-    event_log($PRIORITY, $EVENT, $STR);
-    event_log($PRIORITY, $EVENT, $FMT, $ARG, ...);
+  event_log($PRIORITY, $EVENT, $STR);
+  event_log($PRIORITY, $EVENT, $FMT, $ARG, ...);
 
 Log an I<$EVENT> at level I<$PRIORITY>, with the specified message
 specified by the I<$FMT> format string and any additional arguments.
@@ -317,16 +317,16 @@ otherwise it is discarded.
 
 =head2 event_mask
 
-    $MASK = event_mask();
-    $OLD_MASK = event_mask($NEW_MASK);
+  $MASK = event_mask();
+  $OLD_MASK = event_mask($NEW_MASK);
 
 Get or set the event mask. The (old/new) mask is expected to be an integer
 composed by combining the various B<EVENT_xxx> constants.
 
 =head2 parse_event_mask
 
-    $MASK = parse_event_mask($STR);
-    $MASK = parse_event_mask($STR, -err => \$ERR);
+  $MASK = parse_event_mask($STR);
+  $MASK = parse_event_mask($STR, -err => \$ERR);
 
 Check whether I<$STR> represents a valid list of event classes.
 Returns an integer representing the mask on success,
@@ -338,7 +338,7 @@ the I<$ERR> scalar will contain a diagnostic.
 
 =head2 event_mask_to_string
 
-    @STR_LIST = event_mask_to_string($MASK);
+  @STR_LIST = event_mask_to_string($MASK);
 
 Translate the bits in I<$MASK> to event mask names and return a list of
 them.

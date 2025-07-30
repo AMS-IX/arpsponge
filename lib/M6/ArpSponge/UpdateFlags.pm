@@ -140,17 +140,17 @@ M6::ArpSponge::UpdateFlags - define constants for arpsponge(1) update flags
 
 =head1 SYNOPSIS
 
-    use M6::ArpSponge::UpdateFlags qw( :const );
+  use M6::ArpSponge::UpdateFlags qw( :const );
 
-    say "ARP_UPDATE_REPLY = ", ARP_UPDATE_REPLY;
+  say "ARP_UPDATE_REPLY = ", ARP_UPDATE_REPLY;
 
-    use M6::ArpSponge::UpdateFlags qw( :func :const );
+  use M6::ArpSponge::UpdateFlags qw( :func :const );
 
-    say "Mask reply,gratuitous = ", parse_update_flags("reply,gratuitous");
+  say "Mask reply,gratuitous = ", parse_update_flags("reply,gratuitous");
 
-    my $mask = ARP_UPDATE_ALL;
+  my $mask = ARP_UPDATE_ALL;
 
-    printf("Mask 0x%2x = (%s)\n", join(',', update_flags_to_string($mask));
+  printf("Mask 0x%2x = (%s)\n", join(',', update_flags_to_string($mask));
 
 =head1 DESCRIPTION
 
@@ -194,8 +194,8 @@ Mask with all bits set (in other words, the disjunction of all methods).
 
 =head2 parse_update_flags
 
-    $FLAG_MASK = parse_update_flags($STR);
-    $FLAG_MASK = parse_update_flags($STR, -err => \$ERR);
+  $FLAG_MASK = parse_update_flags($STR);
+  $FLAG_MASK = parse_update_flags($STR, -err => \$ERR);
 
 Check whether I<$STR> represents a valid list of ARP update flags. Returns an
 integer representing the flags on success, C<undef> on error. Note that an
@@ -206,7 +206,7 @@ the I<$ERR> scalar will contain a diagnostic message.
 
 =head2 update_flags_to_string
 
-    @FLAG_STR_LIST = update_flags_to_string($ARG);
+  @FLAG_STR_LIST = update_flags_to_string($ARG);
 
 Translate the bits in I<$ARG> to ARP update flag names and return a list of
 them.

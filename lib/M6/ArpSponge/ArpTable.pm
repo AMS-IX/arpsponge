@@ -160,7 +160,7 @@ track of IP to MAC mappings.
 
 =head2 new
 
-    $OBJ = M6::ArpSponge::Table->new();
+  $OBJ = M6::ArpSponge::Table->new();
 
 Create a new object instance and return a reference to it.
 
@@ -168,8 +168,8 @@ Create a new object instance and return a reference to it.
 
 =head2 add
 
-    $TIMESTAMP = $OBJ->add( $IP, $MAC );
-    $TIMESTAMP = $OBJ->add( $IP, $MAC, $TIMESTAMP );
+  $TIMESTAMP = $OBJ->add( $IP, $MAC );
+  $TIMESTAMP = $OBJ->add( $IP, $MAC, $TIMESTAMP );
 
 Add a mapping for I<$IP> to I<$MAC>. If I<$TIMESTAMP> is given, use
 it for the entry's timestamp, otherwise use the current time.
@@ -177,27 +177,27 @@ Return the timestamp.
 
 =head2 clear_ip
 
-    $OBJ->clear_ip( $IP );
+  $OBJ->clear_ip( $IP );
 
 Clear the table for I<$IP>.
 
 =head2 clear_mac
 
-    $OBJ->clear_mac( $MAC );
+  $OBJ->clear_mac( $MAC );
 
 Clear the table for MAC address I<$MAC>.
 
 =head2 ip_list
 
-    @IP_LIST = $OBJ->ip_list();
+  @IP_LIST = $OBJ->ip_list();
 
 Return an unsorted list of all IP addresses that are present in the
 ARP table.
 
 =head2 lookup_ip
 
-    $MAC = $OBJ->lookup_ip( $IP );
-    ($MAC, $MTIME) = OBJ->lookup_ip( $IP );
+  $MAC = $OBJ->lookup_ip( $IP );
+  ($MAC, $MTIME) = OBJ->lookup_ip( $IP );
 
 Return the MAC address for I<$IP>
 (or MAC address and last modification time in list context).
@@ -205,22 +205,22 @@ Returns C<undef> (or an empty list) if there is no entry for I<$IP>.
 
 =head2 lookup_mac
 
-    @IP_LIST = $OBJ->lookup_mac( $MAC );
+  @IP_LIST = $OBJ->lookup_mac( $MAC );
 
 Return an unsorted (possibly empty) list of IP addresses that are mapped
 to I<MAC>.
 
 =head2 mac_list
 
-    @MAC_LIST = $OBJ->mac_list();
+  @MAC_LIST = $OBJ->mac_list();
 
 Return an unsorted list of MAC addresses that are present in the
 ARP table.
 
 =head2 purge
 
-    $IP_COUNT = $OBJ->purge();
-    $IP_COUNT = $OBJ->purge( $TIMESTAMP );
+  $IP_COUNT = $OBJ->purge();
+  $IP_COUNT = $OBJ->purge( $TIMESTAMP );
 
 Delete all entries from the table. If I<$TIMESTAMP> is given,
 only delete entries that are older than I<$TIMESTAMP>

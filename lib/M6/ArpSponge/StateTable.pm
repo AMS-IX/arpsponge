@@ -166,7 +166,7 @@ state.
 
 =head2 new
 
-    OBJ = M6::ArpSponge::StateTable->new();
+  OBJ = M6::ArpSponge::StateTable->new();
 
 Create a new B<M6::ArpSponge::StateTable> object and return
 a reference to it.
@@ -175,24 +175,24 @@ a reference to it.
 
 =head2 clear_all
 
-    $TABLE->clear_all();
+  $TABLE->clear_all();
 
 Clears all state information from the I<$TABLE> object as if
 it was freshly created via L<B<new>()|/new>.
 
 =head2 get_all_pending
 
-    $HASH = $TABLE->get_all_pending();
+  $HASH = $TABLE->get_all_pending();
 
 Returns a HashRef that contains an entry for each IP address that is
 in one of the B<PENDING(>I<x>B<)> states
 (see L<B<M6::ArpSponge::State>|M6::ArpSponge::State>):
 
-    {
-        HEXIP_1 => STATE_1,
-        HEXIP_2 => STATE_2,
-        ...
-    }
+  {
+    HEXIP_1 => STATE_1,
+    HEXIP_2 => STATE_2,
+    ...
+  }
 
 This HashRef should be treated as B<read-only>.
 Modifications to the underlying hash should be done through
@@ -200,24 +200,24 @@ L<B<clear_all>()|/clear_all> or L<B<set_state>()|/set_state>.
 
 =head2 get_all_state_info
 
-    $HASH = $TABLE->get_all_state_info();
+  $HASH = $TABLE->get_all_state_info();
 
 Returns a HashRef that contains an entry for each IP address
 for which a state is kept:
 
-    {
-        HEXIP_1 => {
-            state => STATE_1,
-            mtime => MTIME_1,
-            atime => ATIME_1,
-        }
-        HEXIP_2 => {
-            state => STATE_2,
-            mtime => MTIME_2,
-            atime => ATIME_2,
-        }
-        ...
+  {
+    HEXIP_1 => {
+      state => STATE_1,
+      mtime => MTIME_1,
+      atime => ATIME_1,
     }
+    HEXIP_2 => {
+      state => STATE_2,
+      mtime => MTIME_2,
+      atime => ATIME_2,
+    }
+    ...
+  }
 
 This HashRef should be treated as B<read-only>.
 Modifications to the underlying hash should be done through
@@ -229,21 +229,21 @@ L<B<set_state>()|/set_state>.
 
 =head2 get_atime
 
-    $ATIME = $TABLE->get_atime($HEXIP);
+  $ATIME = $TABLE->get_atime($HEXIP);
 
 Returns the "access time" of I<$HEXIP>,
 or C<undef> if I<$TABLE> has no state for I<$HEXIP>:
 
 =head2 get_mtime
 
-    $MTIME = $TABLE->get_mtime($HEXIP);
+  $MTIME = $TABLE->get_mtime($HEXIP);
 
 Returns the "modification time" of I<$HEXIP>,
 or C<undef> if I<$TABLE> has no state for I<$HEXIP>:
 
 =head2 get_state
 
-    $STATE = $TABLE->get_state($HEXIP);
+  $STATE = $TABLE->get_state($HEXIP);
 
 Returns the state of I<$HEXIP>
 (one of the values defined in
@@ -252,16 +252,16 @@ or C<undef> if I<$TABLE> has no state for I<$HEXIP>:
 
 =head2 get_state_info
 
-    $STATE_HASH = $TABLE->get_state_info($HEXIP);
+  $STATE_HASH = $TABLE->get_state_info($HEXIP);
 
 Returns a HashRef with the state information of I<$HEXIP>,
 or C<undef> if I<$TABLE> has no state for I<$HEXIP>:
 
-    {
-        state => $STATE,
-        mtime => $MTIME,
-        atime => $ATIME,
-    }
+  {
+    state => $STATE,
+    mtime => $MTIME,
+    atime => $ATIME,
+  }
 
 This HashRef should be treated as B<read-only>.
 Modifications to the underlying hash should be done through
@@ -273,22 +273,22 @@ L<B<set_state>()|/set_state>.
 
 =head2 has_state
 
-    $BOOL = $TABLE->has_state($HEXIP);
+  $BOOL = $TABLE->has_state($HEXIP);
 
 Returns whether or not I<$TABLE> has state information for
 I<$HEXIP>
 
 =head2 is_pending
 
-    $STATE = $TABLE->is_pending($HEXIP);
+  $STATE = $TABLE->is_pending($HEXIP);
 
 Returns the state for I<$HEXIP> if it is in one of the pending states
 (B<PENDING(0)> and up), C<undef> otherwise.
 
 =head2 set_atime
 
-    $TABLE->set_atime($HEXIP);
-    $TABLE->set_atime($HEXIP, $ATIME);
+  $TABLE->set_atime($HEXIP);
+  $TABLE->set_atime($HEXIP, $ATIME);
 
 Sets the "access time" of I<$HEXIP>.
 If I<$ATIME> is not given, it will set it to the current time
@@ -296,8 +296,8 @@ If I<$ATIME> is not given, it will set it to the current time
 
 =head2 set_mtime
 
-    $TABLE->set_mtime($HEXIP);
-    $TABLE->set_mtime($HEXIP, $MTIME);
+  $TABLE->set_mtime($HEXIP);
+  $TABLE->set_mtime($HEXIP, $MTIME);
 
 Sets the "modification time" of I<$HEXIP>.
 If I<$MTIME> is not given, it will set it to the current time
@@ -305,8 +305,8 @@ If I<$MTIME> is not given, it will set it to the current time
 
 =head2 set_state
 
-    $TABLE->set_state($HEXIP, $STATE);
-    $TABLE->set_state($HEXIP, $STATE, $TIME);
+  $TABLE->set_state($HEXIP, $STATE);
+  $TABLE->set_state($HEXIP, $STATE, $TIME);
 
 Sets the state of I<$HEXIP> in I<$TABLE>.
 If I<$STATE> is B<NONE> or C<undef>,

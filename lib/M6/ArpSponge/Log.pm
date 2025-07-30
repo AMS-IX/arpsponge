@@ -331,22 +331,22 @@ M6::ArpSponge::Log - logging functions for the arpsponge(1)
 
 =head1 SYNOPSIS
 
-    use M6::ArpSponge::Log qw( :macros :func );
+ use M6::ArpSponge::Log qw( :macros :func );
 
-    init_log();
+ init_log();
 
-    log_level(LOG_NOTICE);
+ log_level(LOG_NOTICE);
 
-    log_notice("my PID is %d", $$);
-    print_log("my PID is %d", $$);
-    print_log_level(LOG_NOTICE, "my PID is %d", $$);
+ log_notice("my PID is %d", $$);
+ print_log("my PID is %d", $$);
+ print_log_level(LOG_NOTICE, "my PID is %d", $$);
 
-    log_is_verbose(1);
+ log_is_verbose(1);
 
-    log_verbose("my PID is $$\n");
-    log_sverbose("my PID is %d\n", $$");
+ log_verbose("my PID is $$\n");
+ log_sverbose("my PID is %d\n", $$");
 
-    end_log();
+ end_log();
 
 =head1 DESCRIPTION
 
@@ -403,8 +403,8 @@ Functions can be imported by name or by the C<:func> or C<:all> tag.
 
 =head2 init_log
 
-    init_log();
-    init_log($IDENT);
+  init_log();
+  init_log($IDENT);
 
 Initialises the logging module. This function should be called before
 any other function in this module.
@@ -420,14 +420,14 @@ L<B<$FindBin::Script>|FindBin/$Script> will be used.
 
 =head2 end_log
 
-    end_log();
+  end_log();
 
 Close the logging interface and clear the list of notification handles.
 
 =head2 log_buffer_size
 
-    $NLINES = log_buffer_size();
-    $OLD_NLINES = log_buffer_size($NEW_NLINES);
+  $NLINES = log_buffer_size();
+  $OLD_NLINES = log_buffer_size($NEW_NLINES);
 
 Get or set the number of lines to keep in the internal log buffer.
 The internal log buffer is a ring buffer where newer entries will
@@ -438,32 +438,32 @@ number of lines is no more than I<$NEW_NLINES>.
 
 =head2 get_log_buffer
 
-    $BUF_REF = get_log_buffer();
+  $BUF_REF = get_log_buffer();
 
 Returns a reference to an array holding the internal log buffer.
 The order of elements is oldest to newest.
 Each element in the array is a log entry that consists of a time stamp
 and a log message:
 
-    $BUF_REF = [
-        [ $T0, $STR_0 ],
-        [ $T1, $STR_1 ],
-        ...
-        [ $Tn, $STR_n ],
-    ];
+  $BUF_REF = [
+      [ $T0, $STR_0 ],
+      [ $T1, $STR_1 ],
+      ...
+      [ $Tn, $STR_n ],
+  ];
 
 The time stamps are expressed as seconds since epoch.
 
 =head2 clear_log_buffer
 
-    clear_log_buffer();
+  clear_log_buffer();
 
 Clear the internal log buffer.
 
 =head2 log_is_verbose
 
-    $LEVEL = log_is_verbose();
-    $OLD_LEVEL = log_is_verbose($NEW_LEVEL);
+  $LEVEL = log_is_verbose();
+  $OLD_LEVEL = log_is_verbose($NEW_LEVEL);
 
 Get or set the verbosity level. Default is 0.
 If verbosity is set to any level greater than 0,
@@ -473,8 +473,8 @@ L<B<syslog>(3)|syslog>.
 
 =head2 log_level
 
-    $LEVEL = log_level();
-    $OLD_LEVEL = log_level($NEW_LEVEL);
+  $LEVEL = log_level();
+  $OLD_LEVEL = log_level($NEW_LEVEL);
 
 Get or set the current cut-off level for logging.
 
@@ -486,7 +486,7 @@ The default level is B<LOG_NOTICE>.
 
 =head2 is_log_level
 
-    $BOOL = is_log_level($LEVEL);
+  $BOOL = is_log_level($LEVEL);
 
 Return a true value if a message with priority I<$LEVEL>
 would be logged according to the current
@@ -499,71 +499,71 @@ but C<log_is_level(LOG_INFO)> would return false.
 
 =head2 log_fatal
 
-    log_fatal($STR);
-    log_fatal($FMT, ...);
+  log_fatal($STR);
+  log_fatal($FMT, ...);
 
 Calls L<B<log_crit>()|/log_crit> with the given arguments
 and then L<B<die>()|perlfunc/die>s with the same message.
 
 =head2 log_emerg
 
-    log_emerg($STR);
-    log_emerg($FMT, ...);
+  log_emerg($STR);
+  log_emerg($FMT, ...);
 
 Synonymous with C<print_log_level(LOG_EMERG, ...)>.
 
 =head2 log_alert
 
-    log_alert($STR);
-    log_alert($FMT, ...);
+  log_alert($STR);
+  log_alert($FMT, ...);
 
 Synonymous with C<print_log_level(LOG_ALERT, ...)>.
 
 =head2 log_crit
 
-    log_crit($STR);
-    log_crit($FMT, ...);
+  log_crit($STR);
+  log_crit($FMT, ...);
 
 Synonymous with C<print_log_level(LOG_CRIT, ...)>.
 
 =head2 log_err
 
-    log_err($STR);
-    log_err($FMT, ...);
+  log_err($STR);
+  log_err($FMT, ...);
 
 Synonymous with C<print_log_level(LOG_ERR, ...)>.
 
 =head2 log_warning
 
-    log_warning($STR);
-    log_warning($FMT, ...);
+  log_warning($STR);
+  log_warning($FMT, ...);
 
 Synonymous with C<print_log_level(LOG_WARNING, ...)>.
 
 =head2 log_notice
 
-    log_notice($STR);
-    log_notice($FMT, ...);
+  log_notice($STR);
+  log_notice($FMT, ...);
 
 Synonymous with C<print_log_level(LOG_NOTICE, ...)>.
 
 =head2 log_info
 
-    log_info($STR);
-    log_info($FMT, ...);
+  log_info($STR);
+  log_info($FMT, ...);
 
 Synonymous with C<print_log_level(LOG_INFO, ...)>.
 
 =head2 log_debug
 
-    log_debug($STR);
-    log_debug($FMT, ...);
+  log_debug($STR);
+  log_debug($FMT, ...);
 
 Synonymous with C<print_log_level(LOG_DEBUG, ...)>.
 
 =head2 add_notify
 
-    add_notify($HANDLE);
+  add_notify($HANDLE);
 
 Adds I<$HANDLE> to the list of notification handles.
 <$HANDLE> is assumed
@@ -575,7 +575,7 @@ IO handle and provide a C<send_log> method.
 
 =head2 remove_notify
 
-    $HANDLE = remove_notify($HANDLE);
+  $HANDLE = remove_notify($HANDLE);
 
 Removes I<$HANDLE> from the list of notification handles.
 <$HANDLE> is assumed
@@ -587,8 +587,8 @@ Returns I<$HANDLE>.
 
 =head2 print_log_level
 
-    print_log_level($LEVEL, $STR);
-    print_log_level($LEVEL, $FMT, ...);
+  print_log_level($LEVEL, $STR);
+  print_log_level($LEVEL, $FMT, ...);
 
 Log a message at priority I<$LEVEL>.
 If more multiple message parameters are given, they will be
@@ -598,15 +598,15 @@ arguments.
 
 =head2 print_log
 
-    print_log($STR);
-    print_log($FMT, ...);
+  print_log($STR);
+  print_log($FMT, ...);
 
 Calls L<B<print_log_level>()|/print_log_level>
 with the default log level (B<LOG_NOTICE>).
 
 =head2 log_verbose
 
-    log_verbose($LEVEL, $STR, ...);
+  log_verbose($LEVEL, $STR, ...);
 
 Prints I<$STR>, ... to F<STDOUT> if verbosity level
 (see L<B<log_is_verbose>|/log_is_verbose>) is
@@ -616,7 +616,7 @@ Does not add any timestamp, identifier, or newline.
 
 =head2 log_sverbose
 
-    log_sverbose($LEVEL, $FMT, ...);
+  log_sverbose($LEVEL, $FMT, ...);
 
 Similar to L<B<log_verbose>|/log_verbose>, but the
 arguments are treated as L<B<printf>()|perlfunc/printf>
@@ -624,7 +624,7 @@ arguments.
 
 =head2 log_level_to_string
 
-    $STR = log_level_to_string( $LEVEL );
+  $STR = log_level_to_string( $LEVEL );
 
 Returns the string representation of the numerical I<$LEVEL>.
 If I<$LEVEL> is outside the pre-defined bounds, the value
@@ -633,8 +633,8 @@ C<debug> (if I<$LEVEL> is too high).
 
 =head2 is_valid_log_level
 
-    $LEVEL = is_valid_log_level($STR);
-    $LEVEL = is_valid_log_level($STR, -err => \$ERR_STR);
+  $LEVEL = is_valid_log_level($STR);
+  $LEVEL = is_valid_log_level($STR, -err => \$ERR_STR);
 
 Checks whether I<$STR> represents a valid syslog level.
 
