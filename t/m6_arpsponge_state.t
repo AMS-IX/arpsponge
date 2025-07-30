@@ -57,7 +57,7 @@ for my $val (sort { ($a||0) <=> ($b||0) } keys %state_map) {
     is $got, $expected, "state_to_string($val) => '$expected'";
 }
 
-is state_to_string(undef), 'NONE',   "state_to_str(undef) => 'NONE'";
-is state_to_string(-10),  'ILLEGAL', "state_to_str(-10) => 'ILLEGAL'";
+is state_to_string(undef), 'NONE',   "state_to_string(undef) => 'NONE'";
+is state_to_string(-10),   'ILLEGAL', "state_to_string(-10) => 'ILLEGAL'";
 
 done_testing();
