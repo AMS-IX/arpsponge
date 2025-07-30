@@ -106,7 +106,7 @@ my %TYPE_CONVERSION_MAP = (
         fmt => '%s',
     },
     arp_update_flags => {
-        convert => sub { join(',', update_flags_to_str($_[0])) },
+        convert => sub { join(',', update_flags_to_string($_[0])) },
         save_raw => 'raw_%s',
         convert_raw => sub { ($_[0] // 0) + 0 },
         fmt => '%s',

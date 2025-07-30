@@ -29,7 +29,7 @@ imported_ok(qw(
     ARP_UPDATE_NONE
     ARP_UPDATE_ALL
     parse_update_flags
-    update_flags_to_str
+    update_flags_to_string
 ));
 
 my @PARSE_TESTS = (
@@ -113,9 +113,9 @@ for my $test (@STR_TESTS) {
     my @expected = sort @{$expected};
     my $exp_str = "(".join(', ', map { qq{'$_'} } @expected).")";
 
-    my @got = sort (update_flags_to_str($arg));
+    my @got = sort (update_flags_to_string($arg));
 
-    is \@got, \@expected, "update_flags_to_str($arg_str) returns $exp_str";
+    is \@got, \@expected, "update_flags_to_string($arg_str) returns $exp_str";
 }
 
 done_testing();

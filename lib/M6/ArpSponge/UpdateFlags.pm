@@ -30,7 +30,7 @@ use Exporter 'import';
 
 BEGIN {
     my @func = qw(
-        parse_update_flags update_flags_to_str
+        parse_update_flags update_flags_to_string
     );
 
     my @update_flags = qw(
@@ -114,7 +114,7 @@ sub parse_update_flags {
 }
 
 
-sub update_flags_to_str {
+sub update_flags_to_string {
     my ($arg) = @_;
     my @list;
 
@@ -150,7 +150,7 @@ M6::ArpSponge::UpdateFlags - define constants for arpsponge(1) update flags
 
     my $mask = ARP_UPDATE_ALL;
 
-    printf("Mask 0x%2x = (%s)\n", join(',', update_flags_to_str($mask));
+    printf("Mask 0x%2x = (%s)\n", join(',', update_flags_to_string($mask));
 
 =head1 DESCRIPTION
 
@@ -194,23 +194,24 @@ Mask with all bits set (in other words, the disjunction of all methods).
 
 =head2 parse_update_flags
 
-    FLAG_MASK = parse_update_flags(STR);
-    FLAG_MASK = parse_update_flags(STR, -err => REF);
+    $FLAG_MASK = parse_update_flags($STR);
+    $FLAG_MASK = parse_update_flags($STR, -err => \$ERR);
 
-Check whether I<ARG> represents a valid list of ARP update flags. Returns an
+Check whether I<$STR> represents a valid list of ARP update flags. Returns an
 integer representing the flags on success, C<undef> on error. Note that an
-undefined I<ARG> is still valid, and represents C<ARP_UPDATE_NONE>.
+undefined I<$ARG> is still valid, and represents I<ARP_UPDATE_NONE>.
 
-If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
-contain a diagnostic.
+If an error occurs and C<-err> is specified,
+the I<$ERR> scalar will contain a diagnostic message.
 
-=head2 update_flags_to_str
+=head2 update_flags_to_string
 
-    FLAG_STR_LIST = update_flags_to_str(ARG);
+    @FLAG_STR_LIST = update_flags_to_string($ARG);
 
-Translate the bits in I<ARG> to ARP update flag names and return a list of
+Translate the bits in I<$ARG> to ARP update flag names and return a list of
 them.
 
 =head1 SEE ALSO
 
+L<B<arpsponge>(1)|arpsponge.1>,
 L<B<M6::ArpSponge::Sponge>(3)|M6::ArpSponge::Sponge>.
