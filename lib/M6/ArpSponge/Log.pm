@@ -363,6 +363,10 @@ sockets and print messages to F<STDOUT>.
 Due to the confusing "lower number is higher priority" semantics,
 this module foregoes the term "priority" in favour of "level".
 
+For more elaborate logging of specific event categories, see
+L<B<M6::ArpSponge::Event>(3)|M6::ArpSponge::Event.3>
+(which uses this module).
+
 =head1 MACROS
 
 Macros can be imported by name or by the C<:macros> or C<:all> tag.
@@ -642,6 +646,7 @@ contain a diagnostic message.
 L<B<arpsponge>(1)|arpsponge.1>,
 L<B<FindBin>(3p)|FindBin.3>,
 L<B<M6::ArpSponge::Control::Server>(3)|M6::ArpSponge::Control::Server.3>,
+L<B<M6::ArpSponge::Event>(3)|M6::ArpSponge::Event.3>,
 L<B<syslog>(3)|syslog.3>,
 L<B<Sys::Syslog>(3p)|Sys::Syslog.3>.
 
