@@ -188,39 +188,167 @@ __END__
 
 =encoding utf8
 
+=head1 NAME
+
+M6::ArpSponge::Event - log arpsponge(1) events
+
+=head1 SYNOPSIS
+
+ use M6::ArpSponge::Event qw( :const :func );
+
+ event_mask(EVENT_ALL & ~EVENT_ALIEN);
+ event_mask(EVENT_IO|EVENT_CTL|EVENT_SPOOF);
+
+ event_debug(EVENT_IO, "I/O debug message");
+ event_log(LOG_DEBUG, EVENT_IO, "I/O debug message");
+
+ event_emerg(EVENT_CTL, "CTL emerg; home=%s", $::ENV{HOME});
+ event_log(LOG_EMERG, EVENT_CTL, "CTL emerg; home=%s", $::ENV{HOME}");
+
+ my $mask = parse_event_mask('ctl,io', -err => \(my $err));
+
+ my @str = event_mask_to_string($mask);
+
+=head1 DESCRIPTION
+
+B<M6::ArpSponge::Event> builds on
+L<B<M6::ArpSponge::Event>(3)|M6::ArpSponge::Event.3>
+by providing distinct event categories in addition to
+log levels.
+The logging functions in this module expect that
+L<B<M6::ArpSponge::Event>(3)|M6::ArpSponge::Event.3>'s
+L<B<init_log>()|M6::ArpSponge::Event/init_log> has
+already been called. This is the programmer's responsibility.
+
+
+In order for this module to be useful, it is important that
+
+See L<B<arpsponge>(1)|arpsponge.1>
+for the possible log categories and their meanings.
+
+
+=head1 CONSTANTS
+
+Event constants can be imported in the caller's namespace
+individually by name or via the C<:const> tag.
+
 =over
 
-=item B<event_log>
-X<event_log>
+=item I<EVENT_NAMES>
 
-    event_log(PRIORITY, EVENT, FMT [, ARG, ... ] )
+A list of all valid event class names. Also includes
+C<all> and C<none>.
 
-Log an I<EVENT> at level I<PRIORITY>, with the message specified by
-the I<FMT> format string and any additional arguments.
+=item I<EVENT_IO>
 
-If I<EVENT> matches the current event mask the message is logged
+The C<io> event class.
+
+=item I<EVENT_ALIEN>
+
+The C<alien> event class.
+
+=item I<EVENT_SPOOF>
+
+The C<spoof> event class.
+
+=item I<EVENT_STATIC>
+
+The C<static> event class.
+
+=item I<EVENT_SPONGE>
+
+The C<sponge> event class.
+
+=item I<EVENT_CTL>
+
+The C<ctl> event class.
+
+=item I<EVENT_STATE>
+
+The C<state> event class.
+
+=item I<EVENT_ALL>
+
+The C<all> event class
+(the combination of all of the above event classes).
+
+=item I<EVENT_NONE>
+
+The C<none> event class
+(the negation of all of the above event classes).
+
+=back
+
+=head1 FUNCTIONS
+
+=head2 event_emerg ... event_debug
+X<event_emerg>
+X<event_alert>
+X<event_crit>
+X<event_err>
+X<event_warning>
+X<event_notice>
+X<event_info>
+X<event_debug>
+
+These functions are convenience wrappers around L<B<event_log>()|/event_log>:
+
+    event_emerg($EVENT, ...)   == event_log(LOG_EMERG,   $EVENT, ...);
+    event_alert($EVENT, ...)   == event_log(LOG_ALERT,   $EVENT, ...);
+    event_crit($EVENT, ...)    == event_log(LOG_CRIT,    $EVENT, ...);
+    event_err($EVENT, ...)     == event_log(LOG_ERR,     $EVENT, ...);
+    event_warning($EVENT, ...) == event_log(LOG_WARNING, $EVENT, ...);
+    event_notice($EVENT, ...)  == event_log(LOG_NOTICE,  $EVENT, ...);
+    event_info($EVENT, ...)    == event_log(LOG_INFO,    $EVENT, ...);
+    event_debug($EVENT, ...)   == event_log(LOG_DEBUG,   $EVENT, ...);
+
+=head2 event_log
+
+    event_log($PRIORITY, $EVENT, $STR);
+    event_log($PRIORITY, $EVENT, $FMT, $ARG, ...);
+
+Log an I<$EVENT> at level I<$PRIORITY>, with the specified message
+specified by the I<$FMT> format string and any additional arguments.
+
+If I<$EVENT> matches the current event mask the message is logged
 with L<B<print_log_level>()|M6::ArpSponge::Log/print_log_level>,
 (see L<B<M6::ArpSponge::Log>|M6::ArpSponge::Log>),
 otherwise it is discarded.
 
-=item B<parse_event_mask>
-( I<ARG> [, B<-err> =E<gt> I<REF>] )
-X<parse_event_mask>
+=head2 event_mask
 
-Check whether I<ARG> represents a valid list of event masks. Returns an
-integer representing the mask on success, C<undef> on error. Note that an
-undefined I<ARG> is still valid, and represents the current mask.
+    $MASK = event_mask();
+    $OLD_MASK = event_mask($NEW_MASK);
 
-If an error occurs, and C<-err> is specified, the scalar behind I<REF> will
-contain a diagnostic.
+Get or set the event mask. The (old/new) mask is expected to be an integer
+composed by combining the various I<EVENT_*> constants.
 
-=item B<event_mask_to_str> ( I<ARG> )
-X<event_mask_to_str>
+=head2 parse_event_mask
 
-Translate the bits in I<ARG> to event mask names and return a list of
+    $MASK = parse_event_mask($STR);
+    $MASK = parse_event_mask($STR, -err => \$ERR);
+
+Check whether I<$STR> represents a valid list of event classes.
+Returns an integer representing the mask on success,
+C<undef> on error.
+Note that an undefined I<$STR> is valid and represents the current mask.
+
+If an error occurs and C<-err> is specified,
+the I<$ERR> scalar will contain a diagnostic.
+
+=head2 event_mask_to_string
+
+    @STR_LIST = event_mask_to_string($MASK);
+
+Translate the bits in I<$MASK> to event mask names and return a list of
 them.
 
-=back
+=head1 CAVEATS
+
+The logging functions in this module expect that
+L<B<M6::ArpSponge::Event>(3)|M6::ArpSponge::Event.3>'s
+L<B<init_log>()|M6::ArpSponge::Event/init_log> has
+already been called. This is the programmer's responsibility.
 
 =head1 COPYRIGHT
 
