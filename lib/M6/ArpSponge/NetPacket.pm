@@ -243,67 +243,67 @@ The constants below can be imported individually, by using the C<:const> or C<:a
 
 =over
 
-=item I<ETH_TYPE_IP>, I<ETH_TYPE_IPV4>
+=item B<ETH_TYPE_IP>, B<ETH_TYPE_IPV4>
 X<ETH_TYPE_IP>X<ETH_TYPE_IPV4>
 
 Ethernet C<type> for IPv4 frames.
 
-=item I<ETH_TYPE_IPV6>
+=item B<ETH_TYPE_IPV6>
 X<ETH_TYPE_IPV6>
 
 Ethernet C<type> for IPv6 frames.
 
-=item I<ETH_TYPE_ARP>
+=item B<ETH_TYPE_ARP>
 X<ETH_TYPE_ARP>
 
 Ethernet C<type> for ARP frames.
 
-=item I<ETH_ADDR_BROADCAST>
+=item B<ETH_ADDR_BROADCAST>
 X<ETH_ADDR_BROADCAST>
 
 Hex string representing the Ethernet broadcast address (C<'ff' x 6>).
 
-=item I<IPV4_ADDR_BROADCAST>
+=item B<IPV4_ADDR_BROADCAST>
 X<IPV4_ADDR_BROADCAST>
 
 Hex string representing the IPv4 broadcast address (C<'ff' x 4>).
 
-=item I<ETH_ADDR_NONE>
+=item B<ETH_ADDR_NONE>
 X<ETH_ADDR_NONE>
 
 Hex string representing the "zero" ethernet address (C<'00' x 6>).
 
-=item I<IPV4_ADDR_NONE>
+=item B<IPV4_ADDR_NONE>
 X<IPV4_ADDR_NONE>
 
 Hex string representing the IPV4 "zero" address (C<'00' x 4>).
 
-=item I<ARP_OPCODE_REQUEST>
+=item B<ARP_OPCODE_REQUEST>
 X<ARP_OPCODE_REQUEST>
 
 ARP C<opcode> for ARP requests.
 
-=item I<ARP_OPCODE_REPLY>
+=item B<ARP_OPCODE_REPLY>
 X<ARP_OPCODE_REPLY>
 
 ARP C<opcode> for ARP replies.
 
-=item I<ARP_HTYPE_ETHERNET>
+=item B<ARP_HTYPE_ETHERNET>
 X<ARP_HTYPE_ETHERNET>
 
 ARP C<htype> for Ethernet hardware addresses.
 
-=item I<ARP_PROTO_IP>, I<ARP_PROTO_IPV4>
+=item B<ARP_PROTO_IP>, B<ARP_PROTO_IPV4>
 X<ARP_PROTO_IP>X<ARP_PROTO_IPV4>
 
 ARP C<proto> for IPv4 requests/replies.
 
-=item I<ARP_HLEN_ETHERNET>
+=item B<ARP_HLEN_ETHERNET>
 X<ARP_HLEN_ETHERNET>
 
 Ethernet protocol address length in bytes (6).
 
-=item I<$ARP_PLEN_IPV4>
+=item B<ARP_PLEN_IPV4>
 X<ARP_PLEN_IPV4>
 
 IP protocol address length in bytes (4).
@@ -459,22 +459,22 @@ fields:
 =item C<htype>
 
 Hardware type field. This routine is only designed for
-I<ARP_HTYPE_ETHERNET>.
+B<ARP_HTYPE_ETHERNET>.
 
 =item C<proto>
 
 Type of protocol address. This routine is only designed for
-I<ARP_PROTO_IPV4>.
+B<ARP_PROTO_IPV4>.
 
 =item C<hlen>, C<plen>
 
 Hardware address length and protocol address length (in octets). For IPv4
-on Ethernet these should be I<ARP_HLEN_ETHERNET> and I<ARP_PLEN_IPV4>,
+on Ethernet these should be B<ARP_HLEN_ETHERNET> and B<ARP_PLEN_IPV4>,
 respectively.
 
 =item C<opcode>
 
-Operation type: one of I<ARP_OPCODE_REQUEST> or I<ARP_OPCODE_REPLY>.
+Operation type: one of B<ARP_OPCODE_REQUEST> or B<ARP_OPCODE_REPLY>.
 
 =item C<sha>
 
@@ -521,27 +521,27 @@ the raw data. I<HASHREF> should point to a hash with the following fields:
 
 =item C<htype>
 
-(optional, default value I<ARP_HTYPE_ETHERNET>)
+(optional, default value B<ARP_HTYPE_ETHERNET>)
 
-Hardware type field. Only I<ARP_HTYPE_ETHERNET> is currently supported.
+Hardware type field. Only B<ARP_HTYPE_ETHERNET> is currently supported.
 
 =item C<proto>
 
-(optional, default value I<ARP_PROTO_IPV4>)
+(optional, default value B<ARP_PROTO_IPV4>)
 
-Type of protocol address. Only I<ARP_PROTO_IPV4> is currently supported.
+Type of protocol address. Only B<ARP_PROTO_IPV4> is currently supported.
 
 =item C<hlen>, C<plen>
 
-(optional, default values I<ARP_HLEN_ETHERNET> and I<ARP_PLEN_IPV4>, resp.)
+(optional, default values B<ARP_HLEN_ETHERNET> and B<ARP_PLEN_IPV4>, resp.)
 
 Hardware address length and protocol address length (in octets). For IPv4
-on Ethernet these should be I<ARP_HLEN_ETHERNET> and I<ARP_PLEN_IPV4>,
+on Ethernet these should be B<ARP_HLEN_ETHERNET> and B<ARP_PLEN_IPV4>,
 respectively.
 
 =item C<opcode>
 
-Operation type: one of I<ARP_OPCODE_REQUEST> or I<ARP_OPCODE_REPLY>.
+Operation type: one of B<ARP_OPCODE_REQUEST> or B<ARP_OPCODE_REPLY>.
 
 =item C<sha>
 

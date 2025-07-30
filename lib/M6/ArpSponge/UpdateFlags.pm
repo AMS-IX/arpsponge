@@ -180,11 +180,11 @@ Send a (proxy) unicast ARP request.
 
 Send a (proxy) gratuitous ARP request.
 
-=item ARP_UPDATE_NONE (name: C<none>)
+=item B<ARP_UPDATE_NONE> (name: C<none>)
 
 Mask with no bits set (in other words, 0).
 
-=item ARP_UPDATE_ALL (name: C<all>)
+=item B<ARP_UPDATE_ALL> (name: C<all>)
 
 Mask with all bits set (in other words, the disjunction of all methods).
 
@@ -199,7 +199,7 @@ Mask with all bits set (in other words, the disjunction of all methods).
 
 Check whether I<$STR> represents a valid list of ARP update flags. Returns an
 integer representing the flags on success, C<undef> on error. Note that an
-undefined I<$ARG> is still valid, and represents I<ARP_UPDATE_NONE>.
+undefined I<$ARG> is still valid, and represents B<ARP_UPDATE_NONE>.
 
 If an error occurs and C<-err> is specified,
 the I<$ERR> scalar will contain a diagnostic message.

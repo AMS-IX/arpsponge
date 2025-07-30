@@ -373,25 +373,25 @@ Macros can be imported by name or by the C<:macros> or C<:all> tag.
 
 The list of exported macros include the log priority macros from
 L<B<Sys::Syslog>(3)|Sys::Syslog>:
-I<LOG_EMERG>, I<LOG_ALERT>, I<LOG_CRIT>, I<LOG_ERR>,
-<LOG_WARNING>, I<LOG_NOTICE>, I<LOG_INFO>,
-and I<LOG_DEBUG>.
+B<LOG_EMERG>, B<LOG_ALERT>, B<LOG_CRIT>, B<LOG_ERR>,
+<LOG_WARNING>, B<LOG_NOTICE>, B<LOG_INFO>,
+and B<LOG_DEBUG>.
 
 In addition to those, the following are defined:
 
 =over
 
-=item I<LOG_MIN_LEVEL>
+=item B<LOG_MIN_LEVEL>
 
 The lowest numbered log priority
-(corresponds to the highest priority, I<LOG_EMERG>).
+(corresponds to the highest priority, B<LOG_EMERG>).
 
-=item I<LOG_MAX_LEVEL>
+=item B<LOG_MAX_LEVEL>
 
 The highest numbered log priority
-(corresponds to the lowest priority I<LOG_DEBUG>).
+(corresponds to the lowest priority B<LOG_DEBUG>).
 
-=item I<LOG_IDENT>
+=item B<LOG_IDENT>
 
 The "ident" field that is used in L<B<syslog>(3)|syslog> messages.
 
@@ -482,7 +482,7 @@ If set to I<$LEVEL>, the logging functions will
 log messages with a level of I<$LEVEL> or lower
 (lower levels corresponding to higher priorities).
 
-The default level is I<LOG_NOTICE>.
+The default level is B<LOG_NOTICE>.
 
 =head2 is_log_level
 
@@ -493,7 +493,7 @@ would be logged according to the current
 L<B<log_level>()|/log_level>.
 
 For instance, if the
-L<B<log_level>()|/log_level> is I<LOG_NOTICE>,
+L<B<log_level>()|/log_level> is B<LOG_NOTICE>,
 then C<log_is_level(LOG_WARNING)> would return true,
 but C<log_is_level(LOG_INFO)> would return false.
 
@@ -602,7 +602,7 @@ arguments.
     print_log($FMT, ...);
 
 Calls L<B<print_log_level>()|/print_log_level>
-with the default log level (I<LOG_NOTICE>).
+with the default log level (B<LOG_NOTICE>).
 
 =head2 log_verbose
 

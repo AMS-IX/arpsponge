@@ -234,45 +234,45 @@ individually by name or via the C<:const> tag.
 
 =over
 
-=item I<EVENT_NAMES>
+=item B<EVENT_NAMES>
 
 A list of all valid event class names. Also includes
 C<all> and C<none>.
 
-=item I<EVENT_IO>
+=item B<EVENT_IO>
 
 The C<io> event class.
 
-=item I<EVENT_ALIEN>
+=item B<EVENT_ALIEN>
 
 The C<alien> event class.
 
-=item I<EVENT_SPOOF>
+=item B<EVENT_SPOOF>
 
 The C<spoof> event class.
 
-=item I<EVENT_STATIC>
+=item B<EVENT_STATIC>
 
 The C<static> event class.
 
-=item I<EVENT_SPONGE>
+=item B<EVENT_SPONGE>
 
 The C<sponge> event class.
 
-=item I<EVENT_CTL>
+=item B<EVENT_CTL>
 
 The C<ctl> event class.
 
-=item I<EVENT_STATE>
+=item B<EVENT_STATE>
 
 The C<state> event class.
 
-=item I<EVENT_ALL>
+=item B<EVENT_ALL>
 
 The C<all> event class
 (the combination of all of the above event classes).
 
-=item I<EVENT_NONE>
+=item B<EVENT_NONE>
 
 The C<none> event class
 (the negation of all of the above event classes).
@@ -321,7 +321,7 @@ otherwise it is discarded.
     $OLD_MASK = event_mask($NEW_MASK);
 
 Get or set the event mask. The (old/new) mask is expected to be an integer
-composed by combining the various I<EVENT_*> constants.
+composed by combining the various B<EVENT_xxx> constants.
 
 =head2 parse_event_mask
 
