@@ -137,7 +137,7 @@ IP address is marked as "alive".
 
 =item B<PENDING>
 
-Synonym for C<PENDING(0)>, that is, the IP address
+Synonym for B<PENDING(0)>, that is, the IP address
 is in "pending" (pre-sponge) state.
 
 =back
