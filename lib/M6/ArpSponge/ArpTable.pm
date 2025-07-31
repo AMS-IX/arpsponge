@@ -112,9 +112,11 @@ sub mac_list { keys %{$_[0]->_rarp} }
 
 sub add {
     my ($self, $ip, $mac, $timestamp) = @_;
-    $timestamp //= time;
+
     $self->clear_ip($ip);
     return if !defined $mac;
+
+    $timestamp //= time;
     $self->_arp->{$ip} = [ $mac, $timestamp ];
     $self->_rarp->{$mac}->{$ip} = $timestamp;
     return $timestamp;

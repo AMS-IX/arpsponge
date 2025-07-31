@@ -107,12 +107,35 @@ has my_mac => (
     builder  => sub { $_[0]->get_mac },
 );
 
+has arp_table => (
+    is       => 'ro',
+    isa      => InstanceOf['M6::ArpSponge::ArpTable'],
+    default  => sub { M6::ArpSponge::ArpTable->new },
+    init_arg => undef,
+);
+
 has queue => (
     is       => 'ro',
     isa      => InstanceOf['M6::ArpSponge::Queue'],
     default  => sub { M6::ArpSponge::Queue->new() },
     init_arg => undef,
     handles  => { queuedepth => 'max_depth' },
+);
+
+has state_table => (
+    is       => 'ro',
+    isa      => InstanceOf['M6::ArpSponge::StateTable'],
+    default  => sub { M6::ArpSponge::StateTable->new },
+    init_arg => undef,
+    handles => {
+        get_state_atime => 'get_atime',
+        set_state_atime => 'set_atime',
+        get_state_mtime => 'get_mtime',
+        set_state_mtime => 'set_mtime',
+        get_state       => 'get_state',
+        get_state_info  => 'get_state_info',
+        get_all_pending => 'get_all_pending',
+    },
 );
 
 has phys_device => (
@@ -141,29 +164,6 @@ has network_hi_i => (
 # Internal Attributes
 #
 ############################################################################
-has _state_table => (
-    is       => 'ro',
-    isa      => InstanceOf['M6::ArpSponge::StateTable'],
-    default  => sub { M6::ArpSponge::StateTable->new },
-    init_arg => undef,
-    handles => {
-        get_state_atime => 'get_atime',
-        set_state_atime => 'set_atime',
-        get_state_mtime => 'get_mtime',
-        set_state_mtime => 'set_mtime',
-        get_state       => 'get_state',
-        get_state_info  => 'get_state_info',
-        get_all_pending => 'get_all_pending',
-    },
-);
-
-has _arp_table => (
-    is       => 'ro',
-    isa      => InstanceOf['M6::ArpSponge::ArpTable'],
-    default  => sub { M6::ArpSponge::ArpTable->new },
-    init_arg => undef,
-);
-
 has _attr  => (
     is       => 'ro',
     default  => DFL_EMPTY_HASH,
@@ -172,7 +172,6 @@ has _attr  => (
 
 has _ip_all => (
     is       => 'lazy',
-    default  => DFL_EMPTY_HASH,
     init_arg => undef,
     builder  => sub { return { map { $_ => 1 } $_[0]->get_ip_all } }
 );
@@ -191,15 +190,6 @@ has _network_obj => (
 #
 ###############################################################################
 
-# $hash = $sponge->attr;
-# $val = $sponge->attr($attr);
-# $oldval = $sponge->attr($attr, $newval);
-#
-# $old_vals = $sponge->attr({
-#   $attr => $newval,
-#   ...
-# });
-#
 sub get_attr { return $_[0]->_attr()->{$_[1]} }
 sub del_attr { delete $_[0]->_attr()->{$_[1]} }
 
@@ -212,7 +202,8 @@ sub set_attr {
 
 sub clear_attr {
     my ($self) = @_;
-    $self->_attr({});
+    %{$self->_attr()} = ();
+    return;
 }
 
 ###############################################################################
@@ -230,28 +221,33 @@ sub broadcast_s     { return hex2ip($_[0]->broadcast) }
 sub my_mac_s        { return hex2mac($_[0]->my_mac)   }
 
 ###############################################################################
+# $sponge->state_name($state);
 #
-# State Methods
+#   Convenience wrapper around `state_to_string()` from
+#   M6::ArpSponge::Util.
 #
 ###############################################################################
-
 sub state_name      { return state_to_string($_[1]) }
 
-sub set_state    {
-    my ($self, $ip, $state, $time) = @_;
-
-    $self->_state_table->set_state($ip, $state, $time);
-
-    if (!defined $state) {
-        $self->queue->clear($ip);
-    }
-    return $state;
+###############################################################################
+# $sponge->clear_state($ip);
+#
+#   Wipe all state info for $ip from the sponge. This includes the IP state
+#   info, queue entries, and ARP info.
+#
+###############################################################################
+sub clear_state {
+    my ($self, $ip) = @_;
+    $self->state_table->set_state($ip, undef);
+    $self->queue->clear($ip);
+    $self->arp_table->clear_ip($ip);
+    return;
 }
 
 ###############################################################################
-# $sponge = new M6::ArpSponge::Sponge(ARG => VAL ...)
+# $sponge = M6::ArpSponge::Sponge->new(ARG => VAL ...)
 #
-#    Create a new Sponge object.
+#    Build a new sponge object.
 #
 ###############################################################################
 sub BUILD {
@@ -263,12 +259,10 @@ sub BUILD {
 
     $self->init_all_state($args->{init_state});
 
-    if (log_is_verbose) {
-        log_sverbose(1, "Device: %s\n", $self->device);
-        log_sverbose(1, "Device: %s\n", $self->phys_device);
-        log_sverbose(1, "MAC:    %s\n", $self->my_mac_s);
-        log_sverbose(1, "IP:     %s\n", $self->my_ip_s);
-    }
+    log_sverbose(1, "Device: %s\n", $self->device);
+    log_sverbose(1, "Device: %s\n", $self->phys_device);
+    log_sverbose(1, "MAC:    %s\n", $self->my_mac_s);
+    log_sverbose(1, "IP:     %s\n", $self->my_ip_s);
 }
 
 ###############################################################################
@@ -283,8 +277,8 @@ sub BUILD {
 sub init_all_state {
     my ($self, $init_state) = @_;
 
-    $self->_arp_table->purge();
-    $self->_state_table->clear_all();
+    $self->arp_table->purge();
+    $self->state_table->clear_all();
     $self->queue->clear_all();
 
     # Build up a bit of state again...
@@ -294,7 +288,7 @@ sub init_all_state {
         my $hi = $self->network_hi_i;
         for (my $num = $lo; $num <= $hi; $num++) {
             my $ip = sprintf("%08x", $num);
-            $self->set_state($ip, $init_state, 0);
+            $self->state_table->set_state($ip, $init_state, 0);
         }
     }
 
@@ -303,8 +297,8 @@ sub init_all_state {
         my $bcast = sprintf("%08x", hex($self->network) | $mask);
 
         # Statically sponge network and broadcast addresses.
-        $self->set_state($self->network, STATIC);
-        $self->set_state($bcast, STATIC);
+        $self->state_table->set_state($self->network, STATIC);
+        $self->state_table->set_state($bcast, STATIC);
     }
 
     for my $ip ($self->my_ip, keys %{$self->_ip_all}) {
@@ -314,32 +308,6 @@ sub init_all_state {
     return $self;
 }
 
-###############################################################################
-# $table = $sponge->arp_table;
-# ($mac, $time) = $sponge->arp_table($ip);
-# ($mac, $time) = $sponge->arp_table($ip, $mac [, $time]);
-#
-#   Perform a ARP table lookup, or update the ARP table.
-#
-###############################################################################
-sub arp_table {
-    return $_[0]->_arp_table if @_ == 1;
-
-    my ($self, $ip, $mac, $time) = @_;
-
-    my $arp_table = $self->_arp_table;
-
-    if (@_ >= 3) {
-        if (defined $mac && $mac ne ETH_ADDR_NONE) {
-            my @entry = ( $mac, $time // time );
-            $arp_table->{$ip} = \@entry;
-            return @entry;
-        }
-        delete $arp_table->{$ip};
-        return;
-    }
-    return $arp_table->{$ip} ? @{$arp_table->{$ip}} : ();
-}
 
 ###############################################################################
 # $mac = $sponge->get_mac;
@@ -425,9 +393,8 @@ sub is_my_network {
 
 sub is_my_network_s {
     my ($self, $ip) = @_;
-    return hex_addr_in_net(ip2hex($ip), $self->network, $self->prefixlen);
+    return $self->is_my_network(ip2hex($ip));
 }
-
 
 ###############################################################################
 # $state = $sponge->set_pending($ip, $n);
@@ -437,7 +404,7 @@ sub is_my_network_s {
 ###############################################################################
 sub set_pending {
     my ($self, $ip, $n) = @_;
-    my $state = $self->set_state($ip, PENDING($n));
+    my $state = $self->state_table->set_state($ip, PENDING($n));
     event_notice(EVENT_SPONGE, "pending: ip=%s state=%d", hex2ip($ip), $n);
     return $state;
 }
@@ -452,6 +419,86 @@ sub incr_pending {
     my ($self, $ip) = @_;
     my $pending = $self->get_state($ip) - PENDING(0);
     return $self->set_pending($ip, $pending+1);
+}
+
+
+###############################################################################
+# $sponge->set_dead($ip);
+#
+#    Set $ip's state to DEAD (i.e. "sponged").
+#
+###############################################################################
+sub set_dead {
+    my ($self, $ip) = @_;
+    my $rate = $self->queue->rate($ip) // 0.0;
+
+    event_notice(EVENT_SPONGE,
+        "sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
+
+    $self->gratuitous_arp($ip) if $self->gratuitous;
+    $self->state_table->set_state($ip, DEAD);
+}
+
+###############################################################################
+# $sponge->set_static($ip);
+#
+#    Set $ip's state to STATIC (i.e. "permanently sponged").
+#
+###############################################################################
+sub set_static {
+    my ($self, $ip) = @_;
+    my $rate = $self->queue->rate($ip) // 0.0;
+
+    event_notice(EVENT_SPONGE,
+        "static sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
+
+    $self->gratuitous_arp($ip) if $self->gratuitous;
+    $self->state_table->set_state($ip, STATIC);
+}
+
+###############################################################################
+# set_alive($data, $ip, $target_mac);
+#
+#   Unsponge the $ip, which is now seen from $target_mac.
+#   Update ARP cache and print appropriate notifications.
+#
+###############################################################################
+sub set_alive {
+    my ($self, $ip, $mac) = @_;
+
+    return if ! $self->is_my_network($ip);
+
+    my @old_arp = $self->arp_table->lookup_ip($ip);
+    my $old_state = $self->get_state($ip);
+
+    $mac //= $old_arp[0] // ETH_ADDR_NONE;
+
+    if (log_is_verbose) {
+        if (!@old_arp) {
+            log_sverbose(1, "learned: ip=%s mac=%s old=none\n",
+                               hex2ip($ip), hex2mac($mac));
+        }
+        elsif ($old_arp[0] ne $mac) {
+            log_sverbose(1, "learned: ip=%s mac=%s old=%s\n",
+                              hex2ip($ip), hex2mac($mac), hex2mac($old_arp[0]));
+        }
+        log_sverbose(1,
+            "clearing: ip=%s mac=%s\n", hex2ip($ip), hex2mac($mac));
+    }
+
+    $self->queue->clear($ip);
+    $self->state_table->set_state($ip, ALIVE);
+    $self->arp_table->add($ip, $mac, time);
+
+    if (defined $old_state && $old_state == DEAD) {
+        event_notice(EVENT_SPONGE,
+            "unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+        return;
+    }
+
+    event_notice(EVENT_SPONGE,
+        "clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
+    return;
 }
 
 ###############################################################################
@@ -634,83 +681,177 @@ sub send_reply {
     return;
 }
 
-###############################################################################
-# $sponge->set_dead($ip);
-#
-#    Set $ip's state to DEAD (i.e. "sponged").
-#
-###############################################################################
-sub set_dead {
-    my ($self, $ip) = @_;
-    my $rate = $self->queue->rate($ip) // 0.0;
-
-    event_notice(EVENT_SPONGE,
-        "sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
-
-    $self->gratuitous_arp($ip) if $self->gratuitous;
-    $self->set_state($ip, DEAD);
-}
-
-###############################################################################
-# $sponge->set_static($ip);
-#
-#    Set $ip's state to STATIC (i.e. "permanently sponged").
-#
-###############################################################################
-sub set_static {
-    my ($self, $ip) = @_;
-    my $rate = $self->queue->rate($ip) // 0.0;
-
-    event_notice(EVENT_SPONGE,
-        "static sponging: ip=%s rate=%0.1f", hex2ip($ip), $rate);
-
-    $self->gratuitous_arp($ip) if $self->gratuitous;
-    $self->set_state($ip, STATIC);
-}
-
-###############################################################################
-# set_alive($data, $ip, $target_mac);
-#
-#   Unsponge the $ip, which is now seen from $target_mac.
-#   Update ARP cache and print appropriate notifications.
-#
-###############################################################################
-sub set_alive {
-    my ($self, $ip, $mac) = @_;
-
-    return if ! $self->is_my_network($ip);
-
-    my @old_arp = $self->arp_table($ip);
-    my $old_state = $self->get_state($ip);
-
-    $mac //= $old_arp[0] // ETH_ADDR_NONE;
-
-    if (log_is_verbose) {
-        if (!@old_arp) {
-            log_sverbose(1, "learned: ip=%s mac=%s old=none\n",
-                               hex2ip($ip), hex2mac($mac));
-        }
-        elsif ($old_arp[0] ne $mac) {
-            log_sverbose(1, "learned: ip=%s mac=%s old=%s\n",
-                              hex2ip($ip), hex2mac($mac), hex2mac($old_arp[0]));
-        }
-        log_sverbose(1,
-            "clearing: ip=%s mac=%s\n", hex2ip($ip), hex2mac($mac));
-    }
-
-    $self->queue->clear($ip);
-    $self->set_state($ip, ALIVE);
-    $self->arp_table($ip, $mac, time);
-
-    if (defined $old_state && $old_state == DEAD) {
-        event_notice(EVENT_SPONGE,
-            "unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
-        return;
-    }
-
-    event_notice(EVENT_SPONGE,
-        "clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
-    return;
-}
-
 1;
+
+__END__
+
+=encoding utf8
+
+=head1 NAME
+
+M6::ArpSponge::Sponge - state information and ARP handling for arpsponge(1)
+
+=head1 SYNOPSIS
+
+ use M6::ArpSponge::Sponge;
+
+ my $sponge = M6::ArpSponge::Sponge->new();
+
+ get_attr
+ del_attr
+ set_attr
+ clear_attr
+ is_my_ip       
+ is_my_ip_s     
+ my_ip_s        
+ network_s      
+ broadcast_s    
+ my_mac_s       
+ state_name     
+ clear_state
+ init_all_state
+ get_mac
+ get_ip_all
+ get_ip
+ is_my_network
+ is_my_network_s
+ set_pending
+ incr_pending
+ set_dead
+ set_static
+ set_alive
+ send_query
+ gratuitous_arp
+ send_arp
+ send_arp_update
+ send_reply
+
+=head1 DESCRIPTION
+
+B<M6::ArpSponge::Sponge> is the main object used by
+L<B<arpsponge>(1)|arpsponge>
+to keep state information on IP addresses.
+
+Its main function is to combine:
+
+=over
+
+=item State information
+
+=over
+
+=item *
+
+L<B<M6::ArpSponge::ArpTable>(3)|M6::ArpSponge::ArpTable.3>
+
+=item *
+
+L<B<M6::ArpSponge::Queue>(3)|M6::ArpSponge::Queue.3>
+
+=item *
+
+L<B<M6::ArpSponge::StateTable>(3)|M6::ArpSponge::StateTable.3>
+
+=back
+
+=item Configuration information
+
+This includes the network to sponge for,
+the host's IP and MAC addresses,
+and user-defined attributes.
+
+=item ARP sending
+
+This includes sending various types of ARP queries and replies:
+gratuitous ARP requests, unsollicited ARP replies, proxy ARP requests.
+
+=back
+
+=head1 CONSTRUCTORS
+
+=head2 new
+
+  $OBJ = M6::ArpSponge::Sponge->new();
+      device       => $DEV_NAME,
+      network      => $HEX_IP,
+      prefixlen    => $LEN,
+      [ queuedepth => $DEPTH ]
+  );
+
+Creates a new B<M6::ArpSponge::Sponge> object instance
+and return as reference to it.
+The C<device>, C<network>, and C<prefixlen> parameter are required.
+The C<queuedepth> is optional and will default to
+L<B<M6::ArpSponge::Defaults-E<gt>QUEUE_DEPTH>|M6::ArpSponge::Defaults/QUEUE_DEPTH>.
+
+=head1 METHODS
+
+=head2 TO DO
+
+ get_attr
+ del_attr
+ set_attr
+ clear_attr
+ is_my_ip       
+ is_my_ip_s     
+ my_ip_s        
+ network_s      
+ broadcast_s    
+ my_mac_s       
+ state_name     
+ clear_state
+ init_all_state
+ get_mac
+ get_ip_all
+ get_ip
+ is_my_network
+ is_my_network_s
+ set_pending
+ incr_pending
+ set_dead
+ set_static
+ set_alive
+ send_query
+ gratuitous_arp
+ send_arp
+ send_arp_update
+ send_reply
+
+=head1 EXAMPLES
+
+=head1 SEE ALSO
+
+L<B<arpsponge>(1)|arpsponge>,
+L<B<M6::ArpSponge::ArpTable>(3)|M6::ArpSponge::ArpTable.3>,
+L<B<M6::ArpSponge::Defaults>(3)|M6::ArpSponge::Defaults.3>,
+L<B<M6::ArpSponge::Event>(3)|M6::ArpSponge::Event.3>,
+L<B<M6::ArpSponge::Log>(3)|M6::ArpSponge::Log.3>,
+L<B<M6::ArpSponge::Queue>(3)|M6::ArpSponge::Queue.3>,
+L<B<M6::ArpSponge::State>(3)|M6::ArpSponge::State.3>,
+L<B<M6::ArpSponge::StateTable>(3)|M6::ArpSponge::StateTable.3>,
+L<B<M6::ArpSponge::UpdateFlags>(3)|M6::ArpSponge::UpdateFlags.3>,
+L<B<M6::ArpSponge::Util>(3)|M6::ArpSponge::Util.3>.
+
+=head1 AUTHOR
+
+Steven Bakker E<lt>Steven.Bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2025.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright E<copy> 2025 AMS-IX B.V.; All rights reserved.
+
+This module is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. See "perldoc perlartistic."
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+=begin MOO-INTERNAL
+
+=head1 MOO INTERNALS
+
+=head2 BUILD
+
+=end MOO-INTERNAL
+

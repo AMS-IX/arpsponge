@@ -265,12 +265,12 @@ sub _get_arp_info_s {
     my ($self, $sponge, $ip_arg) = @_;
 
     my $arp_table = $sponge->arp_table;
-    my @ip_list = defined $ip_arg ? ($ip_arg) : keys %$arp_table;
+    my @ip_list = defined $ip_arg ? ($ip_arg) : $arp_table->ip_list();
     my @output = ();
 
     for my $ip (sort { $a cmp $b } @ip_list) {
-        my $entry = $arp_table->{$ip};
-        my ($mac, $mtime) = $entry ? @{$entry} : (mac2hex(0), 0);
+        my @entry = $arp_table->lookup_ip($ip);
+        my ($mac, $mtime) = @entry ? @entry : (ETH_ADDR_NONE, 0);
         push @output, join('',
                 sprintf("%s=%s\n", 'ip', $ip),
                 sprintf("%s=%s\n", 'mac', $mac),
@@ -372,7 +372,7 @@ sub _cmd_clear_arp {
     if (!$sponge->is_my_network($ip)) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
-    $sponge->arp_table($ip, undef);
+    $sponge->arp_table->clear_ip($ip);
     return $self->send_ok();
 }
 
@@ -399,8 +399,7 @@ sub _cmd_clear_ip {
     if (!$sponge->is_my_network($ip)) {
         return $self->send_error(hex2ip($ip), ": address out of range");
     }
-    $sponge->set_state($ip, undef);
-    $sponge->arp_table($ip, undef);
+    $sponge->clear_state($ip);
     $self->_log_ctl(
         "[client %d] %s %s", $self->fileno, $cmd, hex2ip($ip));
     return $self->send_ok();
@@ -733,7 +732,7 @@ sub _cmd_inform {
         return $self->send_error(hex2ip($ip2), ": address out of range");
     }
 
-    my ($mac1, $time1) = $sponge->arp_table($ip1);
+    my ($mac1, $time1) = $sponge->arp_table->lookup_ip($ip1);
     if (!defined $mac1 || $mac1 eq ETH_ADDR_NONE) {
         $self->send_error(hex2ip($ip1), ": no MAC address available");
         return 1;
@@ -746,7 +745,7 @@ sub _cmd_inform {
         $mac2 = $sponge->my_mac; # Try _our_ address..
     }
     else {
-        ($mac2, my $time2) = $sponge->arp_table($ip2);
+        ($mac2, my $time2) = $sponge->arp_table->lookup_ip($ip2);
         if (!defined $mac2 || $mac2 eq ETH_ADDR_NONE) {
             $self->send_error(hex2ip($ip2), ": no MAC address available");
             return 1;

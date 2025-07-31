@@ -638,18 +638,20 @@ sub get_ip_state_table_s {
                      "# IP", "State", "Queue", "Rate (q/min)", "Updated")
          );
 
-    my $states = $sponge->state_table;
+    my $states = $sponge->state_table->get_all_state_info;
     my $queue = $sponge->queue;
 
     my ($nalive, $ndead, $npending) = (0,0,0);
 
-    for my $ip (sort { $a cmp $b } keys %$states) {
-        my $state = $$states{$ip};
+    for my $ip (sort { $a cmp $b } keys %{$states}) {
+        my $state_entry = $states->{$ip};
+
+        my ($state, $stamp) = @{$state_entry}{qw( state mtime )};
+
         next unless defined $state;
 
         my $depth = $queue->depth($ip);
         my $rate  = $queue->rate($ip);
-        my $stamp = $sponge->get_state_mtime($ip);
 
         $fh->print(
             sprintf("%-17s %-12s %7d %8.3f     %s\n", hex2ip($ip),
@@ -687,8 +689,9 @@ sub get_arp_table_s {
         );
 
     my $nmac = 0;
-    for my $ip (sort { $a cmp $b } keys %{$sponge->arp_table}) {
-        my ($mac, $time) = @{$sponge->arp_table->{$ip}};
+    my $arp_table = $sponge->arp_table();
+    for my $ip (sort { $a cmp $b } $arp_table->ip_list) {
+        my ($mac, $time) = $sponge->lookup_ip($ip);
         $nmac++;
         $fh->print(sprintf("%-17s %-17s %-11d %s\n",
                         hex2mac($mac), hex2ip($ip), $time, format_time($time)
@@ -871,7 +874,7 @@ sub do_sweep {
 
         my $do_query = 0;
         if ($sponge->get_state($ip) == ALIVE) {
-            my ($dst_mac, $mtime) = $sponge->arp_table($ip);
+            my ($dst_mac, $mtime) = $sponge->arp_table->lookup_ip($ip);
             if ($age >= $threshold) {
                 if (!$skip_alive || !defined $dst_mac) {
                     $do_query++;
@@ -956,7 +959,7 @@ sub update_state {
 
         $Static_Error_Count++;
 
-        $sponge->arp_table($src_ip, $src_mac, $now);
+        $sponge->arp_table->add($src_ip, $src_mac, $now);
         return;
     }
 
@@ -1015,7 +1018,7 @@ sub process_pkt {
         return if $sponge->is_my_ip($dst_ip);                   # Not our IP
         return if $sponge->get_state($dst_ip) != ALIVE();       # IP is alive
 
-        my ($dst_mac, $mtime) = $sponge->arp_table($dst_ip);
+        my ($dst_mac, $mtime) = $sponge->arp_table->looup_ip($dst_ip);
         return if !$dst_mac or $dst_mac eq ETH_ADDR_NONE;      # MAC is valid
         $sponge->send_arp_update(
             tha => $src_mac,
