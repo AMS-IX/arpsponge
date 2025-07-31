@@ -33,6 +33,7 @@ our $VERSION = $M6::ArpSponge::VERSION;
 
 use Moo;
 
+use Net::Pcap;
 use M6::ArpSponge::Log;
 use M6::ArpSponge::Event       qw( :const :func );
 use M6::ArpSponge::State       qw( :const :func );
@@ -45,7 +46,7 @@ use M6::ArpSponge::StateTable;
 
 use Types::Standard qw( InstanceOf );
 
-use namespace::clean;
+#use namespace::clean;
 
 use constant DFL_EMPTY_HASH  => sub { {} };
 use constant DFL_FALSE       => sub { 0 };
@@ -581,7 +582,7 @@ sub send_arp {
                                 })
                 });
 
-    if (Net::Pcap::sendpacket($pcap_h, $pkt) < 0) {
+    if (pcap_sendpacket($pcap_h, $pkt) < 0) {
         event_err(EVENT_IO, "ERROR sending ARP packet: %s", $!);
     }
     return;
