@@ -46,7 +46,7 @@ use M6::ArpSponge::StateTable;
 
 use Types::Standard qw( InstanceOf );
 
-#use namespace::clean;
+use namespace::clean;
 
 use constant DFL_EMPTY_HASH  => sub { {} };
 use constant DFL_FALSE       => sub { 0 };
