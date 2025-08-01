@@ -1018,7 +1018,7 @@ sub process_pkt {
         return if $sponge->is_my_ip($dst_ip);                   # Not our IP
         return if $sponge->get_state($dst_ip) != ALIVE();       # IP is alive
 
-        my ($dst_mac, $mtime) = $sponge->arp_table->looup_ip($dst_ip);
+        my ($dst_mac, $mtime) = $sponge->arp_table->lookup_ip($dst_ip);
         return if !$dst_mac or $dst_mac eq ETH_ADDR_NONE;      # MAC is valid
         $sponge->send_arp_update(
             tha => $src_mac,
