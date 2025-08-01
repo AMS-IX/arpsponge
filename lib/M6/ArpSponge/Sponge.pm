@@ -600,16 +600,16 @@ sub send_arp_update {
     my $pcap_h = $self->pcap_handle;
 
     if (!$pcap_h || log_is_verbose) {
-        my $dst_mac_s = hex2mac($args{tha});
-        my $dst_ip_s  = hex2ip($args{tpa});
-        my $src_mac_s = hex2mac($args{sha});
-        my $src_ip_s  = hex2ip($args{spa});
-        my $tag       = $args{tag} // '';
+        my $tha = hex2mac($args{tha});
+        my $tpa = hex2ip($args{tpa});
+        my $sha = hex2mac($args{sha});
+        my $spa = hex2ip($args{spa});
+        my $tag = $args{tag} // '';
         log_sverbose(1, "%s%sarp inform %s\@%s about %s\@%s\n",
                         $tag,
                         (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
-                         $dst_ip_s, $dst_mac_s,
-                         $src_ip_s, $src_mac_s,
+                         $tpa, $tha,
+                         $spa, $sha,
                     );
     }
     return if (!$pcap_h || $self->is_dummy);
@@ -617,7 +617,15 @@ sub send_arp_update {
     my $update_flags = $self->arp_update_flags;
 
     # Try various ways of updating the neighbour's cache...
+    #
+    # The goal is to inform <TPA>@<THA> about <SPA>@<SHA>.
+    #
     if ($update_flags & ARP_UPDATE_REPLY) {
+        # Unsollicited ARP reply:
+        #
+        #   Send to <THA>:
+        #       ARP <SPA> IS-AT <SHA>
+        #
         $self->send_arp( sha => $args{sha},
                          spa => $args{spa},
                          tha => $args{tha},
@@ -626,6 +634,14 @@ sub send_arp_update {
     }
 
     if ($update_flags & ARP_UPDATE_REQUEST) {
+        # Request <TPA> on behalf of <SPA>; send to <THA> as unicast.
+        #
+        # The idea is that <TPA> responds with a "IS-AT" to <SPA>@<SHA>,
+        # updating its own ARP cache for <SPA>.
+        #
+        #   Send to <THA>:
+        #       ARP WHO-HAS <TPA> TELL <SPA>@<SHA>
+        #
         $self->send_arp( sha => $args{sha},
                          spa => $args{spa},
                          tha => $args{tha},
@@ -633,9 +649,15 @@ sub send_arp_update {
                          opcode => ARP_OPCODE_REQUEST );
     }
 
-    # Third option: fake a gratuitous ARP: "unicast proxy gratuitous ARP
-    # request" :-)
     if ($update_flags & ARP_UPDATE_GRATUITOUS) {
+        # Fake a gratuitous ARP, sent as a unicast message:
+        # "gratuitous unicast proxy ARP request" :-)
+        #
+        #   Send to <THA>:
+        #       ARP WHO-HAS <SPA> TELL <SPA>@<SHA>
+        #
+        # The idea is that <THA> updates its own ARP cache for <SPA>.
+        #
         $self->send_arp( sha => $args{sha},
                          spa => $args{spa},
                          tha => $args{tha},
@@ -787,12 +809,42 @@ L<B<M6::ArpSponge::Defaults-E<gt>QUEUE_DEPTH>|M6::ArpSponge::Defaults/QUEUE_DEPT
 
 =head1 METHODS
 
+=head2 Custom attributes
+
+=over
+
+=item B<get_attr>
+X<get_attr>
+
+  $VAL = $OBJ->get_attr($NAME);
+
+Return the value of attribute I<$NAME> or C<undef> it doesn't exist.
+
+=item B<del_attr>
+X<del_attr>
+
+  $VAL = $OBJ->del_attr($NAME);
+
+Delete attribute I<$NAME> and return its old value (if any).
+
+=item B<set_attr>
+X<set_attr>
+
+  $OBJ->set_attr($NAME, $VAL);
+
+Set attribute I<$NAME> to I<$VAL>.
+
+=item B<clear_attr>
+X<clear_attr>
+
+  $OBJ->clear_attr();
+
+Clear/delete all custom attributes.
+
+=back
+
 =head2 TO DO
 
- get_attr
- del_attr
- set_attr
- clear_attr
  is_my_ip       
  is_my_ip_s     
  my_ip_s        

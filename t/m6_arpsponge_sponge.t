@@ -16,8 +16,8 @@ use Test::Mock::Sys::Syslog;
 my ($mock_syslog, $mock_pcap);
 
 BEGIN {
-    my $mock_syslog = Test::Mock::Sys::Syslog->new();
-    my $mock_pcap = Test::Mock::Net::Pcap->new();
+    $mock_syslog = Test::Mock::Sys::Syslog->new();
+    $mock_pcap = Test::Mock::Net::Pcap->new();
 }
 
 use Net::Pcap;
@@ -26,7 +26,7 @@ use M6::ArpSponge::Sponge;
 use M6::ArpSponge::Defaults;
 use M6::ArpSponge::State qw( :const );
 use M6::ArpSponge::UpdateFlags qw( :const );
-use M6::ArpSponge::NetPacket qw( :const );
+use M6::ArpSponge::NetPacket qw( :const :func );
 use M6::ArpSponge::Util qw( :all );
 
 my $net_addr    = NetAddr::IP->new('198.51.100.0/24');
@@ -224,6 +224,58 @@ subtest 'state_name' => sub {
     }
 };
 
+sub check_arp_sent {
+    my ($sponge, %expected) = @_;
+
+    my $pcap_h = $sponge->pcap_handle;
+    my $sent = $mock_pcap->get_sent($pcap_h);
+    is int(@{$sent}), 1, "1 packet sent via Net::Pcap"
+        or return;
+
+    my $packet = $sent->[-1];
+    my $eth_data = decode_ethernet($packet);
+
+    $expected{src_mac} //= $sponge->my_mac,
+    $expected{sha}     //= $expected{src_mac} // $sponge->my_mac;
+    $expected{spa}     //= $sponge->my_ip;
+
+    $expected{dst_mac} //= $expected{tha} // ETH_ADDR_BROADCAST;
+    $expected{tha}     //= $expected{dst_mac};
+
+    my @expected_eth = (
+        [ src_mac  => $expected{src_mac} ],
+        [ dest_mac => $expected{dst_mac} ],
+    );
+    for my $chk (@expected_eth) {
+        my ($key, $expected) = @{$chk};
+        is $eth_data->{$key}, $expected,
+            "Ethernet $key is '$expected'";
+    }
+
+    is $eth_data->{type}, ETH_TYPE_ARP, "packet is an ARP packet"
+        or return;
+
+    my $arp_data = decode_arp($eth_data->{data});
+    my @expected_arp = (
+        [ htype  => ARP_HTYPE_ETHERNET ],
+        [ proto  => ARP_PROTO_IPV4 ],
+        [ hlen   => ARP_HLEN_ETHERNET ],
+        [ plen   => ARP_PLEN_IPV4 ],
+        [ opcode => $expected{opcode} ],
+        [ sha    => $expected{sha} ],
+        [ spa    => $expected{spa} ],
+        [ tha    => $expected{tha} ],
+        [ tpa    => $expected{tpa} ],
+        [ data   => undef ],
+    );
+    for my $chk (@expected_arp) {
+        my ($key, $expected) = @{$chk};
+        my $exp_str = defined $expected ? "'$expected'" : 'undef';
+        is $arp_data->{$key}, $expected,
+            "ARP $key is $exp_str";
+    }
+}
+
 subtest 'state_change' => sub {
 
     my $err;
@@ -240,10 +292,14 @@ subtest 'state_change' => sub {
         pcap_handle => $pcap_h,
     );
 
-    my $lo_s = $net_addr->first;
-    my $hi_s = $net_addr->last;
-    my $lo_h = ip2hex($lo_s->addr);
-    my $hi_h = ip2hex($hi_s->addr);
+    my $lo_s     = $net_addr->first;
+    my $lo_h     = ip2hex($lo_s->addr);
+
+    my $static_s = $net_addr->first+1;
+    my $static_h = ip2hex($static_s->addr);
+
+    my $hi_s     = $net_addr->last;
+    my $hi_h     = ip2hex($hi_s->addr);
 
     $sponge->set_alive($lo_h);
     is $sponge->get_state($lo_h), ALIVE,
@@ -257,13 +313,218 @@ subtest 'state_change' => sub {
     is $sponge->get_state($lo_h), PENDING(1),
         "get_state('$lo_h') is PENDING(1) after incr_pending('$lo_h')";
 
-    $sponge->set_dead($lo_h);
-    is $sponge->get_state($lo_h), DEAD,
-        "get_state('$lo_h') is DEAD after set_dead('$lo_h')";
+    subtest 'set_dead' => sub {
+        $mock_pcap->clear_sent($pcap_h);
+        $sponge->set_dead($lo_h);
+        is $sponge->get_state($lo_h), DEAD, "get_state('$lo_h') is DEAD";
+
+        subtest 'gratuitous_arp' => sub {
+            check_arp_sent($sponge,
+                spa     => $lo_h,
+                tpa     => $lo_h,
+                opcode  => ARP_OPCODE_REQUEST,
+            );
+        };
+    };
+
+    subtest 'set_static' => sub {
+        $mock_pcap->clear_sent($pcap_h);
+        $sponge->set_static($static_h);
+        is $sponge->get_state($static_h), STATIC,
+            "get_state('$static_h') is STATIC";
+
+        subtest 'gratuitous_arp' => sub {
+            check_arp_sent($sponge,
+                spa     => $static_h,
+                tpa     => $static_h,
+                opcode  => ARP_OPCODE_REQUEST,
+            );
+        };
+    };
 
     $sponge->set_alive($lo_h);
     is $sponge->get_state($lo_h), ALIVE,
         "get_state('$lo_h') is ALIVE after set_alive('$lo_h')";
+
+    $sponge->set_dead($lo_h);
+    is $sponge->get_state($lo_h), DEAD,
+        "get_state('$lo_h') is DEAD after set_dead('$lo_h')";
+
+    my $request_ip = $hi_h;
+    my $request_mac = 'a6a6b7b7c8c8';
+
+    subtest 'send_reply' => sub {
+        $mock_pcap->clear_sent($pcap_h);
+        $sponge->send_reply($lo_h,
+            { spa => $request_ip, sha => $request_mac });
+
+        check_arp_sent($sponge,
+            dst_mac => $request_mac,
+            spa     => $lo_h,
+            tpa     => $request_ip,
+            opcode  => ARP_OPCODE_REPLY,
+        );
+    };
+
+    subtest 'send_query' => sub {
+        $mock_pcap->clear_sent($pcap_h);
+        $sponge->send_query($lo_h);
+        check_arp_sent($sponge,
+            dst_mac => ETH_ADDR_BROADCAST,
+            tpa     => $lo_h,
+            opcode  => ARP_OPCODE_REQUEST,
+        );
+    };
+
+    subtest 'ARP sending' => sub {
+        # Simulate that we received a packet from
+        # ($inform_ip @ $inform_mac) that was addressed
+        # to ($about_ip @ $my_mac).
+        #
+        # Inform $inform_ip that $about_ip is now at $about_mac.
+
+        my $inform_ip  = $lo_h;
+        my $inform_mac = 'a6a6b7b7c8c8';
+
+        my $about_ip   = $hi_h;
+        my $about_mac  = '1e1e2e2e3e3e';
+
+        subtest 'send_arp_update(reply)' => sub {
+            # Send to $inform_mac:
+            #   ARP $about_ip IS-AT $about_mac
+            $mock_pcap->clear_sent($pcap_h);
+            $sponge->arp_update_flags(ARP_UPDATE_REPLY);
+            $sponge->send_arp_update(
+                tpa => $inform_ip,
+                tha => $inform_mac,
+                spa => $about_ip,
+                sha => $about_mac,
+                tag => '[auto]',
+            );
+
+            check_arp_sent($sponge,
+                dst_mac => $inform_mac,
+                tpa     => $inform_ip,
+                tha     => $inform_mac,
+                spa     => $about_ip,
+                sha     => $about_mac,
+                opcode  => ARP_OPCODE_REPLY,
+            );
+        };
+
+        subtest 'send_arp_update(request)' => sub {
+            # Send to $inform_mac:
+            #   ARP WHO-HAS $inform_ip TELL $about_ip @ $about_mac
+            $mock_pcap->clear_sent($pcap_h);
+            $sponge->arp_update_flags(ARP_UPDATE_REQUEST);
+            $sponge->send_arp_update(
+                tpa => $inform_ip,
+                tha => $inform_mac,
+                spa => $about_ip,
+                sha => $about_mac,
+                tag => '[auto]',
+            );
+
+            check_arp_sent($sponge,
+                dst_mac => $inform_mac,
+                tpa     => $inform_ip,
+                tha     => $inform_mac,
+                spa     => $about_ip,
+                sha     => $about_mac,
+                opcode  => ARP_OPCODE_REQUEST,
+            );
+        };
+
+        subtest 'send_arp_update(gratuitous)' => sub {
+            # Send to $inform_mac:
+            #   ARP WHO-HAS $about_ip TELL $about_ip @ $about_mac
+            $mock_pcap->clear_sent($pcap_h);
+            $sponge->arp_update_flags(ARP_UPDATE_GRATUITOUS);
+            $sponge->send_arp_update(
+                tpa => $about_ip,
+                tha => $inform_mac,
+                spa => $about_ip,
+                sha => $about_mac,
+                tag => '[auto]',
+            );
+
+            check_arp_sent($sponge,
+                dst_mac => $inform_mac,
+                tpa     => $about_ip,
+                tha     => $inform_mac,
+                spa     => $about_ip,
+                sha     => $about_mac,
+                opcode  => ARP_OPCODE_REQUEST,
+            );
+        };
+
+        subtest 'is_dummy' => sub {
+            $sponge->is_dummy(1);
+            note "set is_dummy to ", $sponge->is_dummy();
+            # Send to $inform_mac:
+            #   ARP WHO-HAS $about_ip TELL $about_ip @ $about_mac
+            $mock_pcap->clear_sent($pcap_h);
+            $sponge->arp_update_flags(ARP_UPDATE_GRATUITOUS);
+            $sponge->send_arp_update(
+                tpa => $about_ip,
+                tha => $inform_mac,
+                spa => $about_ip,
+                sha => $about_mac,
+                tag => '[auto]',
+            );
+            my $sent = $mock_pcap->get_sent($pcap_h);
+            is @{$sent}, 0, "send_arp_update() sends no packet";
+
+            $mock_pcap->clear_sent($pcap_h);
+            $sponge->send_reply($lo_h,
+                { spa => $request_ip, sha => $request_mac });
+            $sent = $mock_pcap->get_sent($pcap_h);
+            is @{$sent}, 0, "send_reply() sends no packet";
+
+            $mock_pcap->clear_sent($pcap_h);
+            $sponge->send_query($lo_h);
+            $sent = $mock_pcap->get_sent($pcap_h);
+            is @{$sent}, 1, "send_query() still sends a packet";
+        };
+    };
 };
 
+subtest 'clear_state' => sub {
+    my $lo_s   = $net_addr->first;
+    my $lo_h   = ip2hex($lo_s->addr);
+    my $hi_s   = $net_addr->last;
+    my $hi_h   = ip2hex($hi_s->addr);
+    my $mac_h  = 'a6a6b7b7c8c8';
+
+    $sponge->set_alive($lo_h, $mac_h);
+    $sponge->set_pending($lo_h, 3);
+
+    is $sponge->get_state($lo_h), PENDING(3),
+        "get_state('$lo_h') is PENDING(3)";
+
+    my ($mac, $mtime) = $sponge->arp_table->lookup_ip($lo_h);
+    is $mac, $mac_h,
+        "'$lo_h' is at MAC '$mac_h'";
+
+    $sponge->queue->add($lo_h, $hi_h, time);
+    $sponge->queue->add($lo_h, $hi_h, time);
+    $sponge->queue->add($lo_h, $hi_h, time);
+    $sponge->queue->add($lo_h, $hi_h, time);
+
+    is $sponge->queue->depth($lo_h), 4,
+        "'$lo_h' queue depth is 4";
+
+    note "call clear_state('$lo_h')";
+    $sponge->clear_state($lo_h);
+
+    is $sponge->get_state($lo_h), undef,
+        "get_state('$lo_h') is undef (aka NONE)";
+
+    ($mac, $mtime) = $sponge->arp_table->lookup_ip($lo_h);
+    is $mac, undef,
+        "'$lo_h' is not in ARP table";
+
+    is $sponge->queue->depth($lo_h), 0,
+        "'$lo_h' queue depth is 0";
+};
 done_testing;
