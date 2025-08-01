@@ -9,6 +9,7 @@ use Net::Pcap;
 use Carp qw( cluck carp );
 use Time::Piece;
 use FindBin;
+use Test::More;
 
 use namespace::clean;
 
@@ -78,9 +79,6 @@ sub _build__mockobj {
         if (defined &{$sub}) {
             $obj->redefine( $func => $mock_map{$func} );
         }
-        else {
-            $obj->mock( $func => $mock_map{$func} );
-        }
     }
     return $obj;
 }
@@ -106,7 +104,9 @@ sub _pcap_dispatch {
 }
 
 sub _pcap_sendpacket {
-    my ($self, @args) = @_;
+    my ($self, $pcap_h, $packet) = @_;
+    my $len = length($packet);
+    note "MOCK pcap_sendpacket($pcap_h, [$len bytes])";
     return 0;
 }
 
@@ -130,24 +130,24 @@ Test::Mock::Net::Pcap - mock out Net::Pcap for unit tests
 
 =head1 SYNOPSIS
 
-    use Net::Pcap;
-    use Test::Mock::Net::Pcap;
+ use Net::Pcap;
+ use Test::Mock::Net::Pcap;
 
-    my $mock = Test::Mock::Net::Pcap->new();
+ my $mock = Test::Mock::Net::Pcap->new();
 
-    $pcap_h = pcap_open_live($dev, $snaplen, $promisc, $to_ms, \$err);
+ $pcap_h = pcap_open_live($dev, $snaplen, $promisc, $to_ms, \$err);
 
-    $fd = pcap_get_selectable_fd($pcap_h);
+ $fd = pcap_get_selectable_fd($pcap_h);
 
-    $count = pcap_dispatch($pcap_h, $count, \&callback, $user_data);
+ $count = pcap_dispatch($pcap_h, $count, \&callback, $user_data);
 
-    pcap_setnonblock($pcap_h, $mode, \$err);
+ pcap_setnonblock($pcap_h, $mode, \$err);
 
-    pcap_sendpacket($pcap_h, $packet);
+ pcap_sendpacket($pcap_h, $packet);
 
-    pcap_inject($pcap_h, $packet);
+ pcap_inject($pcap_h, $packet);
 
-    pcap_close($pcap_h);
+ pcap_close($pcap_h);
 
 =head1 DESCRIPTION
 
@@ -160,8 +160,10 @@ Usage is fairly straightforward:
 
 =item 1.
 
-Import/require L<B<Net::Pcap>(3)|Net::Pcap>
-adn B<Test::Mock::Net::Pcap>.
+Import/require
+L<B<Net::Pcap>(3)|Net::Pcap>
+and
+B<Test::Mock::Net::Pcap>.
 
     use Net::Pcap;
     use Test::Mock::Net::Pcap;
@@ -190,11 +192,18 @@ original interface is restored.
 
 =back
 
+B<NOTE:> The use of 
+L<B<namespace::clean>(3)|namespace::clean>
+may interfere with the use of this module,
+see L<CAVEATS|/CAVEATS> below.
+
 =head1 CONSTRUCTOR
 
 =head2 new
 
     OBJ = Test::Mock::Net::Pcap->new();
+    OBJ = Test::Mock::Net::Pcap->new( namespace => $NS);
+    OBJ = Test::Mock::Net::Pcap->new( namespace => [ $NS, ... ] );
 
 Creates a new B<Test::Mock::Net::Pcap>
 object instance and returns a reference to it.
@@ -204,6 +213,30 @@ L<B<Net::Pcap>(3)|Net::Pcap>
 functions,
 see L<MOCKED FUNCTIONS/MOCKED FUNCTIONS>
 below.
+
+By default, it will mock C<pcap_> functions in the
+C<Net::Pcap> and C<main> namespaces.
+
+This allows you to write:
+
+  use Net::Pcap;
+  use Test::Mock::Net::Pcap;
+
+  my $err;
+
+  {
+      my $mock = Test::Mock::Net::Pcap->new();
+
+      # Mocked interface is now active.
+      my $pcap_h = pcap_open_live('dummy', 1500, 1, 0, \$err);
+  }
+
+  # Original interface is now active.
+  my $pcap_h = pcap_open_live('dummy', 1500, 1, 0, \$err);
+
+If you want to override L<pcap_> functions in another module (namespace),
+you can use the C<namespace> parameter to provide the namespace(s) for which
+you want to override the interface, but see L<CAVEATS|/CAVEATS> below.
 
 =head1 METHODS
 
@@ -227,7 +260,72 @@ below.
 
 =back
 
-=head1 EXAMPLE
+=head1 CAVEATS
+
+=head2 Compatibility with "namespace::clean"
+
+B<Test::Mock::Net::Pcap> cannot mock C<pcap_>
+functions for a module that uses
+L<B<namespace::clean>(3)|namespace::clean>,
+I<unless>
+B<Test::Mock::Net::Pcap>
+is instantiated
+I<before>
+the target module is loaded.
+
+Take, for instance, a fictitious module named C<Foo>:
+
+    # Foo.pm
+    package Reply;
+    use Net::Pcap;
+    use namespace::clean;
+
+    sub send_reply {
+        my ($msg) = @_;
+        ...
+        pcap_sendpacket($pcap_h, $packet);
+    }
+
+We then want to write test script that calls on C<Foo>,
+with the 
+L<B<Net::Pcap>(3)|Net::Pcap.3>
+interface mocked out:
+
+    # script.pl
+    use Test::Mock::Net::Pcap;
+    use Foo;
+
+    my $mock = Test::Mock::Net::Pcap->new(namespace => 'Foo');
+
+    Foo::send_reply('welcome');
+
+Here, the constructor for
+B<Test::Mock::Net::Pcap>
+will try to install mock versions of L<pcap_> functions in
+the C<Foo> namespace, but this will fail due to C<Foo>'s use of
+C<namespace::clean>.
+
+The solution is to instantiate 
+B<Test::Mock::Net::Pcap>
+I<before> the C<use Foo> statement:
+
+    # script.pl
+    use Test::Mock::Net::Pcap;
+    my $mock_pcap;
+    BEGIN {
+        $mock_pcap = Test::Mock::Net::Pcap->new(namespace => 'Foo');
+    }
+
+    use Foo;
+
+    Foo::send_reply('welcome');
+
+The constructor can be called without a C<namespace> argument as well,
+in which case it will mock the 
+L<B<Net::Pcap>(3)|Net::Pcap.3>
+interface for I<all> subsequent code/modules.
+
+=head1 EXAMPLES
 
 The following code fragment shows how to use this module in a
 L<B<Test2>(3)|Test2> environment:
@@ -253,9 +351,10 @@ L<B<Test2>(3)|Test2> environment:
 
 =head1 SEE ALSO
 
+L<B<namespace::clean>(3)|namespace::clean>,
+L<B<Net::Pcap>(3)|Net::Pcap>,
 L<B<Test2>(3)|Test2>,
-L<B<Test2::V0>(3)|Test2::V0>,
-L<B<Net::Pcap>(3)|Net::Pcap>.
+L<B<Test2::V0>(3)|Test2::V0>.
 
 =head1 AUTHOR
 

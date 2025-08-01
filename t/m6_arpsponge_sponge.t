@@ -8,12 +8,19 @@ use lib "$FindBin::Bin/lib";
 use Test::More;
 
 use Scalar::Util qw( reftype );
-use List::Util qw( first );
+use List::Util   qw( first );
 
-use Net::Pcap;
 use Test::Mock::Net::Pcap;
 use Test::Mock::Sys::Syslog;
 
+my ($mock_syslog, $mock_pcap);
+
+BEGIN {
+    my $mock_syslog = Test::Mock::Sys::Syslog->new();
+    my $mock_pcap = Test::Mock::Net::Pcap->new();
+}
+
+use Net::Pcap;
 use M6::ArpSponge::Log qw( :func );
 use M6::ArpSponge::Sponge;
 use M6::ArpSponge::Defaults;
@@ -218,25 +225,20 @@ subtest 'state_name' => sub {
 };
 
 subtest 'state_change' => sub {
-    my $mock_log = Test::Mock::Sys::Syslog->new(
-        namespace => [qw(
-            main
-            M6::ArpSponge::Log
-        )],
-    );
-    my $mock_pcap = Test::Mock::Net::Pcap->new(
-        namespace => [qw(
-            main
-            M6::ArpSponge::Sponge
-        )],
-    );
 
     my $err;
     init_log();
     my $pcap_h = pcap_open_live($dev, 64*1024, 1, 0, \$err);
 
-    $sponge->pcap_handle($pcap_h);
-    $sponge->gratuitous(1);
+    my $sponge = M6::ArpSponge::Sponge->new(
+        device      => $dev,
+        network     => $network_h,
+        prefixlen   => $prefixlen,
+        sponge_net  => 1,
+        init_state  => ALIVE,
+        gratuitous  => 1,
+        pcap_handle => $pcap_h,
+    );
 
     my $lo_s = $net_addr->first;
     my $hi_s = $net_addr->last;
@@ -246,15 +248,19 @@ subtest 'state_change' => sub {
     $sponge->set_alive($lo_h);
     is $sponge->get_state($lo_h), ALIVE,
         "get_state('$lo_h') is ALIVE after set_alive('$lo_h')";
+
     $sponge->set_pending($lo_h, 0);
     is $sponge->get_state($lo_h), PENDING(0),
         "get_state('$lo_h') is PENDING(0) after set_pending('$lo_h', 0)";
+
     $sponge->incr_pending($lo_h);
     is $sponge->get_state($lo_h), PENDING(1),
         "get_state('$lo_h') is PENDING(1) after incr_pending('$lo_h')";
+
     $sponge->set_dead($lo_h);
     is $sponge->get_state($lo_h), DEAD,
         "get_state('$lo_h') is DEAD after set_dead('$lo_h')";
+
     $sponge->set_alive($lo_h);
     is $sponge->get_state($lo_h), ALIVE,
         "get_state('$lo_h') is ALIVE after set_alive('$lo_h')";

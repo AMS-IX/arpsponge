@@ -11,14 +11,17 @@ use Test::Output;
 use Test::Exception;
 
 use FindBin;
-
 use lib "$FindBin::Bin/lib";
-
-use M6::ArpSponge::Log qw(:func :macros);
 
 use Test::Mock::Sys::Syslog;
 
-my $mock = Test::Mock::Sys::Syslog->new(namespace => 'M6::ArpSponge::Log');
+my $mock_syslog;
+
+BEGIN {
+    $mock_syslog = Test::Mock::Sys::Syslog->new();
+}
+
+use M6::ArpSponge::Log qw(:func :macros);
 
 subtest 'init_log' => sub {
     ok init_log(), "init_log() returns true";
@@ -27,7 +30,7 @@ subtest 'init_log' => sub {
     ok init_log('test'), "init_log('test') returns true";
     is LOG_IDENT, 'test', "init_log('test') sets LOG_IDENT to 'test'";
 
-    ok $mock->log_is_open, "init_log() calls openlog()";
+    ok $mock_syslog->log_is_open, "init_log() calls openlog()";
 
     cmp_ok log_buffer_size(), '>', 0,
         "log_buffer_size() is greater than 0";
@@ -85,7 +88,7 @@ subtest 'log_level(LOG_DEBUG)' => sub {
     my $buf = get_log_buffer();
     is int(@{$buf}), 8, "LOG_DEBUG logs 8 messages in internal buffer";
 
-    $buf = $mock->log_buffer();
+    $buf = $mock_syslog->log_buffer();
     is int(@{$buf}), 8, "LOG_DEBUG logs 8 syslog messages";
 
     my @prio = (LOG_MIN_LEVEL .. LOG_MAX_LEVEL);
@@ -102,7 +105,7 @@ subtest 'log_level(LOG_DEBUG)' => sub {
 };
 
 subtest 'log_level(LOG_WARNING)' => sub {
-    $mock->clear_log_buffer();
+    $mock_syslog->clear_log_buffer();
     clear_log_buffer();
 
     log_level(LOG_WARNING);
@@ -126,7 +129,7 @@ subtest 'log_level(LOG_WARNING)' => sub {
     is int(@{$buf}), $n_expected,
         "LOG_WARNING logs $n_expected messages in internal buffer";
 
-    $buf = $mock->log_buffer();
+    $buf = $mock_syslog->log_buffer();
     is int(@{$buf}), $n_expected,
         "LOG_WARNING logs $n_expected syslog messages";
 
@@ -159,7 +162,7 @@ package TestNotify {
 }
 
 subtest 'notify' => sub {
-    $mock->clear_log_buffer();
+    $mock_syslog->clear_log_buffer();
     clear_log_buffer();
 
     log_level(LOG_INFO);
@@ -180,7 +183,7 @@ subtest 'notify' => sub {
 };
 
 subtest 'print_log' => sub {
-    $mock->clear_log_buffer();
+    $mock_syslog->clear_log_buffer();
     clear_log_buffer();
 
     log_level(LOG_NOTICE);
@@ -193,14 +196,14 @@ subtest 'print_log' => sub {
     is int(@{$buf}), $n_expected,
         "print_log() adds a message to the internal buffer";
 
-    $buf = $mock->log_buffer();
+    $buf = $mock_syslog->log_buffer();
     is int(@{$buf}), $n_expected,
         "print_log() logs a syslog messages";
 };
 
 subtest 'log_is_verbose' => sub {
     log_is_verbose(0);
-    $mock->clear_log_buffer();
+    $mock_syslog->clear_log_buffer();
     clear_log_buffer();
 
     log_level(LOG_NOTICE);
@@ -241,14 +244,14 @@ subtest 'log_is_verbose' => sub {
     is int(@{$buf}), 1,
         "print_log() adds a message to the internal buffer if verbosity is 1.";
 
-    $buf = $mock->log_buffer();
+    $buf = $mock_syslog->log_buffer();
     is int(@{$buf}), 0,
         "print_log() logs no syslog messages if verbosity is 1.";
 
 };
 
 subtest 'log_buffer_size' => sub {
-    $mock->clear_log_buffer();
+    $mock_syslog->clear_log_buffer();
     log_is_verbose(0);
     clear_log_buffer();
     my $bufsiz = 4;
@@ -298,7 +301,7 @@ subtest 'log_fatal' => sub {
     throws_ok { log_fatal('a FATAL message') } qr{a FATAL message},
         "log_fatal(\$msg) dies with appropriate message";
 
-    my $buf = $mock->log_buffer();
+    my $buf = $mock_syslog->log_buffer();
     my ($prio, $msg) = @{$buf->[-1]};
     like $msg, qr{a FATAL message},
         "log_fatal() logs appropriate message";

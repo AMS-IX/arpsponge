@@ -22,10 +22,17 @@ use Test2::V0;
 use FindBin;
 use lib "$FindBin::Bin/lib";
 
+use Test::Mock::Sys::Syslog;
+
+my $mock_syslog;
+
+BEGIN {
+    $mock_syslog = Test::Mock::Sys::Syslog->new();
+}
+
 use M6::ArpSponge::Event qw(:all);
 use Sys::Syslog qw(:standard :macros);
 use M6::ArpSponge::Log qw(:func);
-use Test::Mock::Sys::Syslog;
 
 imported_ok(qw(
         EVENT_NAMES
@@ -202,7 +209,6 @@ subtest 'event_mask_to_string' => sub {
 };
 
 subtest 'event_logging' => sub {
-    my $mock = Test::Mock::Sys::Syslog->new(namespace => 'M6::ArpSponge::Log');
     init_log();
 
     event_mask(EVENT_IO|EVENT_CTL);
@@ -225,10 +231,10 @@ subtest 'event_logging' => sub {
         my $prio = is_valid_log_level($prio_name);
         my $msg = "an IO event at level \U$prio_name\E";
 
-        $mock->clear_log_buffer();
+        $mock_syslog->clear_log_buffer();
         $func->(EVENT_IO, $msg);
         
-        my $buf = $mock->log_buffer();
+        my $buf = $mock_syslog->log_buffer();
         is int(@{$buf}),  1, "logged a \U$prio_name\E message";
 
         my ($got_prio, $got_msg) = @{$buf->[-1]};
@@ -238,9 +244,9 @@ subtest 'event_logging' => sub {
             "event_${prio_name}(EVENT_IO, ...) logs $msg";
     }
 
-    $mock->clear_log_buffer();
+    $mock_syslog->clear_log_buffer();
     event_err(EVENT_ALIEN, 'an ALIEN event at level ERR');
-    my $buf = $mock->log_buffer();
+    my $buf = $mock_syslog->log_buffer();
     is @{$buf}, 0,
         "event_emerg(EVENT_ALIEN, ...) is not logged due to event mask";
 };

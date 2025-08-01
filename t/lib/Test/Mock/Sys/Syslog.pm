@@ -184,19 +184,24 @@ Test::Mock::Sys::Syslog - mock out Sys::Syslog for unit tests
 
 =head1 SYNOPSIS
 
-    use Sys::Syslog qw( openlog closelog syslog :macros );
-    use Test::Mock::Sys::Syslog;
+  use Test::Mock::Sys::Syslog;
 
-    my $mock = Test::Mock::Sys::Syslog->new();
+  my $mock_syslog;
 
-    openlog($LOG_IDENT, $LOG_OPT, $LOG_FACILITY);
+  BEGIN {
+      $mock_syslog = Test::Mock::Sys::Syslog->new();
+  }
 
-    syslog($LOG_PRIO, $FMT, @ARGS);
-    syslog($LOG_PRIO, $STR);
+  use Sys::Syslog qw( openlog closelog syslog :macros );
 
-    setlogsock(...);
+  openlog($LOG_IDENT, $LOG_OPT, $LOG_FACILITY);
 
-    closelog();
+  syslog($LOG_PRIO, $FMT, @ARGS);
+  syslog($LOG_PRIO, $STR);
+
+  setlogsock(...);
+
+  closelog();
 
 =head1 DESCRIPTION
 
@@ -242,11 +247,18 @@ original interface is restored.
 
 =back
 
+B<NOTE:> The use of 
+L<B<namespace::clean>(3)|namespace::clean>
+may interfere with the use of this module,
+see L<CAVEATS|/CAVEATS> below.
+
 =head1 CONSTRUCTOR
 
 =head2 new
 
-    OBJ = Test::Mock::Sys::Syslog->new();
+  OBJ = Test::Mock::Sys::Syslog->new();
+  OBJ = Test::Mock::Sys::Syslog->new( namespace => $NS);
+  OBJ = Test::Mock::Sys::Syslog->new( namespace => [ $NS, ... ] );
 
 Creates a new B<Test::Mock::Sys::Syslog>
 object instance and returns a reference to it.
@@ -257,17 +269,45 @@ functions,
 see L<MOCKED FUNCTIONS/MOCKED FUNCTIONS>
 below.
 
+By default, it will mock
+L<B<Sys::Syslog>(3)|Sys::Syslog>
+functions in the
+C<Sys::Syslog> and C<main> namespaces.
+
+This allows you to write:
+
+  use Sys::Syslog qw( ... );
+  use Test::Mock::Sys::Syslog;
+
+  {
+    my $mock = Test::Mock::Sys::Syslog->new();
+
+    # Mocked interface is now active.
+    openlog(...);
+    syslog(...);
+    closelog();
+  }
+
+  # Original interface is now active.
+  openlog(...);
+  syslog(...);
+  closelog();
+
+If you want to override C<Sys::Syslog> functions in another module (namespace),
+you can use the C<namespace> parameter to provide the namespace(s) for which
+you want to override the interface, but see L<CAVEATS|/CAVEATS> below.
+
 =head1 METHODS
 
 =head2 clear_log_buffer
 
-    OBJ->clear_log_buffer();
+  $OBJ->clear_log_buffer();
 
 Clear the log buffer.
 
 =head2 log_buffer
 
-    ARRAY_REF = OBJ->log_buffer();
+  $ARRAY_REF = $OBJ->log_buffer();
 
 Return an array reference with log messages.
 Each element is an array consisting of the priority (uppercase string)
@@ -288,20 +328,28 @@ Example:
 
 =head2 ident
 
+  $IDENT = $OBJ->ident();
+
 The value of the I<$ident> parameter given to
 L<B<openlog>()|Sys::Syslog/openlog>.
 
 =head2 logopt
+
+  $LOGOPT = $OBJ->logopt();
 
 The value of the I<$logopt> parameter given to
 L<B<openlog>()|Sys::Syslog/openlog>.
 
 =head2 facility
 
+  $FACILITY = $OBJ->facility();
+
 The value of the I<$facility> parameter given to
 L<B<openlog>()|Sys::Syslog/openlog>.
 
 =head2 log_is_open
+
+  $BOOL = $OBJ->log_is_open();
 
 Boolean indicating if the log has been opened with
 L<B<openlog>()|Sys::Syslog/openlog>
@@ -312,7 +360,7 @@ L<B<closelog>()|Sys::Syslog/closelog>.
 
 =head2 openlog
 
-    openlog($IDENT, $LOGOPT, $FACILITY);
+  openlog($IDENT, $LOGOPT, $FACILITY);
 
 Simulates the opening of a log connection.
 After this call,
@@ -320,7 +368,7 @@ the L<B<log_is_open>()|/log_is_open> returns true.
 
 =head2 closelog
 
-    closelog();
+  closelog();
 
 Marks the log system as "closed".
 After this call,
@@ -328,8 +376,8 @@ the L<B<log_is_open>()|/log_is_open> returns false.
 
 =head2 syslog
 
-    syslog($PRIORITY, $FMT, @ARGS);
-    syslog($PRIORITY, $STR;
+  syslog($PRIORITY, $FMT, @ARGS);
+  syslog($PRIORITY, $STR;
 
 Simulates the original L<B<syslog>()|Sys::Syslog/syslog>.
 
@@ -343,7 +391,70 @@ otherwise, this acts as a no-op.
 
 Mocked to be a no-op.
 
-=head1 EXAMPLE
+=head1 CAVEATS
+
+=head2 Compatibility with "namespace::clean"
+
+B<Test::Mock::Net::Pcap> cannot mock C<pcap_>
+functions for a module that uses
+L<B<namespace::clean>(3)|namespace::clean>,
+I<unless>
+B<Test::Mock::Net::Pcap>
+is instantiated
+I<before>
+the target module is loaded.
+
+Take, for instance, a fictitious module named C<Foo>:
+
+    # Foo.pm
+    package Reply;
+    use Sys::Syslog qw( :standard :macros );
+    use namespace::clean;
+
+    sub do_something {
+        ...
+        syslog(LOG_INFO, "something was done!");
+    }
+
+We then want to write test script that calls on C<Foo>,
+with the 
+L<B<Sys::Syslog>(3)|Sys::Syslog.3>
+interface mocked out:
+
+  # script.pl
+  use Test::Mock::Sys::Syslog;
+  use Foo;
+
+  my $mock = Test::Mock::Sys::Syslog->new(namespace => 'Foo');
+
+  Foo::do_something();
+
+Here, the constructor for
+B<Test::Mock::Sys::Syslog>
+will try to install mock versions of the C<Sys::Syslog> functions
+in the C<Foo> namespace, but this will fail due to C<Foo>'s use of
+C<namespace::clean>.
+
+The solution is to instantiate 
+B<Test::Mock::Sys::Syslog>
+I<before> the C<use Foo> statement:
+
+  # script.pl
+  use Test::Mock::Sys::Syslog;
+  my $mock_syslog;
+  BEGIN {
+      $mock_syslog = Test::Mock::Sys::Syslog->new(namespace => 'Foo');
+  }
+  use Foo;
+
+  Foo::do_something();
+
+The constructor can be called without a C<namespace> argument as well,
+in which case it will mock the 
+L<B<Sys::Syslog>(3)|Sys::Syslog.3>
+interface for I<all> subsequent code/modules.
+
+=head1 EXAMPLES
 
 The following code fragment shows how to use this module in a
 L<B<Test2>(3)|Test2> environment:
@@ -380,9 +491,10 @@ L<B<Test2>(3)|Test2> environment:
 
 =head1 SEE ALSO
 
+L<B<namespace::clean>(3)|namespace::clean>,
+L<B<Sys::Syslog>(3)|Sys::Syslog>,
 L<B<Test2>(3)|Test2>,
-L<B<Test2::V0>(3)|Test2::V0>,
-L<B<Sys::Syslog>(3)|Sys::Syslog>.
+L<B<Test2::V0>(3)|Test2::V0>.
 
 =head1 AUTHOR
 
