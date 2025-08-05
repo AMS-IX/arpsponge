@@ -897,25 +897,59 @@ Clear/delete all custom attributes.
 
 =head2 TO DO
 
- is_my_ip
- is_my_ip_s
- my_ip_s
- network_s
- broadcast_s
- my_mac_s
- state_name
- clear_state
- init_all_state
- get_mac
- get_ip_all
+ my_ip
+ my_ip_s        
+ is_my_ip       
+ is_my_ip_s     
  get_ip
+ get_ip_all
+
+ network
+ network_s      
+ prefixlen
+ network_lo_i
+ network_hi_i
  is_my_network
  is_my_network_s
+ broadcast
+ broadcast_s    
+
+ my_mac
+ my_mac_s       
+ get_mac
+
+ device
+ phys_device
+
+ arp_age
+ arp_update_flags
+ flood_protection
+ gratuitous
+ is_dummy
+ max_pending
+ max_rate
+ sponge_net
+ pcap_handle
+
+=head2 Tables
+
+ arp_table
+ queue
+ state_table
+
+=head2 State management
+
+ state_name     
+ clear_state
+ init_all_state
  set_pending
  incr_pending
  set_dead
  set_static
  set_alive
+
+=head2 ARP sending
+
  send_query
  gratuitous_arp
  send_arp
