@@ -23,14 +23,17 @@ use Config;
 
 use IPC::Run qw( run );
 
-use Net::Pcap qw( pcap_open_live pcap_dispatch pcap_fileno
-                  pcap_get_selectable_fd pcap_setnonblock );
+use Net::Pcap qw(
+    pcap_dispatch pcap_get_selectable_fd
+    pcap_open_live pcap_setnonblock
+);
 
 use M6::ArpSponge::NetPacket  qw( :all );
 
 use NetAddr::IP         qw( :lower );
 use Time::HiRes         qw( time sleep );
-use POSIX               qw( strftime :signal_h :errno_h );
+use Time::Piece;
+use POSIX               qw( :signal_h :errno_h );
 use File::Path          qw( mkpath );
 
 use IO::File;
@@ -236,13 +239,17 @@ sub Main {
 
     my ($device);
 
-    log_fatal("Invalid parameter syntax: expected \"dev\" instead of \"$ARGV[1]\"\n")
-        unless lc $ARGV[1] eq 'dev';
+    if (lc $ARGV[1] eq 'dev') {
+        log_fatal(
+            qq{Invalid parameter syntax: },
+            qq{expected "dev" instead of "$ARGV[1]"\n}
+        );
+    }
 
     $device = $ARGV[2];
 
-    $rundir         //= "$RUN_DIR/$device";
-    $statusfile     //= "$rundir/status";
+    $rundir     //= "$RUN_DIR/$device";
+    $statusfile //= "$rundir/status";
 
     ####################################################################
 
@@ -728,8 +735,8 @@ sub reset_timer {
         my $caller = (caller(1))[3];
         event_warning(EVENT_STATE,
             "$caller - timer event LAG: %s; %s",
-            strftime("planned=%H:%M:%S", localtime($next_alarm+$Timer_Cycle)),
-            strftime("adjusted=%H:%M:%S", localtime($now+$Timer_Cycle)),
+            localtime($next_alarm+$Timer_Cycle)->strftime("planned=%T"),
+            localtime($now+$Timer_Cycle)->strftime("adjusted=%T"),
         );
         $next_alarm = $now;
     }
