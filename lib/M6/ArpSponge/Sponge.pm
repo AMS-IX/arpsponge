@@ -267,7 +267,7 @@ sub BUILD {
 }
 
 ###############################################################################
-# $sponge->init_all_state();
+# $sponge->init_all_state($init_state);
 #
 #   Wipe all state info from the sponge. This includes all IP state info,
 #   all queue info, all timings, all ARP info.
@@ -720,34 +720,86 @@ M6::ArpSponge::Sponge - state information and ARP handling for arpsponge(1)
 
  my $sponge = M6::ArpSponge::Sponge->new();
 
- get_attr
- del_attr
- set_attr
- clear_attr
- is_my_ip       
- is_my_ip_s     
- my_ip_s        
- network_s      
- broadcast_s    
- my_mac_s       
- state_name     
- clear_state
- init_all_state
- get_mac
- get_ip_all
- get_ip
- is_my_network
- is_my_network_s
- set_pending
- incr_pending
- set_dead
- set_static
- set_alive
- send_query
- gratuitous_arp
- send_arp
- send_arp_update
- send_reply
+ $attr_val = $sponge->get_attr($attr_name);
+ $sponge->set_attr($attr_name, $attr_val);
+ $sponge->del_attr($attr_name);
+ $sponge->clear_attr();
+
+ $hex_ip     = $sponge->my_ip()
+ $ip_string  = $sponge->my_ip_s();
+ $bool       = $sponge->is_my_ip($hex_ip);
+ $bool       = $sponge->is_my_ip_s($ip_string);
+
+ $len        = $sponge->prefixlen();
+
+ $hex_ip     = $sponge->network();
+ $ip_string  = $sponge->network_s();;
+ $num        = $sponge->network_lo_i();
+ $num        = $sponge->network_hi_i();
+ $bool       = $sponge->is_my_network($hex_ip);
+ $bool       = $sponge->is_my_network_s($ip_string);
+
+ $hex_ip     = $sponge->broadcast()
+ $ip_string  = $sponge->broadcast_s();
+
+ $hex_mac    = $sponge->my_mac_s();
+ $mac_string = $sponge->my_mac();
+
+ $state_str  = $sponge->state_name($state_num);
+
+ $sponge->clear_state($hex_ip);
+ $sponge->init_all_state($init_state);
+
+ $hex_mac = $sponge->get_mac($dev_name);
+
+ @hex_ip_list = $sponge->get_ip_all();
+ $hex_ip      = $sponge->get_ip($dev_name);
+
+ $sponge->set_pending
+ $sponge->incr_pending
+ $sponge->set_dead
+ $sponge->set_static
+ $sponge->set_alive
+ $sponge->send_query
+ $sponge->gratuitous_arp
+ $sponge->send_arp
+ $sponge->send_arp_update
+ $sponge->send_reply
+
+ $dev_name = $sponge->device();
+ $dev_name = $sponge->phys_device();
+
+ $pcap_handle = $sponge->pcap_handle();
+ $sponge->pcap_handle($new_handle);
+
+ $arp_age = $sponge->arp_age();
+ $sponge->arp_age($new_arp_age);
+
+ $mask = $sponge->arp_update_flags();
+ $sponge->arp_update_flags($new_mask;
+
+ $rate = $sponge->flood_protection();
+ $sponge->flood_protection($new_rate);
+
+ $bool = $sponge->gratuitous();
+ $sponge->gratuitous($new_bool);
+
+ $bool = $sponge->is_dummy();
+ $sponge->is_dummy($new_bool);
+
+ $count = $sponge->max_pending();
+ $sponge->max_pending($new_count);
+
+ $rate = $sponge->max_rate();
+ $rate = $sponge->max_rate($new_rate);
+
+ $bool = $sponge->sponge_net();
+ $sponge->sponge_net($new_bool);
+
+ $m6_arpsponge_arptable   = $sponge->arp_table()
+ $m6_arpsponge_queue      = $sponge->queue()
+ $m6_arpsponge_statetable = $sponge->state_table()
+
 
 =head1 DESCRIPTION
 
@@ -845,13 +897,13 @@ Clear/delete all custom attributes.
 
 =head2 TO DO
 
- is_my_ip       
- is_my_ip_s     
- my_ip_s        
- network_s      
- broadcast_s    
- my_mac_s       
- state_name     
+ is_my_ip
+ is_my_ip_s
+ my_ip_s
+ network_s
+ broadcast_s
+ my_mac_s
+ state_name
  clear_state
  init_all_state
  get_mac
