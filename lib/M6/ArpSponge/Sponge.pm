@@ -458,7 +458,7 @@ sub set_static {
 }
 
 ###############################################################################
-# set_alive($data, $ip, $target_mac);
+# set_alive($ip, $target_mac);
 #
 #   Unsponge the $ip, which is now seen from $target_mac.
 #   Update ARP cache and print appropriate notifications.
@@ -606,11 +606,11 @@ sub send_arp_update {
         my $spa = hex2ip($args{spa});
         my $tag = $args{tag} // '';
         log_sverbose(1, "%s%sarp inform %s\@%s about %s\@%s\n",
-                        $tag,
-                        (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
-                         $tpa, $tha,
-                         $spa, $sha,
-                    );
+            $tag,
+            (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
+            $tpa, $tha,
+            $spa, $sha,
+        );
     }
     return if (!$pcap_h || $self->is_dummy);
 
@@ -755,16 +755,24 @@ M6::ArpSponge::Sponge - state information and ARP handling for arpsponge(1)
  @hex_ip_list = $sponge->get_ip_all();
  $hex_ip      = $sponge->get_ip($dev_name);
 
- $sponge->set_pending
- $sponge->incr_pending
- $sponge->set_dead
- $sponge->set_static
- $sponge->set_alive
- $sponge->send_query
- $sponge->gratuitous_arp
- $sponge->send_arp
- $sponge->send_arp_update
- $sponge->send_reply
+ $sponge->set_pending($hex_ip, $level);
+ $sponge->incr_pending($hex_ip);
+ $sponge->set_dead($hex_ip);
+ $sponge->set_static($hex_ip);
+ $sponge->set_alive($hex_ip, $hex_mac);
+ $sponge->send_query($hex_ip);
+ $sponge->gratuitous_arp($hex_ip);
+
+ $sponge->send_arp(tha => $tha);
+
+ $sponge->send_arp_update(
+    tha => $tha,
+    tpa => $tpa,
+    spa => $spa,
+    sha => $sha
+ );
+
+ $sponge->send_reply($hex_ip, \%arp_request);
 
  $dev_name = $sponge->device();
  $dev_name = $sponge->phys_device();
