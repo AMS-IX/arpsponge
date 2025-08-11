@@ -139,7 +139,7 @@ has state_table => (
     },
 );
 
-has phys_device => (
+has _phys_device => (
     is       => 'lazy',
     init_arg => undef,
     builder  => sub { (split(/:/, $_[0]->device))[0] },
@@ -260,10 +260,13 @@ sub BUILD {
 
     $self->init_all_state($args->{init_state});
 
-    log_sverbose(1, "Device: %s\n", $self->device);
-    log_sverbose(1, "Device: %s\n", $self->phys_device);
-    log_sverbose(1, "MAC:    %s\n", $self->my_mac_s);
-    log_sverbose(1, "IP:     %s\n", $self->my_ip_s);
+    log_sverbose(1, "%-7s %s", "Device", $self->device);
+    if ($self->_phys_device ne $self->device) {
+        log_sverbose(1, "(%s)", $self->_phys_device);
+    }
+    log_verbose(1, "\n");
+    log_sverbose(1, "%-7s %s\n", "MAC", $self->my_mac_s);
+    log_sverbose(1, "%-7s %s\n", "IP", $self->my_ip_s);
 }
 
 ###############################################################################
@@ -873,61 +876,126 @@ L<B<M6::ArpSponge::Defaults-E<gt>QUEUE_DEPTH>|M6::ArpSponge::Defaults/QUEUE_DEPT
 
 =over
 
-=item B<get_attr>
-X<get_attr>
+=item B<clear_attr>
+X<clear_attr>
 
-  $VAL = $OBJ->get_attr($NAME);
+  $OBJ->clear_attr();
 
-Return the value of attribute I<$NAME> or C<undef> it doesn't exist.
+Deletes all custom attributes.
 
 =item B<del_attr>
 X<del_attr>
 
   $VAL = $OBJ->del_attr($NAME);
 
-Delete attribute I<$NAME> and return its old value (if any).
+Deletes attribute I<$NAME> and returns its old value (if any).
+
+=item B<get_attr>
+X<get_attr>
+
+  $VAL = $OBJ->get_attr($NAME);
+
+Returns the value of attribute I<$NAME> or C<undef> it doesn't exist.
 
 =item B<set_attr>
 X<set_attr>
 
   $OBJ->set_attr($NAME, $VAL);
 
-Set attribute I<$NAME> to I<$VAL>.
-
-=item B<clear_attr>
-X<clear_attr>
-
-  $OBJ->clear_attr();
-
-Clear/delete all custom attributes.
+Sets attribute I<$NAME> to I<$VAL>.
 
 =back
 
-=head2 TO DO
+=head2 Read-only Properties
 
- my_ip
- my_ip_s        
- is_my_ip       
- is_my_ip_s     
- get_ip
- get_ip_all
+=over
 
- network
- network_s      
- prefixlen
- network_lo_i
- network_hi_i
+=item B<broadcast>, B<broadcast_s>
+X<broadcast>X<broadcast_s>
+
+  $HEX_IP = $OBJ->broadcast();
+  $IP_STR = $OBJ->broadcast_s();
+
+Returns the broadcast address for the sponge's
+L<B<network>()|/network> as a hexadecimal
+and dotted decimal string, respectively.
+
+=item B<device>
+X<device>
+
+  $DEV_STR = $OBJ->device();
+
+Returns the C<device> argument that was given
+to the constructur.
+
+=item B<my_ip>, B<my_ip_s>
+X<my_ip>X<my_ip_s>
+
+  $HEX_IP = $OBJ->my_ip();
+  $IP_STR = $OBJ->my_ip_s();
+
+Returns the sponge's IP address as a lowercase
+hexadecimal string or a dotted decimal string, respectively.
+The IP address is automatically determined based on the 
+L<B<device>()|/device>.
+
+=item B<my_mac>, B<my_mac_s>
+X<my_mac>X<my_mac_s>
+
+Returns the sponge's own MAC address as a hexadecimal
+and "canonical" string, resp.
+The MAC address is automatically determined based on the 
+L<B<device>()|/device>.
+
+Example:
+
+    $OBJ->my_mac()   eq 'a6b7c8d9e0fa'
+    $OBJ->my_mac_s() eq 'a6:b7:c8:d9:e0:fa'
+
+=item B<network>, B<network_s>
+X<network>X<network_s>
+
+  $HEX_IP = $OBJ->network();
+  $IP_STR = $OBJ->network_s();
+
+Returns the sponge's C<network> parameter as
+a hexadecimal string or a dotted decimal string,
+respectively.
+
+=item B<network_lo_i>, B<network_hi_i>
+X<network_lo_i>X<network_hi_i>
+
+  $INT_LO = $OBJ->network_lo_i();
+  $INT_HI = $OBJ->network_hi_i();
+
+Returns the first (last) usable IP address in
+L<B<network>()|/network> as a 32-bit integer.
+
+These functions can be used to iterate over all IP
+addresses in the sponge network range.
+
+=item B<prefixlen>
+X<prefixlen>
+
+  $LEN = $OBJ->prefixlen();
+
+Returns the prefix length of L<B<network>()|/network>.
+
+=back
+
+=head1 TO DO
+
+=head2 Boolean checks
+
  is_my_network
  is_my_network_s
- broadcast
- broadcast_s    
+ is_my_ip       
+ is_my_ip_s     
 
- my_mac
- my_mac_s       
- get_mac
+ is_my_network
+ is_my_network_s
 
- device
- phys_device
+=head2 Read-write Properties
 
  arp_age
  arp_update_flags
@@ -956,6 +1024,13 @@ Clear/delete all custom attributes.
  set_static
  set_alive
 
+=head2 System interrogation
+
+ get_ip
+ get_ip_all
+
+ get_mac
+
 =head2 ARP sending
 
  send_query
@@ -965,6 +1040,8 @@ Clear/delete all custom attributes.
  send_reply
 
 =head1 EXAMPLES
+
+TBD.
 
 =head1 SEE ALSO
 
