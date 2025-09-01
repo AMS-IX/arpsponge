@@ -112,7 +112,9 @@ sub hex_addr_in_net {
 
     return 1 if !$len;
 
-    my $mask = (0,8,12,14,15)[$len];
+    my $mask = (0,8,12,14)[$len];
+    # my $mask = 0xf & (0xf << (4-$len));
+
     my $addr_nibble = hex(substr($addr, $nibbles, 1));
     my $net_nibble  = hex(substr($net,  $nibbles, 1));
     return ($addr_nibble & $mask) == $net_nibble;
