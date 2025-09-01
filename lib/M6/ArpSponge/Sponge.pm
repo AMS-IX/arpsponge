@@ -936,7 +936,7 @@ X<my_ip>X<my_ip_s>
 
 Returns the sponge's IP address as a lowercase
 hexadecimal string or a dotted decimal string, respectively.
-The IP address is automatically determined based on the 
+The IP address is automatically determined based on the
 L<B<device>()|/device>.
 
 =item B<my_mac>, B<my_mac_s>
@@ -944,7 +944,7 @@ X<my_mac>X<my_mac_s>
 
 Returns the sponge's own MAC address as a hexadecimal
 and "canonical" string, resp.
-The MAC address is automatically determined based on the 
+The MAC address is automatically determined based on the
 L<B<device>()|/device>.
 
 Example:
@@ -983,17 +983,32 @@ Returns the prefix length of L<B<network>()|/network>.
 
 =back
 
-=head1 TO DO
-
 =head2 Boolean checks
 
- is_my_network
- is_my_network_s
- is_my_ip       
- is_my_ip_s     
+=over
 
- is_my_network
- is_my_network_s
+=item B<is_my_network>, B<is_my_network_s>
+X<is_my_network>X<is_my_network_s>
+
+  $BOOL = $OBJ->is_my_network($HEX_IP);
+  $BOOL = $OBJ->is_my_network_s($IP_STR);
+
+Returns true if the I<$HEX_IP> (I<$IP_STR>) is
+in the monitored L<B<network>()|/network> range,
+false otherwise.
+
+=item B<is_my_ip>, B<is_my_ip_s>
+X<is_my_ip>X<is_my_ip_s>
+
+  $BOOL = $OBJ->is_my_ip($HEX_IP);
+  $BOOL = $OBJ->is_my_ip_s($IP_STR);
+
+Returns true if the I<$HEX_IP> (I<$IP_STR>) matches
+any of the host's IPv4 addresses, false otherwise.
+
+=back
+
+=head1 TO DO
 
 =head2 Read-write Properties
 
@@ -1015,7 +1030,7 @@ Returns the prefix length of L<B<network>()|/network>.
 
 =head2 State management
 
- state_name     
+ state_name
  clear_state
  init_all_state
  set_pending
