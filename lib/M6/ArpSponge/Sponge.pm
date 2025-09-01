@@ -297,12 +297,9 @@ sub init_all_state {
     }
 
     if ($self->sponge_net) {
-        my $mask  = oct("0b"."1" x (32 - $self->prefixlen));
-        my $bcast = sprintf("%08x", hex($self->network) | $mask);
-
         # Statically sponge network and broadcast addresses.
         $self->state_table->set_state($self->network, STATIC);
-        $self->state_table->set_state($bcast, STATIC);
+        $self->state_table->set_state($self->broadcast, STATIC);
     }
 
     for my $ip ($self->my_ip, keys %{$self->_ip_all}) {
