@@ -237,7 +237,7 @@ sub is_valid_ip {
         return;
     }
 
-    my $ip = $arg =~ /^\d/ ? NetAddr::IP->new($arg) : undef;
+    my $ip = $arg =~ m{^\d+(?:[./]|$)} ? NetAddr::IP->new($arg) : undef;
     if (!$ip) {
         ${$opts{-err}} = q{not a valid IPv4 address};
         return;
