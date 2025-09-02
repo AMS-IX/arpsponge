@@ -420,7 +420,7 @@ sub parse_command_line {
             log_fatal("not enough parameters.\n$USAGE_MSG") if @${args} < 2;
 
             my $arg = lc shift @{$args};
-            if ($args ne 'dev') {
+            if ($arg ne 'dev') {
                 log_fatal(
                     "invalid parameter: expected 'dev' instead of '%s'.",
                     $arg
