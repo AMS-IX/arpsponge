@@ -61,33 +61,15 @@ has device           => ( is => 'ro', required => 1 );
 has network          => ( is => 'ro', required => 1 );
 has prefixlen        => ( is => 'ro', required => 1 );
 
-has arp_age          => (
-    is => 'rw',
-    default => \&M6::ArpSponge::Defaults::MAX_ARP_AGE
-);
-
 has arp_update_flags => ( is => 'rw', default => \&ARP_UPDATE_ALL );
-
-has flood_protection => (
-    is => 'rw',
-    default => \&M6::ArpSponge::Defaults::FLOOD_PROTECTION,
-);
 
 has gratuitous       => ( is => 'rw', default => DFL_FALSE );
 
-has is_dummy         => ( is => 'rw', default => DFL_FALSE );
+has init_state       => ( is => 'rw', default => NONE );
 
-has max_pending      => (
-    is      => 'rw',
-    default => \&M6::ArpSponge::Defaults::MAX_PENDING
-);
+has dummy_mode       => ( is => 'rw', default => DFL_FALSE );
 
-has max_rate         => (
-    is      => 'rw',
-    default => \&M6::ArpSponge::Defaults::MAX_ARP_RATE
-);
-
-has sponge_net       => ( is => 'rw', default => DFL_FALSE );
+has sponge_network   => ( is => 'rw', default => DFL_FALSE );
 
 has pcap_handle      => ( is => 'rw' );
 
@@ -120,7 +102,7 @@ has queue => (
     isa      => InstanceOf['M6::ArpSponge::Queue'],
     default  => sub { M6::ArpSponge::Queue->new() },
     init_arg => undef,
-    handles  => { queuedepth => 'max_depth' },
+    handles  => { queue_depth => 'max_depth' },
 );
 
 has state_table => (
@@ -254,11 +236,11 @@ sub clear_state {
 sub BUILD {
     my ($self, $args) = @_;
 
-    if (exists $args->{queuedepth}) {
-        $self->queue->max_depth($args->{queuedepth});
+    if (exists $args->{queue_depth}) {
+        $self->queue->max_depth($args->{queue_depth});
     }
 
-    $self->init_all_state($args->{init_state});
+    $self->init_all_state($self->init_state);
 
     log_sverbose(1, "%-7s %s", "Device", $self->device);
     if ($self->_phys_device ne $self->device) {
@@ -287,7 +269,7 @@ sub init_all_state {
 
     # Build up a bit of state again...
 
-    if (defined $init_state) {
+    if (defined $init_state && $init_state != NONE) {
         my $lo = $self->network_lo_i;
         my $hi = $self->network_hi_i;
         for (my $num = $lo; $num <= $hi; $num++) {
@@ -296,7 +278,7 @@ sub init_all_state {
         }
     }
 
-    if ($self->sponge_net) {
+    if ($self->sponge_network) {
         # Statically sponge network and broadcast addresses.
         $self->state_table->set_state($self->network, STATIC);
         $self->state_table->set_state($self->broadcast, STATIC);
@@ -537,13 +519,13 @@ sub gratuitous_arp {
 
     if (log_is_verbose) {
         log_sverbose(1, "%sgratuitous ARP [dev=%s]: %s\n",
-                ($self->is_dummy ? '[DUMMY] ' : ''),
+                ($self->dummy_mode ? '[DUMMY] ' : ''),
                 $self->phys_device, hex2ip($ip));
     }
 
     $self->set_state_atime($ip, time);
 
-    return if $self->is_dummy;
+    return if $self->dummy_mode;
 
     my $ip_s = hex2ip($ip);
     $self->send_arp( spa => $ip,
@@ -607,12 +589,12 @@ sub send_arp_update {
         my $tag = $args{tag} // '';
         log_sverbose(1, "%s%sarp inform %s\@%s about %s\@%s\n",
             $tag,
-            (!$pcap_h || $self->is_dummy ? '[DUMMY] ' : ''),
+            (!$pcap_h || $self->dummy_mode ? '[DUMMY] ' : ''),
             $tpa, $tha,
             $spa, $sha,
         );
     }
-    return if (!$pcap_h || $self->is_dummy);
+    return if (!$pcap_h || $self->dummy_mode);
 
     my $update_flags = $self->arp_update_flags;
 
@@ -680,7 +662,7 @@ sub send_reply {
 
     my $pcap_h = $self->pcap_handle;
 
-    if (!$pcap_h || $self->is_dummy) {
+    if (!$pcap_h || $self->dummy_mode) {
         my $dst_mac_s = hex2mac($arp_obj->{sha});
         my $dst_ip_s  = hex2ip($arp_obj->{spa});
         my $src_ip_s  = hex2ip($src_ip);
@@ -780,29 +762,20 @@ M6::ArpSponge::Sponge - state information and ARP handling for arpsponge(1)
  $pcap_handle = $sponge->pcap_handle();
  $sponge->pcap_handle($new_handle);
 
- $arp_age = $sponge->arp_age();
- $sponge->arp_age($new_arp_age);
-
  $mask = $sponge->arp_update_flags();
  $sponge->arp_update_flags($new_mask;
-
- $rate = $sponge->flood_protection();
- $sponge->flood_protection($new_rate);
 
  $bool = $sponge->gratuitous();
  $sponge->gratuitous($new_bool);
 
- $bool = $sponge->is_dummy();
- $sponge->is_dummy($new_bool);
+ $bool = $sponge->dummy_mode();
+ $sponge->dummy_mode($new_bool);
 
  $count = $sponge->max_pending();
  $sponge->max_pending($new_count);
 
- $rate = $sponge->max_rate();
- $rate = $sponge->max_rate($new_rate);
-
- $bool = $sponge->sponge_net();
- $sponge->sponge_net($new_bool);
+ $bool = $sponge->sponge_network();
+ $sponge->sponge_network($new_bool);
 
  $m6_arpsponge_arptable   = $sponge->arp_table()
  $m6_arpsponge_queue      = $sponge->queue()
@@ -855,16 +828,16 @@ gratuitous ARP requests, unsollicited ARP replies, proxy ARP requests.
 =head2 new
 
   $OBJ = M6::ArpSponge::Sponge->new();
-      device       => $DEV_NAME,
-      network      => $HEX_IP,
-      prefixlen    => $LEN,
-      [ queuedepth => $DEPTH ]
+      device        => $DEV_NAME,
+      network       => $HEX_IP,
+      prefixlen     => $LEN,
+      [ queue_depth => $DEPTH ]
   );
 
 Creates a new B<M6::ArpSponge::Sponge> object instance
 and return as reference to it.
 The C<device>, C<network>, and C<prefixlen> parameter are required.
-The C<queuedepth> is optional and will default to
+The C<queue_depth> is optional and will default to
 L<B<M6::ArpSponge::Defaults-E<gt>QUEUE_DEPTH>|M6::ArpSponge::Defaults/QUEUE_DEPTH>.
 
 =head1 METHODS
@@ -1009,14 +982,11 @@ any of the host's IPv4 addresses, false otherwise.
 
 =head2 Read-write Properties
 
- arp_age
  arp_update_flags
- flood_protection
  gratuitous
- is_dummy
+ dummy_mode
  max_pending
- max_rate
- sponge_net
+ sponge_network
  pcap_handle
 
 =head2 Tables
