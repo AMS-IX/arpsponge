@@ -156,7 +156,7 @@ sub parse_event_mask {
 
         my $int_event = $STR_TO_EVENT_MASK{$event};
         if (!defined $int_event) {
-            ${$opts{-err}} = qq/"$event" is not a valid event name/;
+            ${$opts{-err}} = qq/'$event' is not a valid event name/;
             return;
         }
 

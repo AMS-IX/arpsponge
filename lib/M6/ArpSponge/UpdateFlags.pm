@@ -99,7 +99,7 @@ sub parse_update_flags {
 
         my $int_method = $STR_TO_FLAG{$method};
         if (! defined $int_method ) {
-            ${$opts{-err}} = qq/"$method" is not a valid ARP update flag/;
+            ${$opts{-err}} = qq/'$method' is not a valid ARP update flag/;
             return;
         }
 

@@ -263,7 +263,7 @@ sub log_fatal {
     }
     log_crit($format, @args);
     chomp(my $msg = sprintf($format, @args));
-    die "$msg\n";
+    die "$SYSLOG_IDENT: $msg\n";
 }
 
 ###############################################################################
@@ -303,7 +303,7 @@ sub is_valid_log_level {
         return $level;
     }
 
-    ${$opts{-err}} = q/"$arg" is not a valid syslog level/;
+    ${$opts{-err}} = q/'$arg' is not a valid syslog level/;
     return;
 }
 
