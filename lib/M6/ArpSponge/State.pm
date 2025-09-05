@@ -37,12 +37,14 @@ BEGIN {
         STATIC DEAD ALIVE PENDING NONE
     );
 
+    my @const = (@states, 'STATE_MIN');
+
     our @EXPORT_OK = ( @func, @states );
     our @EXPORT    = ();
 
     our %EXPORT_TAGS = (
         'func'   => \@func,
-        'const'  => \@states,
+        'const'  => \@const,
         'all'    => \@EXPORT_OK,
     );
 }
@@ -121,24 +123,46 @@ L<B<arpsponge>(1)|arpsponge> IP status fields.
 
 The symbolic constants translate to integer values.
 
+=head2 State values
+
 =over
 
-=item B<STATIC>
+=item B<STATIC> =E<gt> -3
+X<STATIC>
 
 IP address is statically sponged.
 
-=item B<DEAD>
+=item B<DEAD> =E<gt> -2
+X<DEAD>
 
 IP address is marked as "dead".
 
-=item B<ALIVE>
+=item B<ALIVE> =E<gt> -1
+X<ALIVE>
 
 IP address is marked as "alive".
 
-=item B<PENDING>
+=item B<NONE> =E<gt> 0
+X<NONE>
+
+IP address state is undefined.
+
+=item B<PENDING> =E<gt> 1
+X<PENDING>
 
 Synonym for B<PENDING(0)>, that is, the IP address
 is in "pending" (pre-sponge) state.
+
+=back
+
+=head2 Other constants
+
+=over
+
+=item B<STATE_MIN> =E<gt> -3
+X<STATE_MIN>
+
+Lowest valid value for a state.
 
 =back
 
