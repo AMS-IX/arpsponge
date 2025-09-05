@@ -65,8 +65,6 @@ has arp_update_flags => ( is => 'rw', default => \&ARP_UPDATE_ALL );
 
 has gratuitous       => ( is => 'rw', default => DFL_FALSE );
 
-has init_state       => ( is => 'rw', default => NONE );
-
 has dummy_mode       => ( is => 'rw', default => DFL_FALSE );
 
 has sponge_network   => ( is => 'rw', default => DFL_FALSE );
@@ -121,7 +119,7 @@ has state_table => (
     },
 );
 
-has _phys_device => (
+has phys_device => (
     is       => 'lazy',
     init_arg => undef,
     builder  => sub { (split(/:/, $_[0]->device))[0] },
@@ -239,16 +237,6 @@ sub BUILD {
     if (exists $args->{queue_depth}) {
         $self->queue->max_depth($args->{queue_depth});
     }
-
-    $self->init_all_state($self->init_state);
-
-    log_sverbose(1, "%-7s %s", "Device", $self->device);
-    if ($self->_phys_device ne $self->device) {
-        log_sverbose(1, "(%s)", $self->_phys_device);
-    }
-    log_verbose(1, "\n");
-    log_sverbose(1, "%-7s %s\n", "MAC", $self->my_mac_s);
-    log_sverbose(1, "%-7s %s\n", "IP", $self->my_ip_s);
 }
 
 ###############################################################################
@@ -474,12 +462,12 @@ sub set_alive {
     $self->arp_table->add($ip, $mac, time);
 
     if (defined $old_state && $old_state == DEAD) {
-        event_notice(EVENT_SPONGE,
+        event_info(EVENT_SPONGE,
             "unsponging: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
         return;
     }
 
-    event_notice(EVENT_SPONGE,
+    event_info(EVENT_SPONGE,
         "clearing: ip=%s mac=%s", hex2ip($ip), hex2mac($mac));
     return;
 }
