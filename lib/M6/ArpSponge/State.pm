@@ -39,7 +39,7 @@ BEGIN {
 
     my @const = (@states, 'STATE_MIN');
 
-    our @EXPORT_OK = ( @func, @states );
+    our @EXPORT_OK = ( @func, @const );
     our @EXPORT    = ();
 
     our %EXPORT_TAGS = (
