@@ -51,6 +51,7 @@ BEGIN {
         log_info
         log_fatal
         log_debug
+        log_is_active
         log_is_verbose log_verbose log_sverbose
         log_level is_log_level
         is_valid_log_level log_level_to_string
@@ -115,6 +116,10 @@ sub __log_getset {
     my $old = $$ref;
     $$ref = $_[1];
     return $old;
+}
+
+sub log_is_active {
+    return defined $Notify;
 }
 
 sub end_log {
@@ -225,7 +230,7 @@ sub print_log_level {
         }
         push @Log_Buffer, [ time, $line ];
 
-        _print_notify($line);
+        _print_notify($line) if $Notify;
 
         if ($is_verbose) {
             printf STDOUT "%s %s[%d]: %s\n", $tstamp, $SYSLOG_IDENT, $$, $line;
@@ -333,7 +338,7 @@ M6::ArpSponge::Log - logging functions for the arpsponge(1)
 
  use M6::ArpSponge::Log qw( :macros :func );
 
- init_log();
+ init_log() if !log_is_active();
 
  log_level(LOG_NOTICE);
 
@@ -418,11 +423,15 @@ on log messages. Any leading directory path will be stripped.
 If I<$IDENT> is not given (or is C<undef>),
 L<B<$FindBin::Script>|FindBin/$Script> will be used.
 
+After this call, L<B<log_is_active>()|/log_is_active> returns true.
+
 =head2 end_log
 
   end_log();
 
 Close the logging interface and clear the list of notification handles.
+
+After this call, L<B<log_is_active>()|/log_is_active> returns false.
 
 =head2 log_buffer_size
 
@@ -459,6 +468,12 @@ The time stamps are expressed as seconds since epoch.
   clear_log_buffer();
 
 Clear the internal log buffer.
+
+=head2 log_is_active
+
+  $BOOL = log_is_active();
+
+Return whether or not the module has been initialised.
 
 =head2 log_is_verbose
 
