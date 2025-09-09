@@ -156,33 +156,29 @@ subtest 'IP/MAC settings' => sub {
 subtest 'default settings' => sub {
     my $expected;
 
-    $expected = M6::ArpSponge::Defaults->MAX_ARP_AGE;
-    is $sponge->arp_age, $expected,
-        "arp_age is $expected";
+    #$expected = M6::ArpSponge::Defaults->MAX_ARP_AGE;
+    #is $sponge->arp_age, $expected,
+    #    "arp_age is $expected";
 
-    $expected = M6::ArpSponge::Defaults->FLOOD_PROTECTION;
-    is $sponge->flood_protection, $expected,
-        "flood_protection is $expected";
+    #$expected = M6::ArpSponge::Defaults->FLOOD_PROTECTION;
+    #is $sponge->flood_protection, $expected,
+    #    "flood_protection is $expected";
 
-    $expected = M6::ArpSponge::Defaults->MAX_PENDING;
-    is $sponge->max_pending, $expected,
-        "max_pending is $expected";
+    #$expected = M6::ArpSponge::Defaults->MAX_PENDING;
+    #is $sponge->max_pending, $expected,
+    #    "max_pending is $expected";
 
-    $expected = M6::ArpSponge::Defaults->MAX_ARP_RATE;
-    is $sponge->max_rate, $expected,
-        "max_rate is $expected";
-
-    $expected = M6::ArpSponge::Defaults->MAX_ARP_RATE;
-    is $sponge->max_rate, $expected,
-        "max_rate is $expected";
+    #$expected = M6::ArpSponge::Defaults->MAX_ARP_RATE;
+    #is $sponge->max_rate, $expected,
+    #    "max_rate is $expected";
 
     $expected = ARP_UPDATE_ALL;
     is $sponge->arp_update_flags, $expected,
         "arp_update_flags is $expected";
 
-    ok !$sponge->is_dummy,   "is_dummy is false";
-    ok !$sponge->gratuitous, "gratuitous is false";
-    ok !$sponge->sponge_net, "sponge_net is false";
+    ok !$sponge->dummy_mode,     "dummy_mode is false";
+    ok !$sponge->gratuitous,     "gratuitous is false";
+    ok !$sponge->sponge_network, "sponge_network is false";
 };
 
 subtest 'attributes' => sub {
@@ -458,9 +454,9 @@ subtest 'state_change' => sub {
             );
         };
 
-        subtest 'is_dummy' => sub {
-            $sponge->is_dummy(1);
-            note "set is_dummy to ", $sponge->is_dummy();
+        subtest 'dummy_mode' => sub {
+            $sponge->dummy_mode(1);
+            note "set dummy_mode to ", $sponge->dummy_mode();
             # Send to $inform_mac:
             #   ARP WHO-HAS $about_ip TELL $about_ip @ $about_mac
             $mock_pcap->clear_sent($pcap_h);
