@@ -87,18 +87,25 @@ my $Verbose        = 0;
 
 my $DEFAULT_PRIO   = LOG_NOTICE;
 
-my %STR_TO_LOG_PRIO = (
-    'emerg'   => LOG_EMERG,
-    'alert'   => LOG_ALERT,
-    'crit'    => LOG_CRIT,
-    'err'     => LOG_ERR,
-    'warning' => LOG_WARNING,
-    'notice'  => LOG_NOTICE,
-    'info'    => LOG_INFO,
-    'debug'   => LOG_DEBUG,
+my %LOG_PRIO_TO_STR = (
+    LOG_EMERG()   => 'emerg',
+    LOG_ALERT()   => 'alert',
+    LOG_CRIT()    => 'crit',
+    LOG_ERR()     => 'err',
+    LOG_WARNING() => 'warning',
+    LOG_NOTICE()  => 'notice',
+    LOG_INFO()    => 'info',
+    LOG_DEBUG()   => 'debug',
 );
 
-my %LOG_PRIO_TO_STR = reverse %STR_TO_LOG_PRIO;
+my %STR_TO_LOG_PRIO = (
+    (reverse %LOG_PRIO_TO_STR),
+    # Alternative naming for standard log levels.
+    'warn'      => LOG_WARNING,
+    'critical'  => LOG_CRIT,
+    'error'     => LOG_ERR,
+    'emergency' => LOG_EMERG,
+);
 
 my $MIN_PRIO       = min(keys %LOG_PRIO_TO_STR);
 my $MAX_PRIO       = max(keys %LOG_PRIO_TO_STR);
