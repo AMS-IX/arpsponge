@@ -1,9 +1,31 @@
+#===============================================================================
+#
+#       Module:  M6::ArpSponge::App::Settings
+#         File:  Settings.pm
+#
+#  Description:  check command line for arpsponge(1)
+#
+#       Author:  Steven Bakker (SB), <Steven.Bakker@ams-ix.net>
+#      Created:  2025-09-09
+#
+#   Copyright (c) 2025 AMS-IX B.V.; All rights reserved.
+#
+#   This module is free software; you can redistribute it and/or modify
+#   it under the same terms as Perl itself. See "perldoc perlartistic."
+#
+#   This software is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+#===============================================================================
+
 package M6::ArpSponge::App::Settings;
 
 use 5.014;
 use warnings;
 
 use Moo;
+use Carp                        qw( confess );
 use Types::Standard             qw( Str HashRef );
 use Data::Dump                  qw( dump );
 use FindBin;
@@ -106,7 +128,7 @@ sub _check_num_opt {
 #       Returns:
 #           ('some_mixed_mode', 'some-mixed_mode', 'MIXED');
 #
-#   (But note that 'some_mixed-mode' would not return anything!)
+#   (But note that 'some_mixed-mode' would fail!)
 #
 sub _fetch_opt {
     my ($opt, $key) = @_;
@@ -124,7 +146,9 @@ sub _fetch_opt {
         return ($key_name, $opt_name, $opt->{$opt_name})
             if exists $opt->{$opt_name};
     }
-    return;
+    # uncoverable statement
+    confess "INTERNAL ERROR: _fetch_opt(): cannot match '$key'",
+            "; tried: ", join(', ', map { "'$_'" } @tries);
 }
 
 sub default_options {
@@ -153,7 +177,7 @@ sub default_options {
         'socket-permissions'  => M6::ArpSponge::Defaults->SOCK_PERMS,
         'sponge-network'      => 0,
         'status-file'         => undef,
-        'sweep'               => undef,
+        'sweep'               => '',
         'sweep-at-start'      => 0,
         'sweep-skip-alive'    => 0,
         'verbose'             => 0,
@@ -163,9 +187,9 @@ sub default_options {
 sub parse_command_line {
     my ($self, %arg) = @_;
 
-    my $args = $arg{args} // \@ARGV;
+    $self->_set_error('');
 
-    my $debug = $arg{debug};
+    my $args = $arg{args} // [];
 
     my %opt = $self->default_options;
 
@@ -201,27 +225,23 @@ sub parse_command_line {
             'status-file|statusfile=s',
             'sweep=s',
             'sweep-at-start!',
-            'sweep-skip-alive',
+            'sweep-skip-alive!',
             'verbose|v+',
 
             'version|V' => sub {
-                print "$PROG $VERSION\n";
+                say $self->prog_name, ' ', $self->version;
                 exit 0;
             },
-            'help|h|?' => sub {
-                pod2usage(
+            'help|h|?' => sub { pod2usage(
                 -exitstatus => 0,
                 -verbose => 0,
                 -input => pod_where({-inc => 1}, 'M6::ArpSponge::App::Manual'),
-                );
-            },
-            'manual' => sub {
-                pod2usage(
+            ) },
+            'manual' => sub { pod2usage(
                 -exitstatus => 0,
                 -verbose => 2,
                 -input => pod_where({-inc => 1}, 'M6::ArpSponge::App::Manual'),
-                );
-            },
+            ) },
         );
     };
 
@@ -234,10 +254,6 @@ sub parse_command_line {
             $error = "UNKNOWN GetOptionsFromArray() error";
         }
         return $self->_set_error($error);
-    }
-
-    if ($debug) {
-        say "Opt:\n", dump(\%opt), "\n";
     }
 
     my %param;
@@ -263,9 +279,7 @@ sub parse_command_line {
             return $self->_set_error(
                 "invalid $argname argument '$opt_network'");
         }
-        $network = NetAddr::IP->new($opt_network)
-            or return $self->_set_error(
-                "invalid $argname argument '$opt_network'");
+        $network = NetAddr::IP->new($opt_network);
 
         $param{network}   = ip2hex($network->addr);
         $param{prefixlen} = $network->masklen;
@@ -334,7 +348,7 @@ sub parse_command_line {
 
     EVENT_MASK: {
         my ($key, $opt_name, $opt_val) = _fetch_opt(\%opt, 'log_mask');
-        my $val = parse_event_mask($opt{log_mask}, -err => \(my $err));
+        my $val = parse_event_mask($opt_val, -err => \(my $err));
         if (!defined $val) {
             return $self->_set_error(
                 "invalid --$opt_name argument '$opt_val'");
@@ -346,15 +360,12 @@ sub parse_command_line {
         my ($key, $opt_name, $opt_val)
             = _fetch_opt(\%opt, 'socket_permissions');
 
-        my @dfl_perms  = split(':', M6::ArpSponge::Defaults->SOCK_PERMS);
-        my @perms      = split(':', $opt_val);
-        if (@perms > 3) {
+        my @perms = split(':', $opt_val);
+        if (@perms != 3) {
             return $self->_set_error(
                 "invalid --$opt_name argument '$opt_val'");
         }
-        my $sock_owner = $perms[0] // $dfl_perms[0];
-        my $sock_group = $perms[1] // $dfl_perms[1];
-        my $sock_mode  = oct($perms[2] // $dfl_perms[2]);
+        my ($sock_owner, $sock_group, $sock_mode) = @perms;
 
         $param{socket_uid} = getpwnam($sock_owner)
             // return $self->_set_error(
@@ -364,7 +375,10 @@ sub parse_command_line {
             // return $self->_set_error(
                     "--socket-permissions: unknown group name '$sock_group'.");
 
-        $param{socket_mode} = $sock_mode;
+        $sock_mode =~ /^0*\d{3,4}$/
+            or return $self->_set_error(
+                    "--socket-permissions: bad mode '$sock_mode'.");
+        $param{socket_mode} = oct($sock_mode);
     }
 
     # Numerical, must be > 0.
@@ -386,13 +400,13 @@ sub parse_command_line {
         max_arp_rate
     )) {
         my ($key, $opt_name, $opt_val) = _fetch_opt(\%opt, $var);
-        return if !$self->_check_num_opt($opt_name, $opt_val, '>', 0);
+        return if !$self->_check_num_opt($opt_name, $opt_val, '>=', 0);
         $param{$key} = $opt_val;
     }
 
     SWEEP: {
         my ($key, $opt_name, $opt_val) = _fetch_opt(\%opt, 'sweep');
-        if (!defined $opt_val || !length($opt_val)) {
+        if (!length($opt_val)) {
             last SWEEP;
         }
 
@@ -400,19 +414,9 @@ sub parse_command_line {
             return $self->_set_error(
                 "invalid --$opt_name argument '$opt_val'");
         }
-        my ($sweep_sec, $sweep_threshold) = ($1, $2);
 
-        if (!$self->_check_num_opt(
-                "$opt_name (seconds)", $sweep_sec, '>=', 0)) {
-            return;
-        }
-        if (!$self->_check_num_opt(
-                "$opt_name (threshold)", $sweep_threshold, '>=', 0)) {
-            return;
-        }
-
-        $param{sweep_sec} = $sweep_sec;
-        $param{sweep_threshold} = $sweep_threshold;
+        $param{sweep_sec} = $1;
+        $param{sweep_threshold} = $2;
     }
 
     RUNDIR_CONTROL_PIDFILE_STATUSFILE: {
@@ -424,10 +428,6 @@ sub parse_command_line {
         $param{status_file}     = $opt{'status-file'}    // "$run_dir/status";
     }
 
-    if ($debug) {
-        say "Program parameters:\n", dump(\%param);
-    }
-
     $self->_set_hash(\%param);
     return 1;
 }
@@ -437,9 +437,202 @@ sub BUILD {
     if ($args->{args}) {
         $self->parse_command_line(
             args => $args->{args},
-            debug => $args->{debug}
         );
     }
 }
 
 1;
+
+__END__
+
+=encoding utf8
+
+=head1 NAME
+
+M6::ArpSponge::App::Settings - check command line for arpsponge(1)
+
+=head1 SYNOPSIS
+
+ use M6::ArpSponge::App::Settings;
+
+ $settings = M6::ArpSponge::App::Settings->new( args => \@ARGV );
+
+ $settings = M6::ArpSponge::App::Settings->new();
+
+ $settings->parse_command_line( args => \@ARGV )
+    or die $settings->error;
+
+ say "program: ", $settings->prog_name;
+ say "version: ", $settings->version;
+ say "usage:   ", $settings->usage_msg;
+
+ my $hash = $settings->hash;
+ for my $k (sort keys %{$hash}) {
+    say "$k = $hash->{$k}";
+ }
+
+=head1 DESCRIPTION
+
+B<M6::ArpSponge::App::Settings>
+provides an interface to parse command line arguments for
+L<B<arpsponge>(1)|arpsponge.1>.
+
+It checks for the presence of required parameters and the
+validity of all supplied options and arguments.
+
+This class is used by
+L<B<M6::ArpSponge::App>(3)|M6::ArpSponge::App>'s
+B<new_from_cli>
+and is of little use outside of that context.
+
+=head1 CONSTRUCTORS
+
+=head2 new
+
+  $OBJ = M6::ArpSponge::App::Settings->new();
+  $OBJ = M6::ArpSponge::App::Settings->new(args => \@argv);
+
+Creates a new object instance.
+
+If the C<args> parameter is provided, the
+L<B<parse_command_line>|/parse_command_line>
+method is called on the newly created instance.
+
+Returns a reference to the newly created instance.
+
+=head1 METHODS
+
+=head2 default_options
+
+  %HASH = M6::ArpSponge::App::Settings->default_options;
+  %HASH = $OBJ->default_options;
+
+Return the default values for all valid command line options.
+Options are named without the leading hyphen(s).
+
+=head2 error
+
+Returns the latest error from
+L<B<parse_command_line>|/parse_command_line>.
+
+=head2 hash
+
+  $HASH = $OBJ->hash;
+
+Returns a HASHREF that holds all the program options.
+The hash contains an entry for every valid command line option.
+Command line options are translated to keys as follows:
+
+=over
+
+=item 1.
+
+The name is translated to lowercase.
+
+=item 2.
+
+Any leading hyphens (C<->) are stripped.
+
+=item 3.
+
+Any remaining hyphens (C<->) are translated to underscore (C<_>).
+
+=back
+
+This means that the value for C<--max-arp-age> can be retrieved
+under the key C<max_arp_age>.
+
+The key names correspond to accessor names in
+L<B<M6::ArpSponge::App>(3)|M6::ArpSponge::App>.
+
+=head2 parse_command_line
+
+  $BOOL = $OBJ->parse_command_line(args => \@ARGS);
+
+Parses the command line arguments contained in I<@ARGS>.
+The elements of I<@ARGS> are consumed as they are parsed,
+so if it is important to keep the original argument list,
+make sure to copy it first, for example:
+
+  $settings->parse_command_line(args => [@ARGV]);
+
+Upon success, the values are stored in 
+I<$OBJ>'s L<B<hash>|/hash> attribute,
+the object's L<B<error>|/error> attribute is cleared,
+and the function returns true.
+
+Upon failure, 
+the object's L<B<error>|/error> attribute is set
+and the function returns false.
+
+=head2 prog_name
+
+    $STR = M6::ArpSponge::App::Settings->prog_name;
+    $STR = $OBJ->prog_name;
+
+Returns the program name.
+
+=head2 usage_msg
+
+    $STR = M6::ArpSponge::App::Settings->usage_msg;
+    $STR = $OBJ->usage_msg;
+
+Returns a wummary usage hint to be printed in diagnostics,
+along the lines of
+"Try '<PROG_NAME> --help' for more information".
+
+=head2 version
+
+    $STR = M6::ArpSponge::App::Settings->version;
+    $STR = $OBJ->version;
+
+Returns the program version string
+(see L<B<$M6::ArpSponge::VERSION>|M6::ArpSponge>).
+
+=begin MOO-INTERNALS
+
+=head2 Moo Internals
+X<BUILD>
+
+Moo internal.
+
+=end MOO-INTERNALS
+
+=head1 EXAMPLES
+
+Use of L<B<default_options>|/default_options>:
+
+  use M6::ArpSponge::App::Settings;
+
+  my $settings = M6::ArpSponge::App::Settings->new();
+
+  $settings->parse_command_line(args => \@ARGV)
+    or die $settings->error."\n";
+
+  my %defaults = $settings->default_options;
+  for my $k (sort keys %defaults) {
+    my $val  = $defaults{$k};
+    printf("%-20s : %s\n", $k, $defaults{$k} // '(undef)');
+  }
+
+
+=head1 SEE ALSO
+
+L<B<M6::ArpSponge>(3)|M6::ArpSponge>,
+L<B<M6::ArpSponge::App>(3)|M6::ArpSponge::App>,
+L<B<arpsponge>(1)|arpsponge>.
+
+=head1 AUTHOR
+
+Steven Bakker E<lt>Steven.Bakker@ams-ix.netE<gt>, AMS-IX B.V.; 2025.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2025 AMS-IX B.V.; All rights reserved.
+
+This module is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. See "perldoc perlartistic."
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
