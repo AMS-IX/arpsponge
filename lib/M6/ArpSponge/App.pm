@@ -2,7 +2,7 @@
 #
 # ARP sponge
 #
-# (c) Copyright AMS-IX B.V. 2003-2010; all rights reserved.
+# (c) Copyright AMS-IX B.V. 2003-2025; all rights reserved.
 #
 # See the LICENSE file that came with this package.
 #
@@ -172,13 +172,6 @@ has passive_mode => (
     default => sub { 0 },
 );
 
-has forced_passive_mode => (
-    is       => 'rwp',
-    isa      => Bool,
-    init_arg => undef,
-    default  => sub { 0 },
-);
-
 has pid_file => (
     is      => 'lazy',
     isa     => Str,
@@ -221,6 +214,7 @@ my @STATE_ATTR = qw(
 
 has state => (
     is => 'lazy',
+    init_arg => undef,
     builder => sub {
         my ($self) = @_;
         return M6::ArpSponge::Sponge->new(
@@ -252,6 +246,10 @@ has verbose => (
     is  => 'rw',
     isa => Int->where(sub { $_ >= 0 }),
     default => sub { 0 },
+    trigger => sub {
+        my ($self, $level) = @_;
+        log_is_verbose($level);
+    },
 );
 
 #############################################################################
@@ -263,10 +261,24 @@ has control_fh => (
     init_arg => undef,
 );
 
+has forced_passive_mode => (
+    is       => 'rwp',
+    isa      => Bool,
+    init_arg => undef,
+    default  => sub { 0 },
+);
+
+has next_sweep_at => (
+    is => 'rwp',
+    isa => Num,
+    init_arg => undef,
+    default => sub { 0 },
+);
+
 # "pcap_handle" is also stored in "state" object, but it's an r/w
 # attribute there. We implement our pcap_handle, that will trigger
 # the construction of pcap_fd, pcap_fh and the state's pcap_handle.
-    has pcap_handle => (
+has pcap_handle => (
     is => 'rwp',
     init_arg => undef,
     trigger => sub {
@@ -343,18 +355,20 @@ sub DEMOLISH {
 
     return if $$ != $self->main_pid;
 
-    log_info "cleaning up";
+    event_info(EVENT_STATE, "cleaning up");
 
     if ($self->wrote_pid) {
         my $pid_file = $self->pid_file;
-        log_info "unlinking PID file '%s'", $pid_file;
+        event_info(EVENT_STATE,
+            "unlinking PID file '%s'", $pid_file);
         unlink($pid_file);
     }
 
     if (defined $self->control_fh) {
         my $socket_file = $self->control_socket;
         if (defined $socket_file && -e $socket_file) {
-            log_info "unlinking control socket '%s'", $socket_file;
+            event_info(EVENT_STATE,
+                "unlinking control socket '%s'", $socket_file);
             unlink($socket_file);
         }
     }
@@ -362,6 +376,8 @@ sub DEMOLISH {
 
 sub new_from_cli {
     my ($class, %arg) = @_;
+
+    init_log() if !log_is_active();
 
     my $settings = M6::ArpSponge::App::Settings->new();
 
@@ -378,8 +394,7 @@ sub new_from_cli {
 sub setup {
     my ($self) = @_;
 
-    init_log();
-    log_is_verbose($self->verbose);
+    init_log() if !log_is_active();
 
     event_notice(EVENT_STATE, "initialising [device=%s, ip=%s, mac=%s]",
                 $self->device, $self->my_ip_s, $self->my_mac_s);
@@ -430,8 +445,49 @@ sub run {
 
     $self->state->init_all_state($self->init_state);
 
+    $self->setup_signal_handlers(1);
+
+    $self->packet_capture_loop();
+
+    $self->setup_signal_handlers(0);
+
     event_notice(EVENT_STATE, "stopping [device=%s, ip=%s, mac=%s]",
                 $self->device, $self->my_ip_s, $self->my_mac_s);
+}
+
+
+sub packet_capture_loop {
+    my ($self) = @_;
+
+    event_info(EVENT_STATE, "entering packet capture loop");
+    event_info(EVENT_STATE, "exiting packet capture loop");
+}
+
+
+sub process_signal {
+    my ($self, $sig_name) = @_;
+}
+
+sub write_status {
+    my ($self, $sig_name) = @_;
+}
+
+sub setup_signal_handlers {
+    my ($self, $activate) = @_;
+
+    if ($activate) {
+        event_info(EVENT_STATE, "adding signal handlers");
+        $::SIG{INT} = $::SIG{QUIT} = $::SIG{TERM}
+            = sub { $self->process_signal($_[0]) };
+
+        $::SIG{'HUP'} = $::SIG{'USR1'}
+            = sub { $self->write_status($_[0]) };
+    }
+    else {
+        event_info(EVENT_STATE, "removing signal handlers");
+        delete @::SIG{qw(INT QUIT TERM)};
+        delete @::SIG{qw(HUP USR1)};
+    }
 }
 
 ###############################################################################
@@ -459,8 +515,9 @@ sub start_daemon($$) {
                 log_fatal("already running (pid = $pid)\n");
             }
         }
-        say STDERR LOG_IDENT.": [WARNING] removing stale PID file $pid_file";
-        log_warning("removing stale PID file %s", $pid_file);
+        my $msg = "removing stale PID file '$pid_file'";
+        say STDERR LOG_IDENT.": [WARNING] $msg";
+        event_warning(EVENT_STATE, $msg);
         unlink $pid_file;
     }
 
@@ -499,7 +556,7 @@ sub start_daemon($$) {
                 $child, $grand_child);
         }
 
-        log_info("daemon spawned; pid=$grand_child");
+        event_info(EVENT_STATE, "daemon spawned; pid=%d", $grand_child);
         $self->main_pid($grand_child);
         _exit(0);
     }
@@ -527,7 +584,7 @@ sub start_daemon($$) {
         # daemon process.
         $self->main_pid($$);
 
-        log_info("now running in daemon mode");
+        event_info(EVENT_STATE, "now running in daemon mode");
 
         # Child (daemon) process.
         open my $pid_fh, '>', $pid_file
@@ -536,10 +593,10 @@ sub start_daemon($$) {
         say $pid_fh $$;
         $self->_set_wrote_pid(1);
         close $pid_fh;
-        log_info("wrote PID %d to '%s'", $$, $pid_file);
+        event_info(EVENT_STATE, "wrote PID %d to '%s'", $$, $pid_file);
 
         # Make sure we go dark.
-        log_is_verbose(0);
+        $self->verbose(0);
         close STDOUT;
         close STDERR;
         close STDIN;
@@ -575,7 +632,8 @@ sub create_control_socket {
     chmod($sock_mode, $socket_file)
         or log_err(qq{chmod %04o %s: %s}, $sock_mode, $socket_file, $!);
 
-    log_info("created control socket '%s': uid=%d, gid=%d, mode=%04o",
+    event_info(EVENT_STATE,
+        "created control socket '%s': uid=%d, gid=%d, mode=%04o",
         $socket_file, $sock_uid, $sock_gid, $sock_mode);
 
     return;
