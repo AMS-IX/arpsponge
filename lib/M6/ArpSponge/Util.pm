@@ -25,6 +25,7 @@ use warnings;
 use POSIX qw( strtod strtol );
 use Time::Piece;
 use NetAddr::IP;
+use Type::Tiny;
 
 BEGIN {
     use Exporter;
@@ -32,19 +33,31 @@ BEGIN {
     our $VERSION = 1.04;
     our @ISA = qw( Exporter );
 
-    our @EXPORT_OK = qw(
-            int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
-            format_time relative_time hex_addr_in_net
-            is_valid_int is_valid_float is_valid_ip
-            is_valid_bool
-            read_from_pipe
-        );
+    my @func = qw(
+        int2ip ip2int hex2ip ip2hex hex2mac mac2hex mac2mac
+        format_time relative_time hex_addr_in_net
+        is_valid_int is_valid_float is_valid_ip
+        is_valid_bool
+        read_from_pipe
+    );
+    my @types = qw( HexIpType );
+
+    our @EXPORT_OK = ( @func, @types );
     our @EXPORT    = ();
 
     our %EXPORT_TAGS = (
-            'all'    => \@EXPORT_OK
-        );
+        'all'    => \@EXPORT_OK,
+        'func'   => \@func,
+        'types'  => \@types,
+    );
 }
+
+
+use constant HexIpType => Type::Tiny->new(
+    name => 'HexIpType',
+    constraint => sub { qr/^[\da-z]{8}$/i },
+    message => 'not a valid hexadecimal IP address'
+);
 
 
 sub int2ip {
@@ -323,7 +336,7 @@ M6::ArpSponge::Util - IP, MAC, misc. utility routines
 =head1 SYNOPSIS
 
   use M6::ArpSponge::Util qw( :all );
- 
+
   $ip  = int2ip( $num );
   $num = ip2int( $ip  );
   $ip  = hex2ip( $hex  );
@@ -331,26 +344,51 @@ M6::ArpSponge::Util - IP, MAC, misc. utility routines
   $mac = hex2mac( $hex );
   $hex = mac2hex( $mac );
   $mac = mac2mac( $mac );
- 
+
   $str = format_time($some_earlier_time);
   $str = relative_time($some_earlier_time);
- 
+
   $in_net = hex_addr_in_net($hex, $hexnet, $prefixlen );
- 
+
   $month = is_valid_int($some_string, -min=>1, -max=>12);
   $count = is_valid_int($some_string, -min=>0);
- 
+
   $chance = is_valid_float($some_string, -min=>0, -max=>1, -inclusive=>1);
- 
+
   $ip_string = is_valid_ip($some_string, -network=>'192.168.1.0/24');
- 
+
   $bool = is_valid_bool($some_expr);
+
+  $type = HexIpType;
 
 =head1 DESCRIPTION
 
 This module defines a number of routines to convert IP and MAC
 representations to and from various formats and some miscellaneous
 utility functions.
+
+=head1 TYPES
+
+The C<:types> tag will import L<B<Type::Tiny>(3)|Type::Tiny> types that can
+be used in L<B<Moo>(3)|Moo>-like classes.
+
+=over
+
+=item B<HexIpType>
+X<HexIpType>
+
+A L<B<Type::Tiny>(3)|Type::Tiny> type constraint that specifies that matches
+the "hexadecimal IP" type (a string of 8 hexadecimal characters).
+
+Can be used in e.g. L<B<Moo>(3)|Moo> classes like:
+
+  has hex_ip => (
+    is => 'rw',
+    isa => HexIpType,
+    default => sub { ip2hex('0.0.0.0') }
+  );
+
+=back
 
 =head1 FUNCTIONS
 
@@ -577,7 +615,7 @@ the I<$ERR> scalar will contain a diagnostic message.
 =head2 is_valid_ip
 
   $IP_STR = is_valid_ip(
-      $ARG, 
+      $ARG,
       [ -network => $CIDR, ]
       [ -err     => \$ERR  ]
   );
